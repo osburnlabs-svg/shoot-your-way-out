@@ -12,16 +12,21 @@
  *     - Weapon pose (64×64 source, upper body): always rendered
  *     Both layers centered at player position inside the same Skia Group.
  *     When idle: weapon pose alone (full-body idle stance).
- *     Alignment note: walk frames have 16px transparent padding on all sides,
- *     so the 64×64 character area aligns with the weapon overlay — verify on device.
+ *
+ * G4 addition:
+ *   WEAPON POSE: weapon layer is now dynamic — reads player.weaponPose from
+ *   game state and selects the matching idle sprite. Debug button (top-left)
+ *   cycles through all 5 poses for verification.
+ *   TODO Phase 4: LevelUpModal + CrateRevealOverlay replace this debug button
+ *   with real weapon equipping logic driven by player progression.
  *
  * Thread model:
  *   UI thread  — useFrameCallback, gesture callbacks, groupTransform derived value
- *   JS thread  — React state (sprite frame selection, FPS display)
+ *   JS thread  — React state (sprite frame/weapon selection, FPS display)
  */
 
 import React, { useCallback, useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import {
   Canvas,
   FilterMode,
@@ -39,10 +44,23 @@ import {
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 
 import { HeroSprites } from '../lib/sprites';
+import type { HeroWeaponPose } from '../lib/sprites';
 import { HERO_SPRITE_SCALE, JOYSTICK_DEADZONE_PX } from '../data/gameConstants';
 import { createInitialGameState, updateGameState } from '../lib/gameEngine';
 import { getPlayerRenderData } from '../lib/gameRenderer';
 import { computeSteps, FIXED_STEP_MS } from '../lib/gameLoop';
+
+// Cycle order and display labels for the debug weapon button.
+const WEAPON_CYCLE: HeroWeaponPose[] = [
+  'pistol', 'rifle', 'machinegun', 'grenade_launcher', 'flamethrower',
+];
+const WEAPON_LABELS: Record<HeroWeaponPose, string> = {
+  pistol: 'Pistol',
+  rifle: 'Rifle',
+  machinegun: 'MachineGun',
+  grenade_launcher: 'Grenade Launcher',
+  flamethrower: 'Flamethrower',
+};
 
 type Props = {
   width: number;
@@ -51,9 +69,8 @@ type Props = {
 
 export default function GameCanvas({ width, height }: Props) {
   // ─── Sprite images (loaded once at mount) ─────────────────────────────────
-  // Weapon pose: 64×64 upper body (also serves as full-body idle).
-  // Walk frames: 96×96 lower body animation (16px transparent border matches weapon canvas).
-  const weaponIdleImage = useImage(HeroSprites.pistol.idle); // Group 4 makes this dynamic
+  // Walk frames: 96×96 lower body animation (16px transparent border aligns
+  // the 64×64 character area with the weapon overlay).
   const walk0 = useImage(HeroSprites.walk[0]);
   const walk1 = useImage(HeroSprites.walk[1]);
   const walk2 = useImage(HeroSprites.walk[2]);
@@ -63,14 +80,25 @@ export default function GameCanvas({ width, height }: Props) {
   const walk6 = useImage(HeroSprites.walk[6]);
   const walkImages = [walk0, walk1, walk2, walk3, walk4, walk5, walk6];
 
+  // Weapon pose images: 64×64 upper body. Selected at runtime from player.weaponPose.
+  const pistolImage = useImage(HeroSprites.pistol.idle);
+  const rifleImage = useImage(HeroSprites.rifle.idle);
+  const machinegunImage = useImage(HeroSprites.machinegun.idle);
+  const grenadeLauncherImage = useImage(HeroSprites.grenade_launcher.idle);
+  const flamethrowerImage = useImage(HeroSprites.flamethrower.idle);
+  const weaponIdleImages: Record<HeroWeaponPose, ReturnType<typeof useImage>> = {
+    pistol: pistolImage,
+    rifle: rifleImage,
+    machinegun: machinegunImage,
+    grenade_launcher: grenadeLauncherImage,
+    flamethrower: flamethrowerImage,
+  };
+
   // ─── Game state ────────────────────────────────────────────────────────────
   const gameState = useSharedValue(createInitialGameState(width, height));
   const accumulator = useSharedValue(0);
 
   // ─── Virtual joystick shared values (UI thread) ───────────────────────────
-  // joystickOrigin: position where the finger first touched down.
-  // inputVector: normalized direction (x, y ∈ [-1,1]); (0,0) when in deadzone.
-  // inputActive: true while finger is on screen.
   const joystickOriginX = useSharedValue(0);
   const joystickOriginY = useSharedValue(0);
   const inputVectorX = useSharedValue(0);
@@ -95,21 +123,39 @@ export default function GameCanvas({ width, height }: Props) {
     [],
   );
 
-  // ─── Sprite state (React, bridged from UI thread only when frame changes) ──
-  const [spriteState, setSpriteState] = useState({ isMoving: false, frame: 0 });
+  // ─── Sprite state (React, bridged from UI thread only when values change) ──
+  // weaponPose included so the weapon image selection re-renders on equip change.
+  const [spriteState, setSpriteState] = useState<{
+    isMoving: boolean;
+    frame: number;
+    weaponPose: HeroWeaponPose;
+  }>({ isMoving: false, frame: 0, weaponPose: 'pistol' });
+
   const lastBridgedFrame = useSharedValue(-1);
   const lastBridgedMoving = useSharedValue(false);
+  const lastBridgedWeapon = useSharedValue<string>('pistol');
 
-  const updateSpriteState = useCallback((isMoving: boolean, frame: number) => {
-    setSpriteState({ isMoving, frame });
-  }, []);
+  const updateSpriteState = useCallback(
+    (isMoving: boolean, frame: number, weaponPose: HeroWeaponPose) => {
+      setSpriteState({ isMoving, frame, weaponPose });
+    },
+    [],
+  );
+
+  // ─── Debug weapon cycle button ─────────────────────────────────────────────
+  // Writes directly to gameState shared value from JS thread — valid pattern.
+  // TODO Phase 4: replace with real equip logic from LevelUpModal + CrateRevealOverlay.
+  const cycleWeapon = useCallback(() => {
+    const current = gameState.value.player.weaponPose;
+    const idx = WEAPON_CYCLE.indexOf(current);
+    const next = WEAPON_CYCLE[(idx + 1) % WEAPON_CYCLE.length];
+    gameState.value = {
+      ...gameState.value,
+      player: { ...gameState.value.player, weaponPose: next },
+    };
+  }, [gameState]);
 
   // ─── Virtual joystick gesture ──────────────────────────────────────────────
-  // onBegin: capture touch-down position as joystick origin.
-  // onUpdate: compute direction vector from origin; normalize if beyond deadzone.
-  // onFinalize: clear input on finger lift or gesture cancel.
-  //
-  // Callbacks are auto-workletized by react-native-worklets/plugin.
   const panGesture = Gesture.Pan()
     .onBegin((e) => {
       joystickOriginX.value = e.x;
@@ -123,11 +169,9 @@ export default function GameCanvas({ width, height }: Props) {
       const dy = e.y - joystickOriginY.value;
       const mag = Math.sqrt(dx * dx + dy * dy);
       if (mag > JOYSTICK_DEADZONE_PX) {
-        // Normalize to unit vector — full speed regardless of drag distance.
         inputVectorX.value = dx / mag;
         inputVectorY.value = dy / mag;
       } else {
-        // Inside deadzone: hero stays still even though finger is down.
         inputVectorX.value = 0;
         inputVectorY.value = 0;
       }
@@ -138,14 +182,9 @@ export default function GameCanvas({ width, height }: Props) {
       inputVectorY.value = 0;
     });
 
-  // ─── Group transform (UI thread → Skia, no React re-renders for movement) ─
-  // Skia re-draws the Canvas whenever this derived value changes (60fps during movement).
-  // Transform: translate to player position, then rotate around that center.
-  // Both sprite layers are drawn at (-w/2, -h/2) inside the Group.
-  //
-  // Sprite orientation: this kit's hero sprites face DOWN by default (positive Y axis).
-  // Our rotation math uses 0 = facing RIGHT (standard atan2 convention).
-  // Subtracting π/2 converts from math convention to sprite convention.
+  // ─── Group transform (UI thread → Skia) ───────────────────────────────────
+  // Sprites face DOWN by default in this kit; subtract π/2 to align with
+  // the standard atan2 convention (0 = right).
   const HERO_SPRITE_ROTATION_OFFSET = -Math.PI / 2;
 
   const groupTransform = useDerivedValue(() => [
@@ -158,19 +197,15 @@ export default function GameCanvas({ width, height }: Props) {
   useFrameCallback((frameInfo) => {
     const dtMs = frameInfo.timeSincePreviousFrame ?? 0;
 
-    // Build inputVector from joystick shared values.
-    // Treat (0,0) as null — hero stays idle in deadzone even if finger is down.
     const ivx = inputActive.value ? inputVectorX.value : 0;
     const ivy = inputActive.value ? inputVectorY.value : 0;
     const iv = (ivx !== 0 || ivy !== 0) ? { x: ivx, y: ivy } : null;
 
-    // Inject current input vector into game state before running fixed steps.
     let state = {
       ...gameState.value,
       player: { ...gameState.value.player, inputVector: iv },
     };
 
-    // Fixed-step update
     accumulator.value += dtMs;
     const { steps, remainingMs } = computeSteps(accumulator.value, FIXED_STEP_MS);
     accumulator.value = remainingMs;
@@ -180,12 +215,17 @@ export default function GameCanvas({ width, height }: Props) {
     }
     gameState.value = state;
 
-    // Bridge sprite state to React only when frame index or isMoving changes.
+    // Bridge sprite state when any display-relevant value changes.
     const rd = getPlayerRenderData(state);
-    if (rd.isMoving !== lastBridgedMoving.value || rd.walkFrame !== lastBridgedFrame.value) {
+    if (
+      rd.isMoving !== lastBridgedMoving.value ||
+      rd.walkFrame !== lastBridgedFrame.value ||
+      rd.weaponPose !== lastBridgedWeapon.value
+    ) {
       lastBridgedMoving.value = rd.isMoving;
       lastBridgedFrame.value = rd.walkFrame;
-      runOnJS(updateSpriteState)(rd.isMoving, rd.walkFrame);
+      lastBridgedWeapon.value = rd.weaponPose;
+      runOnJS(updateSpriteState)(rd.isMoving, rd.walkFrame, rd.weaponPose);
     }
 
     // FPS — bridge to React once per second
@@ -204,15 +244,8 @@ export default function GameCanvas({ width, height }: Props) {
   });
 
   // ─── Render ────────────────────────────────────────────────────────────────
-  // Two-layer sprite system:
-  //   bodyImage   — walk frame (96×96, lower body). Rendered when moving; null when idle.
-  //   weaponImage — weapon pose (64×64, upper body + idle stance). Always rendered.
-  //
-  // Both are centered at the Group origin (= player position).
-  // The 16px transparent border on walk frames means the 64×64 character
-  // area inside them aligns exactly with the 64×64 weapon overlay.
   const bodyImage = spriteState.isMoving ? (walkImages[spriteState.frame] ?? null) : null;
-  const weaponImage = weaponIdleImage; // Group 4 will make this dynamic
+  const weaponImage = weaponIdleImages[spriteState.weaponPose];
 
   const bodyW = bodyImage ? bodyImage.width() * HERO_SPRITE_SCALE : 0;
   const bodyH = bodyImage ? bodyImage.height() * HERO_SPRITE_SCALE : 0;
@@ -224,7 +257,7 @@ export default function GameCanvas({ width, height }: Props) {
       <View style={StyleSheet.absoluteFill}>
         {/* TODO Phase 5: wrap world rendering in <Group> with camera transform.
             scale = zoom level, translate = camera offset following player.
-            Visual sprite scale (currently 4x) will likely need tuning once
+            Visual sprite scale (currently 2×) will likely need tuning once
             tiles + enemies + HUD are visible on screen — the right scale
             can't be determined until Phase 5 has all elements present. */}
         <Canvas style={StyleSheet.absoluteFill}>
@@ -240,7 +273,7 @@ export default function GameCanvas({ width, height }: Props) {
                 sampling={{ filter: FilterMode.Nearest, mipmap: MipmapMode.None }}
               />
             )}
-            {/* Top layer: upper body + weapon pose (always visible) */}
+            {/* Top layer: weapon pose — dynamic from player.weaponPose */}
             {weaponImage && (
               <Image
                 image={weaponImage}
@@ -254,7 +287,20 @@ export default function GameCanvas({ width, height }: Props) {
           </Group>
         </Canvas>
 
-        {/* Debug overlay — dev only. */}
+        {/* Debug weapon cycle button — top-left.
+            TODO Phase 4: remove once LevelUpModal + CrateRevealOverlay wire
+            real weapon equipping from player progression. */}
+        <Pressable
+          style={[styles.debugOverlay, styles.weaponButton, { top: 50, left: 10 }]}
+          onPress={cycleWeapon}
+        >
+          <Text style={styles.debugText}>
+            Weapon: {WEAPON_LABELS[spriteState.weaponPose]}
+          </Text>
+          <Text style={[styles.debugText, styles.tapHint]}>tap to cycle</Text>
+        </Pressable>
+
+        {/* FPS overlay — top-right. */}
         {/* TODO Phase 7: replace hardcoded insets with real safe-area values. */}
         <View
           style={[styles.debugOverlay, { top: 50, right: 10 }]}
@@ -277,9 +323,16 @@ const styles = StyleSheet.create({
     paddingVertical: 5,
     borderRadius: 4,
   },
+  weaponButton: {
+    alignItems: 'flex-start',
+  },
   debugText: {
     color: '#4CAF50',
     fontSize: 11,
     fontVariant: ['tabular-nums'],
+  },
+  tapHint: {
+    color: '#888',
+    fontSize: 9,
   },
 });
