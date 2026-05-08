@@ -22,6 +22,7 @@ export type AnimationConfig = {
  * return the zero-based frame index to display.
  */
 export function getCurrentFrame(config: AnimationConfig, elapsedMs: number): number {
+  'worklet';
   const totalDuration = config.frameCount * config.frameDurationMs;
 
   if (!config.loop && elapsedMs >= totalDuration) {
@@ -40,6 +41,7 @@ export function getCurrentFrame(config: AnimationConfig, elapsedMs: number): num
  * completed one full play. Always false for looping animations.
  */
 export function isAnimationComplete(config: AnimationConfig, elapsedMs: number): boolean {
+  'worklet';
   if (config.loop) return false;
   return elapsedMs >= config.frameCount * config.frameDurationMs;
 }

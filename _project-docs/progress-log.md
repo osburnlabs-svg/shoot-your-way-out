@@ -42,6 +42,7 @@ Status legend:
 | Issue | Discovered | Workaround | Must resolve by |
 |---|---|---|---|
 | SafeAreaProvider native ViewManager not registering on Fabric — react-native-safe-area-context's `RNCSafeAreaProvider` is missing from the New Architecture build despite the package being installed | Phase 2 Group 2 | Hardcoded inset values in DebugOverlay (`top: 50, right: 10`) | Phase 7 — HUD requires real safe-area awareness for notch / dynamic island / home indicator |
+| No camera/zoom system — world renders at 1:1 with no `<Group>` wrapper, sprite scale hardcoded per element | Phase 2 G3 | `HERO_SPRITE_SCALE` constant in `gameConstants.ts` as a tunable | Phase 5 — tile rendering and obstacle placement need a camera that follows the player; multiple sprite scales need a unified zoom |
 
 ---
 

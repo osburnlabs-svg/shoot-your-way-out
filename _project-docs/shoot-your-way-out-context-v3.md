@@ -797,7 +797,7 @@ Each phase = one focused CC session. Commit to GitHub after each phase. Test on 
 | 3 | Enemy spawning (Scav + Raider only), wave scaling, auto-fire targeting, basic AI, projectile system, kill/XP | Survive a 60-second basic wave |
 | 4a | XP gems, level-up modal (kit Upgrade Preset), 10 stat-modifier skills, weapon progression unlocks (level 4/8/12/16) | Full progression for stat skills works |
 | 4b | 10 ability skills (grenades, molotovs, smoke), throwable system, crate drop system + reveal animation | All 20 skills functional, crates working |
-| 5 | Tile rendering, three map JSONs, map select screen, obstacle placement, collision with obstacles, all enemy types (Gunner/Sniper/Humvee/BTR/Panzer/ACS) | Three playable maps with full enemy roster |
+| 5 | Tile rendering, three map JSONs, map select screen, obstacle placement, collision with obstacles, all enemy types (Gunner/Sniper/Humvee/BTR/Panzer/ACS), world camera system | Three playable maps with full enemy roster + camera/zoom system implemented |
 | 6 | Audio engine full implementation, all SFX wired, music tracks playing, atmospheric effects (fog, weather, vignette), explosions, smoke | Game feels and sounds complete |
 | 7 | Full UI — main menu, map select polish, settings, pause, game over, persistence (high score, stats), minimap, analytics integration | Production-ready menu flow |
 | 8 | Helicopter boss (both phases), Gas Bomb hazard, Bomber strafe events, hero death animation polish | Boss encounters working |
@@ -806,6 +806,8 @@ Each phase = one focused CC session. Commit to GitHub after each phase. Test on 
 **Audio is added incrementally** — stubbed in Phase 1, called by all phases, fully wired in Phase 6.
 
 **Vehicle enemies (Humvee/BTR/Panzer/ACS)** are introduced in Phase 5 alongside maps because they need obstacle collision systems.
+
+**Phase 5 also owns the world camera system.** Deliverable: wrap all rendered world entities (tiles, player, enemies, projectiles, obstacles) in a single Skia `<Group>` with a camera transform — scale for zoom level, translate for follow-the-player offset. This replaces all per-sprite scale hardcoding (`HERO_SPRITE_SCALE` and equivalents). Final zoom level cannot be determined until tiles + enemies + HUD are all visible together, so Phase 5 is the right time to lock it.
 
 **Boss is Phase 8** — late, intentionally. Boss needs all other systems (audio, hazards, projectile system, multiple enemy AI) already working.
 
