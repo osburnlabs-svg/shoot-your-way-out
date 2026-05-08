@@ -25,7 +25,7 @@ Status legend:
 |---|---|---|---|---|---|
 | 0 — Pre-build setup | 🟢 Complete | 2026-05-08 | n/a | n/a | Directories, kits, context doc, accounts |
 | 1 — Project scaffold | 🟢 Complete | 2026-05-08 | a85087b | Yes | Placeholder screen confirmed on device via Expo Go |
-| 2 — Player + drag-to-move | ⚪ | | | | |
+| 2 — Player + drag-to-move | 🟡 In Progress | 2026-05-08 | | | G1 hotfix applied |
 | 3 — Enemies + auto-fire | ⚪ | | | | |
 | 4a — Stat skills + level-up | ⚪ | | | | |
 | 4b — Ability skills + crates | ⚪ | | | | |
@@ -169,7 +169,9 @@ Major decisions made during development that override or clarify the v3 doc.
 
 | Date | Decision | Why | Affects |
 |---|---|---|---|
-| | | | |
+| 2026-05-08 | `babel.config.js` is required with `react-native-worklets/plugin` | Empirical — app crashed on device without it once Skia was added. `babel-preset-expo` does not auto-register the worklets plugin when Skia is present. | All future phases that use Skia rendering or Reanimated worklets (i.e., all of them) |
+| 2026-05-08 | Switched from Expo Go to EAS development build for device testing | Expo Go's bundled native binaries are incompatible with Reanimated v4 + react-native-worklets + Skia v2.2.x. Empirically confirmed in Phase 2 G1 — crashes on startup unfixable from JS side. | All dev workflow going forward: use `eas build --profile development --platform android` once, then `npx expo start --dev-client` |
+| 2026-05-08 | Removed `expo-in-app-purchases`, Phase 9 will use `react-native-iap` | Package imports removed `expo-modules-core` APIs (`ExportedModule`, `ExpoMethod`) — fails to compile against SDK 54. EAS dev build failed because of it. `react-native-iap` was already the v3-documented fallback. | `lib/monetization.ts` (Phase 9 wiring) — interface unchanged |
 
 ---
 
@@ -184,12 +186,32 @@ Major decisions made during development that override or clarify the v3 doc.
 - **Why:** Skia v2.2.x does not ship an `app.plugin.js` file. The config plugin mechanism was used in older versions.
 - **Action for future sessions:** Do NOT add `@shopify/react-native-skia` to `app.json` plugins. The only plugin entry in `app.json` should be the AdMob plugin. Verified: Phase 1's working `app.json` has only the AdMob plugin.
 
-### 2. Reanimated babel plugin
+### 2. Reanimated babel plugin — CORRECTED in Phase 2 G1
 
 - **v3 says:** A `babel.config.js` containing `react-native-reanimated/plugin` should be created (implied by the tech stack section).
-- **Reality:** In Reanimated v4 (which installs automatically with Expo SDK 54), this babel plugin is no longer required. `babel-preset-expo` handles it automatically. Creating a `babel.config.js` manually risks overriding Expo's internal defaults unnecessarily.
-- **Why:** Reanimated v4 dropped the babel plugin requirement as part of its major refactor.
-- **Action for future sessions:** Do NOT create a `babel.config.js` unless a specific future feature explicitly requires one. The Phase 1 project intentionally has no `babel.config.js`.
+- **Original Phase 1 errata said:** Do NOT create a `babel.config.js` — Reanimated v4 + Expo SDK 54 handles it automatically via `babel-preset-expo`.
+- **Reality (discovered empirically in Phase 2 G1):** The original Phase 1 errata is WRONG once `@shopify/react-native-skia` is in the project. Skia's worklet integration requires the Reanimated worklets babel plugin to be explicitly registered. Without it, the app crashes on device with: `[runtime not ready]: Error: react-native-reanimated is not installed!`
+- **Why:** `babel-preset-expo` does not auto-register the worklets plugin when Skia is present. The plugin must be declared explicitly.
+- **Plugin name:** In Reanimated v4, the worklets plugin was extracted into a separate package `react-native-worklets`. Installed version: `0.8.3`. The plugin entry point is `react-native-worklets/plugin` (resolves to `node_modules/react-native-worklets/plugin/index.js`). The old `react-native-reanimated/plugin` string does NOT exist in this version.
+- **Root component side-effect imports (discovered empirically in Phase 2 G1 hotfix continuation):** Even with `babel.config.js` correct, the app still crashes unless `src/App.tsx` (the root component) begins with these two side-effect imports, in this order, before any other import:
+  ```typescript
+  import 'react-native-reanimated';
+  import 'react-native-gesture-handler';
+  ```
+  Skia's worklet integration lazy-requires Reanimated at runtime. Without an explicit upstream import, that lazy require throws `OptionalDependencyNotInstalledError` even though the package is installed. Gesture handler is imported here too so it's initialized before any drag/pan gesture handlers are registered (Phase 2 G3+).
+- **Action for future sessions:** `babel.config.js` EXISTS at project root and MUST be preserved. Do not delete it. `src/App.tsx` MUST begin with the two side-effect imports above before any Skia or other imports. Both are engine boilerplate — future template games (game #2+) inherit this pattern. If upgrading Reanimated, verify the plugin path in `babel.config.js` hasn't changed before editing.
+
+### 4. Expo Go incompatibility with Reanimated v4 + Skia
+
+- **v3 says:** Develop and test with Expo Go on device (implied by Phase 1 setup — "Expo Go installed on phone").
+- **Reality (confirmed empirically in Phase 2 G1):** Expo Go is incompatible with this project's native module set. Expo Go ships with a fixed snapshot of native binary modules compiled in. Reanimated v4 + Worklets + Skia use TurboModule/JSI signatures that don't match Expo Go's bundled versions, causing crashes on startup that cannot be fixed from the JS side.
+- **Why:** Any project using Reanimated v4, react-native-worklets, or @shopify/react-native-skia requires its own compiled native binary. Expo Go cannot provide this — it's a known, documented incompatibility in the Expo ecosystem.
+- **Action for future sessions:** This project uses a **custom EAS development build**, not Expo Go. The dev workflow is:
+  1. Build once: `eas build --profile development --platform android` (queues on EAS cloud, ~10 min, produces an installable APK)
+  2. Install the APK on device (enable "Install from unknown sources" when prompted)
+  3. Develop: `npx expo start --dev-client` (Metro server, hot reload works normally)
+  - The installed dev client app replaces Expo Go for this project. Rebuild it only when native dependencies change. JS-only changes hot-reload as normal.
+- **Future template games (game #2+):** Inherit this requirement. Any game using Skia + Reanimated needs a dev client build.
 
 ### 3. AdMob placeholder format
 
@@ -201,6 +223,14 @@ Major decisions made during development that override or clarify the v3 doc.
 - **Why:** App IDs and unit IDs serve different purposes. App IDs must be valid at the native layer; unit IDs are only passed when ads are actually requested (Phase 9).
 - **Action for future sessions:** In Phase 9, search for both `_phase9_todo` AND `// TODO: Replace in Phase 9` to find every spot needing real AdMob credentials. Replace app IDs in `app.json` and unit IDs in `lib/monetization.ts`.
 
+### 5. expo-in-app-purchases incompatible with Expo SDK 54
+
+- **v3 says:** Install `expo-in-app-purchases` in Phase 1, configure in Phase 9 (with `react-native-iap` as a fallback if SDK 54 compat issues).
+- **Reality (confirmed during Phase 2 EAS dev build):** `expo-in-app-purchases` fails to compile against `expo-modules-core` 3.x (shipped with SDK 54). It imports `expo.modules.core.ExportedModule` and `expo.modules.core.interfaces.ExpoMethod`, both removed in the new architecture. The EAS cloud build fails at the Android compile step.
+- **Why the fallback existed in v3:** v3 anticipated this risk and named `react-native-iap` as the alternative. That alternative is now the plan.
+- **Action:** Package removed in Phase 2 hotfix via `npm uninstall expo-in-app-purchases`. The `lib/monetization.ts` interface is unchanged — Phase 9 will install `react-native-iap` and wire it through `purchaseSupport()` / `isSupportUnlocked()`. No other files reference the old package.
+- **Future template games (game #2+):** Do NOT install `expo-in-app-purchases`. Use `react-native-iap` from the start.
+
 ---
 
 ## Asset Inventory Status
@@ -209,7 +239,7 @@ Per-asset tracking of what's been imported and where it lives in the project.
 
 | Asset Category | Status | Location in Project | Notes |
 |---|---|---|---|
-| Hero sprites | ⚪ Not imported | | Phase 2 |
+| Hero sprites | 🟡 Imported, pending device verify | `assets/sprites/hero/` — 31 PNGs across walk/die/pistol/rifle/machinegun/grenade_launcher/flamethrower | Phase 2 G1 |
 | Foot soldier sprites | ⚪ Not imported | | Phase 3 |
 | Specialist enemy sprites | ⚪ Not imported | | Phase 5 |
 | Vehicle enemy sprites | ⚪ Not imported | | Phase 5 |

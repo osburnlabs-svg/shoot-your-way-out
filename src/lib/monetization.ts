@@ -1,5 +1,7 @@
 // monetization.ts — Phase 1 stub. All methods are no-ops.
-// Full implementation in Phase 9 using react-native-google-mobile-ads + expo-in-app-purchases.
+// Full implementation in Phase 9 using react-native-google-mobile-ads + react-native-iap.
+// Note: expo-in-app-purchases was removed in Phase 2 hotfix — incompatible with expo-modules-core 3.x (SDK 54).
+// Phase 9 will install react-native-iap and wire it through purchaseSupport() / isSupportUnlocked().
 //
 // AdMob unit IDs are placeholders — replace all before Phase 9 build.
 // Search for "_phase9_todo" to find every spot that needs updating.
