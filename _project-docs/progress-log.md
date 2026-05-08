@@ -25,7 +25,7 @@ Status legend:
 |---|---|---|---|---|---|
 | 0 — Pre-build setup | 🟢 Complete | 2026-05-08 | n/a | n/a | Directories, kits, context doc, accounts |
 | 1 — Project scaffold | 🟢 Complete | 2026-05-08 | a85087b | Yes | Placeholder screen confirmed on device via Expo Go |
-| 2 — Player + drag-to-move | 🟡 In Progress | 2026-05-08 | | | G1 hotfix applied |
+| 2 — Player + drag-to-move | 🟡 In Progress | 2026-05-08 | G1: fe57417 G2: 9116c45 | G1+G2 yes | G1+G2 complete; G3 in progress |
 | 3 — Enemies + auto-fire | ⚪ | | | | |
 | 4a — Stat skills + level-up | ⚪ | | | | |
 | 4b — Ability skills + crates | ⚪ | | | | |
@@ -34,6 +34,30 @@ Status legend:
 | 7 — UI + persistence + analytics | ⚪ | | | | |
 | 8 — Helicopter boss + hazards | ⚪ | | | | |
 | 9 — Monetization + store submission | ⚪ | | | | |
+
+---
+
+## Open Issues / Tech Debt
+
+| Issue | Discovered | Workaround | Must resolve by |
+|---|---|---|---|
+| SafeAreaProvider native ViewManager not registering on Fabric — react-native-safe-area-context's `RNCSafeAreaProvider` is missing from the New Architecture build despite the package being installed | Phase 2 Group 2 | Hardcoded inset values in DebugOverlay (`top: 50, right: 10`) | Phase 7 — HUD requires real safe-area awareness for notch / dynamic island / home indicator |
+
+---
+
+## Phase Pre-Flight Checklist
+
+Every phase that touches `package.json` must run through this checklist before starting feature work:
+
+- [ ] List native packages added/removed/changed
+- [ ] Pin exact versions (no `~` or `^` for native code)
+- [ ] Run `npx expo-doctor` — resolve warnings
+- [ ] Rebuild dev client APK if any native changes
+- [ ] Install fresh APK on device
+- [ ] Run native smoke test (SafeAreaProvider, Skia, GestureDetector, Reanimated)
+- [ ] Verify smoke test passes before writing feature code
+
+See "Native Dependency Hygiene" section in v3 master context for the full guideline.
 
 ---
 
@@ -95,7 +119,13 @@ Status legend:
 
 **Goal:** Player character renders with hero sprites, drag-to-move controls work on touch device, walk animation plays, character rotates to face drag direction, weapon pose switches based on equipped weapon.
 
-**Status:** Not started
+**Status:** 🟡 In Progress
+
+**Groups:**
+- G1 🟢 — Sprites + animation system (commit fe57417, device-tested)
+- G2 🟢 — Game loop + canvas + screen state machine (commit 9116c45, device-tested)
+- G3 🟡 — Drag-to-move + walk animation + rotation (in progress)
+- G4 ⚪ — Weapon pose switching
 
 ---
 
@@ -173,6 +203,7 @@ Major decisions made during development that override or clarify the v3 doc.
 | 2026-05-08 | Switched from Expo Go to EAS development build for device testing | Expo Go's bundled native binaries are incompatible with Reanimated v4 + react-native-worklets + Skia v2.2.x. Empirically confirmed in Phase 2 G1 — crashes on startup unfixable from JS side. | All dev workflow going forward: use `eas build --profile development --platform android` once, then `npx expo start --dev-client` |
 | 2026-05-08 | Removed `expo-in-app-purchases`, Phase 9 will use `react-native-iap` | Package imports removed `expo-modules-core` APIs (`ExportedModule`, `ExpoMethod`) — fails to compile against SDK 54. EAS dev build failed because of it. `react-native-iap` was already the v3-documented fallback. | `lib/monetization.ts` (Phase 9 wiring) — interface unchanged |
 | 2026-05-08 | Native dep added → must rebuild dev client APK before testing | Fabric crashes with `IllegalViewOperationException` if a native module (e.g., `react-native-safe-area-context`) is added after the APK was built. JS hot-reloads; native ViewManagers do not. Discovered in Phase 2 G2. | All phases that add native packages (6, 9 especially) |
+| 2026-05-08 | Adopt Native Dependency Hygiene workflow | Phase 2 hit two integration issues (expo-in-app-purchases incompat, SafeAreaProvider Fabric mismatch) that pre-flight checks would have caught | All future phases that touch package.json native deps |
 
 ---
 

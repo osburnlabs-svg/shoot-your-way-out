@@ -105,6 +105,34 @@ Shoot Your Way Out is **game #1 of a series of mobile games**. We are building a
 
 ---
 
+## Native Dependency Hygiene
+
+**Engine-level rule** — applies to this game and all future games built from this template.
+
+Any change to `package.json` that adds, removes, or upgrades a package with native code (anything that compiles into the APK / IPA) must be treated as a separate, deliberate workflow with its own checklist. Do not mix native dependency changes with feature work in the same session.
+
+### Why this rule exists
+
+Phase 2 hit two integration issues that pre-flight checks would have caught:
+1. `expo-in-app-purchases` — incompatible with SDK 54. Failed at first EAS dev build. Would have been caught by running `npx expo-doctor` before building.
+2. `react-native-safe-area-context` — `RNCSafeAreaProvider` native ViewManager not registering in the Fabric build. Added JS-side after the dev client APK was already built, causing a mismatch. Would have been caught by a smoke test after rebuilding.
+
+### Native Dependency Change Checklist
+
+When adding, removing, or upgrading a package with native code:
+
+1. **Identify scope.** List every package being added/changed. Confirm each is needed for the current phase.
+2. **Pin exact versions.** Native packages get exact-pinned (`"4.1.1"` not `"~4.1.1"` or `"^4.1.1"`). Patch updates on native code can break view manager registration silently.
+3. **Run `npx expo-doctor`.** Resolve all warnings before rebuilding. If a warning is intentionally ignored, document why.
+4. **Rebuild dev client APK via EAS** (`eas build --profile development --platform android`).
+5. **Install new APK on device.**
+6. **Smoke test.** Before writing any new feature code, render a minimal test screen that exercises every native module: SafeAreaProvider, Skia Canvas, GestureDetector, Reanimated useFrameCallback, etc. If any fails to mount, debug the native integration *first*. Do not start feature work until the smoke test passes.
+7. **Document any issues** in the progress log errata + Open Issues table.
+
+Native modules ship as compiled C++/Java/Kotlin paired with JS bindings. The two halves must match. JS-only changes are free; native changes are expensive and must be verified independently.
+
+---
+
 ## Pre-Phase-1 Checklist (status)
 
 - [x] GitHub repo created: `osburnlabs-svg/shoot-your-way-out`
