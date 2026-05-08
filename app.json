@@ -1,11 +1,11 @@
 {
   "expo": {
-    "name": "shoot-your-way-out",
+    "name": "Shoot Your Way Out",
     "slug": "shoot-your-way-out",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "userInterfaceStyle": "light",
+    "userInterfaceStyle": "dark",
     "newArchEnabled": true,
     "splash": {
       "image": "./assets/splash-icon.png",
@@ -13,7 +13,8 @@
       "backgroundColor": "#ffffff"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": false,
+      "bundleIdentifier": "com.osburnlabs.shootyourwayout"
     },
     "android": {
       "adaptiveIcon": {
@@ -21,10 +22,26 @@
         "backgroundColor": "#ffffff"
       },
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "package": "com.osburnlabs.shootyourwayout"
     },
     "web": {
       "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      [
+        "react-native-google-mobile-ads",
+        {
+          "_phase9_todo": "Replace androidAppId and iosAppId with real values from AdMob console before Phase 9 build",
+          "androidAppId": "ca-app-pub-3940256099942544~3347511713",
+          "iosAppId": "ca-app-pub-3940256099942544~1458002511"
+        }
+      ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "9ba67011-cd20-4d7a-929c-e0d92c38a21c"
+      }
     }
   }
 }
