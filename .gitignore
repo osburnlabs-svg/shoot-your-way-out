@@ -39,3 +39,9 @@ yarn-error.*
 # generated native folders
 /ios
 /android
+
+# Claude Code local state
+.claude/
+
+# Asset kits (large, source material only)
+_project-docs/kits/
