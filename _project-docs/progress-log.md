@@ -25,7 +25,7 @@ Status legend:
 |---|---|---|---|---|---|
 | 0 — Pre-build setup | 🟢 Complete | 2026-05-08 | n/a | n/a | Directories, kits, context doc, accounts |
 | 1 — Project scaffold | 🟢 Complete | 2026-05-08 | a85087b | Yes | Placeholder screen confirmed on device via Expo Go |
-| 2 — Player + drag-to-move | 🟡 In Progress | 2026-05-08 | G1: fe57417 G2: 9116c45 | G1+G2 yes | G1+G2 complete; G3 in progress |
+| 2 — Player + drag-to-move | 🟡 In Progress | 2026-05-08 | G1: fe57417 G2: 9116c45 G3: 3f618d0 | G1+G2+G3 yes | G1+G2+G3 complete; G4 pending |
 | 3 — Enemies + auto-fire | ⚪ | | | | |
 | 4a — Stat skills + level-up | ⚪ | | | | |
 | 4b — Ability skills + crates | ⚪ | | | | |
@@ -125,7 +125,7 @@ See "Native Dependency Hygiene" section in v3 master context for the full guidel
 **Groups:**
 - G1 🟢 — Sprites + animation system (commit fe57417, device-tested)
 - G2 🟢 — Game loop + canvas + screen state machine (commit 9116c45, device-tested)
-- G3 🟡 — Drag-to-move + walk animation + rotation (in progress)
+- G3 🟢 — Drag-to-move + walk animation + rotation (commit 3f618d0, device-tested)
 - G4 ⚪ — Weapon pose switching
 
 ---
