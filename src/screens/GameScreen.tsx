@@ -1,12 +1,34 @@
-// Phase 2+ — GameScreen
-// Full gameplay screen. Hosts GameCanvas (Skia render) and HUD overlay.
-// Game loop, input, spawning, combat all orchestrated from here via gameEngine.
-// Phase 2: player + drag-to-move
-// Phase 3: enemies + auto-fire
-// Phase 4: skills + crates
-// Phase 5: maps + vehicle enemies
-// Phase 8: boss + hazards
+/**
+ * GameScreen — active gameplay screen.
+ *
+ * Hosts GameCanvas and (from Phase 3+) the HUD overlay.
+ * Passes canvas dimensions so GameCanvas can initialize game state
+ * with the correct center position.
+ *
+ * Phase 3:  adds drag gesture handler, passes input state to GameCanvas
+ * Phase 4a: adds LevelUpModal overlay
+ * Phase 4b: adds CrateRevealOverlay
+ * Phase 5:  passes active map config to GameCanvas
+ * Phase 7:  adds HUD overlay, pause button
+ */
+
+import React from 'react';
+import { StyleSheet, useWindowDimensions, View } from 'react-native';
+import GameCanvas from '../components/GameCanvas';
 
 export default function GameScreen() {
-  return null;
+  const { width, height } = useWindowDimensions();
+
+  return (
+    <View style={styles.container}>
+      <GameCanvas width={width} height={height} />
+    </View>
+  );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#0a0d08',
+  },
+});
