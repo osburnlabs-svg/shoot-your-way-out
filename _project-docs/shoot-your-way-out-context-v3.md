@@ -279,7 +279,7 @@ Numbers are starting values, balanced during playtesting.
 - Player can never have a worse run than baseline
 
 **Crate drops (the upside):**
-- Spawned by elites and bosses (see drop table below)
+- Spawned by bosses (see drop table below)
 - Walk over crate → 1.5s open animation → weapon reveal
 - If crate weapon tier > current → auto-equip with flash effect
 - If crate weapon tier ≤ current → converts to bonus score + 5 XP
@@ -322,7 +322,7 @@ Skills are stackable modifiers selected via the level-up modal (3 random choices
 
 **SPECIALS (rare, max 1 stack)**
 - **Night Vision** — extended fog-of-war view, +10% all stats
-- **Comms Headset** — XP gems pull toward player from longer range
+- **Comms Headset** — money pickups pull toward player from longer range
 
 **Skill icons:** the kit's Upgrade Preset already shows weapons + heart (HP) + armor + helmet. We extend by reusing icon archetypes:
 - Damage skills → bullet/ammo icon
@@ -343,7 +343,7 @@ This is acceptable for v1. Generating 20 unique pixel-art icons isn't necessary 
 | Gunner | Gunner (kit 1b) | 60 | 0.9 | 8/tick | 12 | 3+ | Stationary fire bursts |
 | Sniper | Sniper (kit 1b) | 30 | 0.7 | 30 | 15 | 4+ | Long range, red laser warning |
 | **Humvee** | Humvee | 80 | 1.5 | 15 | 18 | 5+ | Drives through, rams player |
-| **BTR** | BTR | 150 | 1.0 | 18 | 30 | 6+ | Elite — drops guaranteed pickup |
+| **BTR** | BTR | 150 | 1.0 | 18 | 30 | 6+ | Drops guaranteed pickup |
 | **Panzer** | Panzer | 250 | 0.6 | 25 | 50 | 7+ | Mini-boss tank — drops crate (15% chance) |
 | **ACS** | ACS | 200 | 0.7 | 20 | 40 | 7+ | Alt to Panzer, drops crate (15% chance) |
 
@@ -372,7 +372,7 @@ Spawns every 2 minutes. Uses helicopter assets from kit 1b. Replaces all earlier
 - Falls and uses `Helicopter/Broken/` wreck sprite
 - 4-frame `Explode/` plays
 - Wreck remains as a permanent obstacle on the map for the rest of the run
-- **Reward:** +3000 score, 12 XP gems, **guaranteed weapon crate**, +1 skill point
+- **Reward:** +3000 score, 12 money pickups, **guaranteed weapon crate**, +1 skill point
 
 ### Hazard Event: Bomber Strafe Run
 
@@ -392,14 +392,14 @@ This is the only environmental hazard in v1. All other hazard concepts (toxic pu
 
 | Pickup | Effect | Drop Chance |
 |---|---|---|
-| HP (regular) | +30 HP instantly | 2% common, 25% elite |
+| HP (regular) | +30 HP instantly | 2% common, 25% bosses |
 | HP Box | +50 HP instantly | Boss only |
 | Armor (Small) | +25 overshield (depletes before HP) | 2% common |
-| Armor (regular) | +50 overshield | 25% elite |
-| Speed | +30% movement for 8s | 2% common, weighted up on elites |
-| Ammo | +20% fire rate for 8s | 2% common, weighted up on elites |
+| Armor (regular) | +50 overshield | 25% bosses |
+| Speed | +30% movement for 8s | 2% common, weighted up on bosses |
+| Ammo | +20% fire rate for 8s | 2% common, weighted up on bosses |
 | Money (Small) | +10 score, magnets at close range | drops from kills |
-| Money (Big) | +50 score, drops only from elites | 25% elite |
+| Money (Big) | +50 score, drops only from bosses | 25% bosses |
 | **Weapon Crate** (Army Box) | Triggers crate reveal sequence | See drop table |
 
 **Weapon Crate drop table:**
@@ -795,7 +795,7 @@ Each phase = one focused CC session. Commit to GitHub after each phase. Test on 
 | 1 | Project setup, file structure, audio/monetization/analytics stubs, asset import, repo, EAS configured | App boots to placeholder screen on device |
 | 2 | Player character with hero sprites, drag-to-move, walk animation, weapon pose switching, basic camera | Player walks and rotates, no enemies yet |
 | 3 | Enemy spawning (Scav + Raider only), wave scaling, auto-fire targeting, basic AI, projectile system, kill/XP | Survive a 60-second basic wave |
-| 4a | XP gems, level-up modal (kit Upgrade Preset), 10 stat-modifier skills, weapon progression unlocks (level 4/8/12/16) | Full progression for stat skills works |
+| 4a | Money pickups (XP source), level-up modal (kit Upgrade Preset), 10 stat-modifier skills, weapon progression unlocks (level 4/8/12/16) | Full progression for stat skills works |
 | 4b | 10 ability skills (grenades, molotovs, smoke), throwable system, crate drop system + reveal animation | All 20 skills functional, crates working |
 | 5 | Tile rendering, three map JSONs, map select screen, obstacle placement, collision with obstacles, all enemy types (Gunner/Sniper/Humvee/BTR/Panzer/ACS), world camera system | Three playable maps with full enemy roster + camera/zoom system implemented |
 | 6 | Audio engine full implementation, all SFX wired, music tracks playing, atmospheric effects (fog, weather, vignette), explosions, smoke | Game feels and sounds complete |
