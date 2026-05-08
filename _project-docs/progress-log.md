@@ -25,7 +25,7 @@ Status legend:
 |---|---|---|---|---|---|
 | 0 — Pre-build setup | 🟢 Complete | 2026-05-08 | n/a | n/a | Directories, kits, context doc, accounts |
 | 1 — Project scaffold | 🟢 Complete | 2026-05-08 | a85087b | Yes | Placeholder screen confirmed on device via Expo Go |
-| 2 — Player + drag-to-move | 🟡 In Progress | 2026-05-08 | G1: fe57417 G2: 9116c45 G3: 3f618d0 | G1+G2+G3 yes | G1+G2+G3 complete; G4 pending |
+| 2 — Player + drag-to-move | 🟢 Complete | 2026-05-08 | G1: fe57417 G2: 9116c45 G3: 3f618d0 G4: 78fa367 | Yes — all 4 groups | All groups complete |
 | 3 — Enemies + auto-fire | ⚪ | | | | |
 | 4a — Stat skills + level-up | ⚪ | | | | |
 | 4b — Ability skills + crates | ⚪ | | | | |
@@ -120,13 +120,13 @@ See "Native Dependency Hygiene" section in v3 master context for the full guidel
 
 **Goal:** Player character renders with hero sprites, drag-to-move controls work on touch device, walk animation plays, character rotates to face drag direction, weapon pose switches based on equipped weapon.
 
-**Status:** 🟡 In Progress
+**Status:** 🟢 Complete
 
 **Groups:**
 - G1 🟢 — Sprites + animation system (commit fe57417, device-tested)
 - G2 🟢 — Game loop + canvas + screen state machine (commit 9116c45, device-tested)
 - G3 🟢 — Drag-to-move + walk animation + rotation (commit 3f618d0, device-tested)
-- G4 ⚪ — Weapon pose switching
+- G4 🟢 — Weapon pose switching + debug cycle button (commit 78fa367, device-tested)
 
 ---
 
