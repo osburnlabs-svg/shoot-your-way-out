@@ -3,6 +3,30 @@
 
 ---
 
+## Working with this project — read first
+
+This project is built by a non-technical solo developer working with Claude as the technical lead. The collaboration model matters as much as the architecture, so:
+
+**Mo is non-technical.** When a term comes up that isn't common English (state management, ECS, atlasing, worklets, refs, useDerivedValue, etc.), translate it the first time it appears. Do not assume Mo knows what it means just because it's standard. Mo will ask if something is unclear, but the default should be plain language with the technical term in parentheses, not the other way around.
+
+**Mo owns scope and product decisions. Claude owns technical decisions.** Mo catches the strategic mistakes — terminology drift, mechanic inconsistencies, "wait, that doesn't match the asset kit." Claude catches the technical mistakes — bad data structures, regression risks, scope creep within a phase. When Claude is uncertain about a product decision (gameplay feel, balance, visual choice), Claude asks Mo. When Mo is uncertain about a technical decision, Mo trusts Claude's recommendation but expects Claude to flag tradeoffs in plain English.
+
+**This is a solo-built mobile game, not a studio production.** The right level of engineering rigor is "well-organized house," not "50-floor skyscraper." Concretely:
+- The architectural bones (single shared game state, UI-thread fixed-timestep loop, renderer-returns-data pattern, lib/ vs data/ separation) are correct and stable. Don't propose redoing them.
+- Implementation shortcuts that work for the current scale (per-frame require() calls, no object pooling, no texture atlasing, no spatial partitioning) are intentional. Defer cleanup until there's a concrete reason — a measured perf problem, or asset count crossing a threshold.
+- Don't over-engineer. If a simple array works, use a simple array. If a feature isn't needed for the next two phases, don't build it now.
+- Don't under-engineer. If something needs to scale to 60 enemies on screen, the math has to work for 60. Don't ship something that breaks at 20.
+
+**Decisions that are hard to reverse, get right early. Decisions that are easy to reverse, defer.** The first category: data shapes, tick loop structure, render pattern. The second: tuning numbers, animation polish, asset organization. Spend prompt budget on the first, ship the second and revisit.
+
+**Verification is on-device, by hand.** No automated tests. Mo runs each group's code on a physical device and reports back. This means each group must be independently verifiable — clean state, single visible change, no stacked speculative fixes.
+
+**Sessions can overflow phase boundaries.** The original plan was "one CC session per phase." Reality is closer to "one CC session per group, with overflow allowed when bugs emerge that cross framework boundaries." Mo runs one chat session per phase as the strategic context anchor; CC sessions are spawned as needed for execution. The discipline that matters is "one verifiable change per commit" and "diagnose before fixing," not session count.
+
+**Communication style:** Mo prefers honest tradeoffs over confident recommendations. If two approaches are reasonable, say so. If you're uncertain, say so. Don't bury caveats. Don't paper over disagreements with the docs — the doc has known errata and Mo will catch drift faster than you will.
+
+---
+
 ## How to Use This Document
 
 Paste this document at the start of any new Claude chat or CC session to instantly restore full context. The document is the single source of truth — if anything in conversation contradicts the doc, the doc wins until updated.
@@ -810,6 +834,58 @@ Each phase = one focused CC session. Commit to GitHub after each phase. Test on 
 **Phase 5 also owns the world camera system.** Deliverable: wrap all rendered world entities (tiles, player, enemies, projectiles, obstacles) in a single Skia `<Group>` with a camera transform — scale for zoom level, translate for follow-the-player offset. This replaces all per-sprite scale hardcoding (`HERO_SPRITE_SCALE` and equivalents). Final zoom level cannot be determined until tiles + enemies + HUD are all visible together, so Phase 5 is the right time to lock it.
 
 **Boss is Phase 8** — late, intentionally. Boss needs all other systems (audio, hazards, projectile system, multiple enemy AI) already working.
+
+---
+
+## Deferred Work / Tech Debt
+
+These are intentional shortcuts the project carries. Each is taken deliberately — not as oversight — because doing the work now would either be premature, expensive, or both. Each entry has an explicit trigger condition for when to revisit.
+
+**Asset loading consolidation (texture atlases)**
+
+Current implementation uses individual `require()` calls per sprite frame, each loaded via `useImage` in `GameCanvas.tsx`. This works at small asset counts but scales linearly: by end of Phase 5 we'll have 80–100 individual `useImage` calls in the render component.
+
+The right end-state is a texture atlas system: pack all sprites into one or a small number of large PNGs, load each atlas once at boot, and look up frames by name + UV coordinates. This is faster, cleaner, and matches industry practice for mobile games.
+
+*Trigger:* Address before launch, as part of Phase 9 readiness. Do NOT do this earlier — atlasing requires knowing the final asset list, and the asset list isn't finalized until Phase 8 ships.
+
+*Estimated work:* One focused session. Tooling: TexturePacker (free for personal use) or equivalent. Runtime change: replace `useImage(require(...))` calls with a single asset-manager lookup. No gameplay code changes required if `lib/sprites.ts` is the only thing that changes.
+
+*Note:* Line ~705 of this doc references `sprites.ts — sprite loading and atlas management`. Atlas management was always planned; the implementation just hasn't landed yet. This entry codifies the deferral.
+
+**Object pooling for short-lived entities (projectiles, pickups, damage numbers, hit effects)**
+
+Currently when a projectile is fired, an object is allocated. When it hits or expires, it's garbage-collected. Same for pickup spawns, damage numbers, and hit-flash effects later. On modern devices this is fine. On lower-end Android devices with 50 enemies and 20 projectiles in flight, garbage collection can cause frame stutters.
+
+The fix is object pooling: pre-allocate a fixed-size pool of projectile objects at boot, mark them inactive when "despawned" instead of deleting them, and reuse inactive objects when "spawning" new ones. No GC pressure, no allocation churn.
+
+*Trigger:* Implement when device testing on a representative low-end Android phone shows measurable frame stutters during heavy combat. Don't pre-optimize without evidence.
+
+*Estimated work:* One focused session per pooled entity type. Engine impact: medium. Game logic impact: minimal.
+
+---
+
+## Known Framework Quirks
+
+Things the underlying frameworks (React Native, Reanimated, Skia, RNGH) do that are non-obvious and have already bitten this project at least once. Future debugging starts here when symptoms match.
+
+**Reanimated gesture handlers force-flush the animation frame queue (Android)**
+
+When a Pan gesture (or any RNGH gesture) runs as a UI-thread worklet, every gesture event calls `__flushAnimationFrame` internally — which synchronously drains the requestAnimationFrame queue and runs `useFrameCallback` early. On Android digitizers firing at 120–240 Hz, this drives the frame callback far above vsync rate. Symptom: FPS counter reads 100–200+ while gesture is active, normal-ish at rest. Reanimated's own source comments acknowledge this with a TODO.
+
+*Fix pattern:* Add `.runOnJS(true)` to the gesture. Routes events through the JS thread, bypassing the flush. Tradeoff: ~1ms input latency, imperceptible for analog input like joysticks. Used in `GameCanvas.tsx` for the movement Pan gesture (commit c47e000).
+
+**Per-frame runOnJS from useFrameCallback creates a feedback loop**
+
+Any `runOnJS(...)` call inside `useFrameCallback` — even gated by a condition — schedules JS-thread work that Reanimated's scheduler interprets as "more animation work pending." The scheduler responds by firing `useFrameCallback` again before the next vsync. With more than one such call per frame on average, the loop drives the frame callback rate above vsync and drops effective dt to near-zero.
+
+*Fix pattern:* No gameplay-data `runOnJS` calls inside `useFrameCallback`. Move sprite-frame selection and similar slow-changing JS-side state to a separate `setInterval` that polls shared values directly on the JS thread. Used in `GameCanvas.tsx` for both hero and enemy sprite frame updates.
+
+**Many useDerivedValue subscriptions to a single shared value cascade**
+
+Adding many (50+) `useDerivedValue` instances all reading from the same shared value, especially when each is wired to a Skia animated prop, produces enough scheduler "pending work" signals per tick to push the frame callback above vsync. Symptom: FPS reads 100–200, scaling with subscriber count.
+
+*Fix pattern:* Collapse N derived values into 1 derived value returning an array, OR keep separate hooks but render inactive slots as `null` in JSX (breaks the Skia subscription for that slot, the hook still runs cheaply). Used in `GameCanvas.tsx` for the 50 enemy slots.
 
 ---
 
