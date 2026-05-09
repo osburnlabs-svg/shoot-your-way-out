@@ -63,11 +63,12 @@ import {
   RAIDER_WALK_FRAME_DURATION_MS,
   SCAV_WALK_FRAME_COUNT,
   SCAV_WALK_FRAME_DURATION_MS,
+  WALK_FRAME_COUNT,
+  WALK_FRAME_DURATION_MS,
 } from '../data/gameConstants';
 import type { EnemyType } from '../data/enemies';
 import { createInitialGameState, updateGameState } from '../lib/gameEngine';
 import type { GameState } from '../lib/gameEngine';
-import { getPlayerRenderData } from '../lib/gameRenderer';
 import { getCurrentFrame } from '../lib/animation';
 import { computeSteps, FIXED_STEP_MS } from '../lib/gameLoop';
 
@@ -214,23 +215,12 @@ export default function GameCanvas({ width, height }: Props) {
     [],
   );
 
-  // ─── Hero sprite state (React, bridged from UI thread only when values change)
+  // ─── Hero sprite state (React, updated by the 100ms timer alongside enemy slots)
   const [spriteState, setSpriteState] = useState<{
     isMoving: boolean;
     frame: number;
     weaponPose: HeroWeaponPose;
   }>({ isMoving: false, frame: 0, weaponPose: 'pistol' });
-
-  const lastBridgedFrame = useSharedValue(-1);
-  const lastBridgedMoving = useSharedValue(false);
-  const lastBridgedWeapon = useSharedValue<string>('pistol');
-
-  const updateSpriteState = useCallback(
-    (isMoving: boolean, frame: number, weaponPose: HeroWeaponPose) => {
-      setSpriteState({ isMoving, frame, weaponPose });
-    },
-    [],
-  );
 
   // ─── Enemy slot state (sprite selection, updated by timer) ──────────────────
   // Slot i = enemies[i]. Only type + walk frame index are bridged to React;
@@ -243,11 +233,23 @@ export default function GameCanvas({ width, height }: Props) {
   );
 
   // Fixed-rate timer — reads gameState.value directly on the JS thread every
-  // 100ms. Completely decoupled from useFrameCallback; cannot contribute to
-  // the runOnJS feedback loop. No runOnJS needed (already on JS thread).
+  // 100ms. Completely decoupled from useFrameCallback; zero runOnJS calls
+  // for sprite selection. Hero + enemy sprite state computed together.
   useEffect(() => {
     const id = setInterval(() => {
       const state = gameState.value;
+
+      // Hero sprite state.
+      const { player } = state;
+      const heroWalkFrame = player.isMoving
+        ? getCurrentFrame(
+            { frameCount: WALK_FRAME_COUNT, frameDurationMs: WALK_FRAME_DURATION_MS, loop: true },
+            state.elapsedMs - player.walkStartedAtMs,
+          )
+        : 0;
+      setSpriteState({ isMoving: player.isMoving, frame: heroWalkFrame, weaponPose: player.weaponPose });
+
+      // Enemy slot sprite state.
       const types = Array.from({ length: ENEMY_SOFT_CAP }, () => null as EnemyType | null);
       const frames = Array.from({ length: ENEMY_SOFT_CAP }, () => 0);
       for (let i = 0; i < state.enemies.length; i++) {
@@ -401,19 +403,6 @@ export default function GameCanvas({ width, height }: Props) {
       state = updateGameState(state, FIXED_STEP_MS);
     }
     gameState.value = state;
-
-    // Bridge hero sprite state when any display-relevant value changes.
-    const rd = getPlayerRenderData(state);
-    if (
-      rd.isMoving !== lastBridgedMoving.value ||
-      rd.walkFrame !== lastBridgedFrame.value ||
-      rd.weaponPose !== lastBridgedWeapon.value
-    ) {
-      lastBridgedMoving.value = rd.isMoving;
-      lastBridgedFrame.value = rd.walkFrame;
-      lastBridgedWeapon.value = rd.weaponPose;
-      runOnJS(updateSpriteState)(rd.isMoving, rd.walkFrame, rd.weaponPose);
-    }
 
     // FPS + debug counters — bridge to React once per second.
     fpsAccumMs.value += dtMs;
