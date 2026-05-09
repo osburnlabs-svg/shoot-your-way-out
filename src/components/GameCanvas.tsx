@@ -48,15 +48,27 @@ import {
   useDerivedValue,
   useFrameCallback,
   useSharedValue,
+  type SharedValue,
 } from 'react-native-reanimated';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 
 import { HeroSprites, EnemySprites } from '../lib/sprites';
 import type { HeroWeaponPose } from '../lib/sprites';
-import { HERO_SPRITE_SCALE, JOYSTICK_DEADZONE_PX } from '../data/gameConstants';
+import {
+  HERO_SPRITE_SCALE,
+  JOYSTICK_DEADZONE_PX,
+  ENEMY_SOFT_CAP,
+  ENEMY_SPRITE_SCALE,
+  SCAV_WALK_FRAME_COUNT,
+  SCAV_WALK_FRAME_DURATION_MS,
+  RAIDER_WALK_FRAME_COUNT,
+  RAIDER_WALK_FRAME_DURATION_MS,
+} from '../data/gameConstants';
+import type { EnemyType } from '../data/enemies';
 import { createInitialGameState, updateGameState } from '../lib/gameEngine';
-import { getPlayerRenderData, getEnemyRenderData } from '../lib/gameRenderer';
-import type { EnemyRenderData } from '../lib/gameRenderer';
+import type { GameState } from '../lib/gameEngine';
+import { getPlayerRenderData } from '../lib/gameRenderer';
+import { getCurrentFrame } from '../lib/animation';
 import { computeSteps, FIXED_STEP_MS } from '../lib/gameLoop';
 
 // Cycle order and display labels for the debug weapon button.
@@ -81,6 +93,30 @@ function formatElapsed(totalSec: number): string {
   const m = Math.floor(totalSec / 60);
   const s = totalSec % 60;
   return `${m}:${s < 10 ? '0' : ''}${s}`;
+}
+
+/**
+ * Per-slot enemy group transform — runs entirely on the UI thread.
+ *
+ * Reads enemy position and player position directly from the shared game state
+ * each tick (same pattern as the hero's groupTransform useDerivedValue).
+ * Inactive slots (no enemy at slotIndex) translate off-screen so they are
+ * invisible without conditionally mounting/unmounting Skia nodes.
+ *
+ * SPRITE_ROTATION_OFFSET is applied here so the JSX <Group transform> prop
+ * receives a complete, ready-to-use transform — no arithmetic in JSX.
+ */
+function useEnemySlotTransform(gameState: SharedValue<GameState>, slotIndex: number) {
+  return useDerivedValue(() => {
+    const enemy = gameState.value.enemies[slotIndex];
+    if (!enemy) {
+      return [{ translateX: -99999 }, { translateY: -99999 }, { rotate: 0 }];
+    }
+    const dx = gameState.value.player.x - enemy.x;
+    const dy = gameState.value.player.y - enemy.y;
+    const rotation = Math.atan2(dy, dx) + SPRITE_ROTATION_OFFSET;
+    return [{ translateX: enemy.x }, { translateY: enemy.y }, { rotate: rotation }];
+  });
 }
 
 type Props = {
@@ -196,15 +232,98 @@ export default function GameCanvas({ width, height }: Props) {
     [],
   );
 
-  // ─── Enemy render data (React state, bridged every frame) ─────────────────
-  // Enemy positions change every frame, so selective bridging like the hero frame
-  // won't help — we bridge on every tick. A plain array of ~50 objects at 60fps
-  // is acceptable for G1; optimize to pre-allocated slots if perf degrades.
-  const [enemyRenderData, setEnemyRenderData] = useState<EnemyRenderData[]>([]);
+  // ─── Enemy slot data (sprite selection only — bridged selectively ~8×/sec) ─
+  // Positions + rotations are handled by per-slot useDerivedValue on the UI
+  // thread (see allSlotTransforms below) — no runOnJS needed for movement.
+  // Only walk frame index + enemy type need to reach the JS thread for image
+  // selection; these change once every 110–120 ms, not every frame.
+  const [enemySlotTypes, setEnemySlotTypes] = useState<Array<EnemyType | null>>(
+    () => Array.from({ length: ENEMY_SOFT_CAP }, () => null as EnemyType | null),
+  );
+  const [enemySlotFrames, setEnemySlotFrames] = useState<number[]>(
+    () => Array.from({ length: ENEMY_SOFT_CAP }, () => 0),
+  );
 
-  const updateEnemyRenderData = useCallback((data: EnemyRenderData[]) => {
-    setEnemyRenderData(data);
-  }, []);
+  // Tracks last-bridged slot state on the UI thread for change detection.
+  const lastSlotFrames = useSharedValue<number[]>(
+    Array.from({ length: ENEMY_SOFT_CAP }, () => -1),
+  );
+  const lastEnemyCount = useSharedValue(0);
+
+  const updateEnemySlotData = useCallback(
+    (types: Array<EnemyType | null>, frames: number[]) => {
+      setEnemySlotTypes(types);
+      setEnemySlotFrames(frames);
+    },
+    [],
+  );
+
+  // ─── Per-slot enemy transforms (UI thread, no runOnJS) ────────────────────
+  // One useDerivedValue per slot (= ENEMY_SOFT_CAP = 50).
+  // Hooks must be called unconditionally and in a fixed order — the static
+  // listing below satisfies React's rules of hooks.
+  const eTransform0  = useEnemySlotTransform(gameState, 0);
+  const eTransform1  = useEnemySlotTransform(gameState, 1);
+  const eTransform2  = useEnemySlotTransform(gameState, 2);
+  const eTransform3  = useEnemySlotTransform(gameState, 3);
+  const eTransform4  = useEnemySlotTransform(gameState, 4);
+  const eTransform5  = useEnemySlotTransform(gameState, 5);
+  const eTransform6  = useEnemySlotTransform(gameState, 6);
+  const eTransform7  = useEnemySlotTransform(gameState, 7);
+  const eTransform8  = useEnemySlotTransform(gameState, 8);
+  const eTransform9  = useEnemySlotTransform(gameState, 9);
+  const eTransform10 = useEnemySlotTransform(gameState, 10);
+  const eTransform11 = useEnemySlotTransform(gameState, 11);
+  const eTransform12 = useEnemySlotTransform(gameState, 12);
+  const eTransform13 = useEnemySlotTransform(gameState, 13);
+  const eTransform14 = useEnemySlotTransform(gameState, 14);
+  const eTransform15 = useEnemySlotTransform(gameState, 15);
+  const eTransform16 = useEnemySlotTransform(gameState, 16);
+  const eTransform17 = useEnemySlotTransform(gameState, 17);
+  const eTransform18 = useEnemySlotTransform(gameState, 18);
+  const eTransform19 = useEnemySlotTransform(gameState, 19);
+  const eTransform20 = useEnemySlotTransform(gameState, 20);
+  const eTransform21 = useEnemySlotTransform(gameState, 21);
+  const eTransform22 = useEnemySlotTransform(gameState, 22);
+  const eTransform23 = useEnemySlotTransform(gameState, 23);
+  const eTransform24 = useEnemySlotTransform(gameState, 24);
+  const eTransform25 = useEnemySlotTransform(gameState, 25);
+  const eTransform26 = useEnemySlotTransform(gameState, 26);
+  const eTransform27 = useEnemySlotTransform(gameState, 27);
+  const eTransform28 = useEnemySlotTransform(gameState, 28);
+  const eTransform29 = useEnemySlotTransform(gameState, 29);
+  const eTransform30 = useEnemySlotTransform(gameState, 30);
+  const eTransform31 = useEnemySlotTransform(gameState, 31);
+  const eTransform32 = useEnemySlotTransform(gameState, 32);
+  const eTransform33 = useEnemySlotTransform(gameState, 33);
+  const eTransform34 = useEnemySlotTransform(gameState, 34);
+  const eTransform35 = useEnemySlotTransform(gameState, 35);
+  const eTransform36 = useEnemySlotTransform(gameState, 36);
+  const eTransform37 = useEnemySlotTransform(gameState, 37);
+  const eTransform38 = useEnemySlotTransform(gameState, 38);
+  const eTransform39 = useEnemySlotTransform(gameState, 39);
+  const eTransform40 = useEnemySlotTransform(gameState, 40);
+  const eTransform41 = useEnemySlotTransform(gameState, 41);
+  const eTransform42 = useEnemySlotTransform(gameState, 42);
+  const eTransform43 = useEnemySlotTransform(gameState, 43);
+  const eTransform44 = useEnemySlotTransform(gameState, 44);
+  const eTransform45 = useEnemySlotTransform(gameState, 45);
+  const eTransform46 = useEnemySlotTransform(gameState, 46);
+  const eTransform47 = useEnemySlotTransform(gameState, 47);
+  const eTransform48 = useEnemySlotTransform(gameState, 48);
+  const eTransform49 = useEnemySlotTransform(gameState, 49);
+  const allSlotTransforms = [
+    eTransform0,  eTransform1,  eTransform2,  eTransform3,  eTransform4,
+    eTransform5,  eTransform6,  eTransform7,  eTransform8,  eTransform9,
+    eTransform10, eTransform11, eTransform12, eTransform13, eTransform14,
+    eTransform15, eTransform16, eTransform17, eTransform18, eTransform19,
+    eTransform20, eTransform21, eTransform22, eTransform23, eTransform24,
+    eTransform25, eTransform26, eTransform27, eTransform28, eTransform29,
+    eTransform30, eTransform31, eTransform32, eTransform33, eTransform34,
+    eTransform35, eTransform36, eTransform37, eTransform38, eTransform39,
+    eTransform40, eTransform41, eTransform42, eTransform43, eTransform44,
+    eTransform45, eTransform46, eTransform47, eTransform48, eTransform49,
+  ];
 
   // ─── Debug weapon cycle button ─────────────────────────────────────────────
   const cycleWeapon = useCallback(() => {
@@ -286,9 +405,39 @@ export default function GameCanvas({ width, height }: Props) {
       runOnJS(updateSpriteState)(rd.isMoving, rd.walkFrame, rd.weaponPose);
     }
 
-    // Bridge enemy render data every frame (positions change every tick).
-    const enemyData = getEnemyRenderData(state);
-    runOnJS(updateEnemyRenderData)(enemyData);
+    // Bridge enemy slot data selectively — only when walk frame or count changes.
+    // Fires at most once per frame-duration interval (~8–9×/sec for 110–120 ms
+    // frames), NOT every game tick. Positions are handled by per-slot
+    // useDerivedValue (allSlotTransforms) and never touch this bridge.
+    let slotDataChanged = state.enemies.length !== lastEnemyCount.value;
+    const newSlotFrames: number[] = [];
+    const newSlotTypes: Array<EnemyType | null> = [];
+    for (let si = 0; si < ENEMY_SOFT_CAP; si++) {
+      const en = state.enemies[si] ?? null;
+      if (!en) {
+        newSlotTypes[si] = null;
+        newSlotFrames[si] = -1;
+        if (lastSlotFrames.value[si] !== -1) slotDataChanged = true;
+      } else {
+        newSlotTypes[si] = en.type;
+        const isScav = en.type === 'scav';
+        const frame = getCurrentFrame(
+          {
+            frameCount: isScav ? SCAV_WALK_FRAME_COUNT : RAIDER_WALK_FRAME_COUNT,
+            frameDurationMs: isScav ? SCAV_WALK_FRAME_DURATION_MS : RAIDER_WALK_FRAME_DURATION_MS,
+            loop: true,
+          },
+          state.elapsedMs - en.walkStartedAtMs,
+        );
+        newSlotFrames[si] = frame;
+        if (lastSlotFrames.value[si] !== frame) slotDataChanged = true;
+      }
+    }
+    if (slotDataChanged) {
+      lastEnemyCount.value = state.enemies.length;
+      lastSlotFrames.value = newSlotFrames;
+      runOnJS(updateEnemySlotData)(newSlotTypes, newSlotFrames);
+    }
 
     // FPS + debug counters — bridge to React once per second.
     fpsAccumMs.value += dtMs;
@@ -325,21 +474,19 @@ export default function GameCanvas({ width, height }: Props) {
         <Canvas style={StyleSheet.absoluteFill}>
 
           {/* ── Enemies (below player) ────────────────────────────────────── */}
-          {enemyRenderData.map((rd) => {
-            const images = rd.type === 'scav' ? scavWalkImages : raiderFireImages;
-            const img = images[rd.walkFrame] ?? null;
+          {/* transform = per-slot useDerivedValue (UI thread, no bridge).    */}
+          {/* Image selection = enemySlotTypes/Frames (React state, ~8×/sec). */}
+          {allSlotTransforms.map((transform, i) => {
+            const type = enemySlotTypes[i];
+            if (!type) return null;
+            const frame = enemySlotFrames[i] >= 0 ? enemySlotFrames[i] : 0;
+            const images = type === 'scav' ? scavWalkImages : raiderFireImages;
+            const img = images[frame] ?? null;
             if (!img) return null;
-            const w = img.width() * rd.scale;
-            const h = img.height() * rd.scale;
+            const w = img.width() * ENEMY_SPRITE_SCALE;
+            const h = img.height() * ENEMY_SPRITE_SCALE;
             return (
-              <Group
-                key={rd.id}
-                transform={[
-                  { translateX: rd.x },
-                  { translateY: rd.y },
-                  { rotate: rd.rotation + SPRITE_ROTATION_OFFSET },
-                ]}
-              >
+              <Group key={i} transform={transform}>
                 <Image
                   image={img}
                   x={-w / 2}
