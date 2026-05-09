@@ -20,9 +20,17 @@
  *   TODO Phase 4: LevelUpModal + CrateRevealOverlay replace this debug button
  *   with real weapon equipping logic driven by player progression.
  *
+ * Phase 3 G1 additions:
+ *   ENEMIES: Scav + Raider spawn from off-screen edges, walk toward player.
+ *   Walk animation cycles using same animation.ts system as hero.
+ *   All 21 enemy sprite frames loaded at mount (unconditional useImage calls).
+ *   Enemy render data is bridged to React state via runOnJS every frame.
+ *   Enemies drawn before the player Group (z-order: enemies below hero).
+ *   Debug overlay gains: Enemies count + M:SS elapsed time.
+ *
  * Thread model:
  *   UI thread  — useFrameCallback, gesture callbacks, groupTransform derived value
- *   JS thread  — React state (sprite frame/weapon selection, FPS display)
+ *   JS thread  — React state (sprite frame/weapon selection, FPS display, enemy data)
  */
 
 import React, { useCallback, useState } from 'react';
@@ -43,11 +51,12 @@ import {
 } from 'react-native-reanimated';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 
-import { HeroSprites } from '../lib/sprites';
+import { HeroSprites, EnemySprites } from '../lib/sprites';
 import type { HeroWeaponPose } from '../lib/sprites';
 import { HERO_SPRITE_SCALE, JOYSTICK_DEADZONE_PX } from '../data/gameConstants';
 import { createInitialGameState, updateGameState } from '../lib/gameEngine';
-import { getPlayerRenderData } from '../lib/gameRenderer';
+import { getPlayerRenderData, getEnemyRenderData } from '../lib/gameRenderer';
+import type { EnemyRenderData } from '../lib/gameRenderer';
 import { computeSteps, FIXED_STEP_MS } from '../lib/gameLoop';
 
 // Cycle order and display labels for the debug weapon button.
@@ -62,15 +71,25 @@ const WEAPON_LABELS: Record<HeroWeaponPose, string> = {
   flamethrower: 'Flamethrower',
 };
 
+// Rotation offset: TDS kit sprites face DOWN by default.
+// Subtract π/2 to align with atan2 convention (0 = right).
+// Applied to both hero and enemy transforms.
+const SPRITE_ROTATION_OFFSET = -Math.PI / 2;
+
+/** Format elapsed seconds as M:SS for the debug overlay. */
+function formatElapsed(totalSec: number): string {
+  const m = Math.floor(totalSec / 60);
+  const s = totalSec % 60;
+  return `${m}:${s < 10 ? '0' : ''}${s}`;
+}
+
 type Props = {
   width: number;
   height: number;
 };
 
 export default function GameCanvas({ width, height }: Props) {
-  // ─── Sprite images (loaded once at mount) ─────────────────────────────────
-  // Walk frames: 96×96 lower body animation (16px transparent border aligns
-  // the 64×64 character area with the weapon overlay).
+  // ─── Hero sprite images (loaded once at mount) ────────────────────────────
   const walk0 = useImage(HeroSprites.walk[0]);
   const walk1 = useImage(HeroSprites.walk[1]);
   const walk2 = useImage(HeroSprites.walk[2]);
@@ -80,7 +99,6 @@ export default function GameCanvas({ width, height }: Props) {
   const walk6 = useImage(HeroSprites.walk[6]);
   const walkImages = [walk0, walk1, walk2, walk3, walk4, walk5, walk6];
 
-  // Weapon pose images: 64×64 upper body. Selected at runtime from player.weaponPose.
   const pistolImage = useImage(HeroSprites.pistol.idle);
   const rifleImage = useImage(HeroSprites.rifle.idle);
   const machinegunImage = useImage(HeroSprites.machinegun.idle);
@@ -93,6 +111,41 @@ export default function GameCanvas({ width, height }: Props) {
     grenade_launcher: grenadeLauncherImage,
     flamethrower: flamethrowerImage,
   };
+
+  // ─── Enemy sprite images (loaded once at mount, all unconditional) ────────
+  // Scav walk: 7 frames (SW_01–07)
+  const scavWalk0 = useImage(EnemySprites.scav.walk[0]);
+  const scavWalk1 = useImage(EnemySprites.scav.walk[1]);
+  const scavWalk2 = useImage(EnemySprites.scav.walk[2]);
+  const scavWalk3 = useImage(EnemySprites.scav.walk[3]);
+  const scavWalk4 = useImage(EnemySprites.scav.walk[4]);
+  const scavWalk5 = useImage(EnemySprites.scav.walk[5]);
+  const scavWalk6 = useImage(EnemySprites.scav.walk[6]);
+  const scavWalkImages = [scavWalk0, scavWalk1, scavWalk2, scavWalk3, scavWalk4, scavWalk5, scavWalk6];
+
+  // Scav shot + die (imported now, used in G2)
+  const scavShot0 = useImage(EnemySprites.scav.shot[0]);
+  const scavDie0 = useImage(EnemySprites.scav.die[0]);
+  const scavDie1 = useImage(EnemySprites.scav.die[1]);
+  const scavDie2 = useImage(EnemySprites.scav.die[2]);
+  const scavDie3 = useImage(EnemySprites.scav.die[3]);
+  // Suppress unused-variable lint — these will be used in G2/G3.
+  void scavShot0; void scavDie0; void scavDie1; void scavDie2; void scavDie3;
+
+  // Raider fire: 5 frames (SF_01–05) — used as walk animation
+  const raiderFire0 = useImage(EnemySprites.raider.fire[0]);
+  const raiderFire1 = useImage(EnemySprites.raider.fire[1]);
+  const raiderFire2 = useImage(EnemySprites.raider.fire[2]);
+  const raiderFire3 = useImage(EnemySprites.raider.fire[3]);
+  const raiderFire4 = useImage(EnemySprites.raider.fire[4]);
+  const raiderFireImages = [raiderFire0, raiderFire1, raiderFire2, raiderFire3, raiderFire4];
+
+  // Raider die (imported now, used in G2)
+  const raiderDie0 = useImage(EnemySprites.raider.die[0]);
+  const raiderDie1 = useImage(EnemySprites.raider.die[1]);
+  const raiderDie2 = useImage(EnemySprites.raider.die[2]);
+  const raiderDie3 = useImage(EnemySprites.raider.die[3]);
+  void raiderDie0; void raiderDie1; void raiderDie2; void raiderDie3;
 
   // ─── Game state ────────────────────────────────────────────────────────────
   const gameState = useSharedValue(createInitialGameState(width, height));
@@ -113,18 +166,19 @@ export default function GameCanvas({ width, height }: Props) {
   const [displayFps, setDisplayFps] = useState(0);
   const [displayElapsed, setDisplayElapsed] = useState(0);
   const [displayFrameCount, setDisplayFrameCount] = useState(0);
+  const [displayEnemyCount, setDisplayEnemyCount] = useState(0);
 
   const updateDebugDisplay = useCallback(
-    (fps: number, elapsedSec: number, frames: number) => {
+    (fps: number, elapsedSec: number, frames: number, enemyCount: number) => {
       setDisplayFps(fps);
       setDisplayElapsed(elapsedSec);
       setDisplayFrameCount(frames);
+      setDisplayEnemyCount(enemyCount);
     },
     [],
   );
 
-  // ─── Sprite state (React, bridged from UI thread only when values change) ──
-  // weaponPose included so the weapon image selection re-renders on equip change.
+  // ─── Hero sprite state (React, bridged from UI thread only when values change)
   const [spriteState, setSpriteState] = useState<{
     isMoving: boolean;
     frame: number;
@@ -142,9 +196,17 @@ export default function GameCanvas({ width, height }: Props) {
     [],
   );
 
+  // ─── Enemy render data (React state, bridged every frame) ─────────────────
+  // Enemy positions change every frame, so selective bridging like the hero frame
+  // won't help — we bridge on every tick. A plain array of ~50 objects at 60fps
+  // is acceptable for G1; optimize to pre-allocated slots if perf degrades.
+  const [enemyRenderData, setEnemyRenderData] = useState<EnemyRenderData[]>([]);
+
+  const updateEnemyRenderData = useCallback((data: EnemyRenderData[]) => {
+    setEnemyRenderData(data);
+  }, []);
+
   // ─── Debug weapon cycle button ─────────────────────────────────────────────
-  // Writes directly to gameState shared value from JS thread — valid pattern.
-  // TODO Phase 4: replace with real equip logic from LevelUpModal + CrateRevealOverlay.
   const cycleWeapon = useCallback(() => {
     const current = gameState.value.player.weaponPose;
     const idx = WEAPON_CYCLE.indexOf(current);
@@ -182,15 +244,11 @@ export default function GameCanvas({ width, height }: Props) {
       inputVectorY.value = 0;
     });
 
-  // ─── Group transform (UI thread → Skia) ───────────────────────────────────
-  // Sprites face DOWN by default in this kit; subtract π/2 to align with
-  // the standard atan2 convention (0 = right).
-  const HERO_SPRITE_ROTATION_OFFSET = -Math.PI / 2;
-
+  // ─── Hero group transform (UI thread → Skia) ───────────────────────────────
   const groupTransform = useDerivedValue(() => [
     { translateX: gameState.value.player.x },
     { translateY: gameState.value.player.y },
-    { rotate: gameState.value.player.rotation + HERO_SPRITE_ROTATION_OFFSET },
+    { rotate: gameState.value.player.rotation + SPRITE_ROTATION_OFFSET },
   ]);
 
   // ─── Game loop ─────────────────────────────────────────────────────────────
@@ -215,7 +273,7 @@ export default function GameCanvas({ width, height }: Props) {
     }
     gameState.value = state;
 
-    // Bridge sprite state when any display-relevant value changes.
+    // Bridge hero sprite state when any display-relevant value changes.
     const rd = getPlayerRenderData(state);
     if (
       rd.isMoving !== lastBridgedMoving.value ||
@@ -228,7 +286,11 @@ export default function GameCanvas({ width, height }: Props) {
       runOnJS(updateSpriteState)(rd.isMoving, rd.walkFrame, rd.weaponPose);
     }
 
-    // FPS — bridge to React once per second
+    // Bridge enemy render data every frame (positions change every tick).
+    const enemyData = getEnemyRenderData(state);
+    runOnJS(updateEnemyRenderData)(enemyData);
+
+    // FPS + debug counters — bridge to React once per second.
     fpsAccumMs.value += dtMs;
     fpsFrameCount.value += 1;
     if (fpsAccumMs.value >= 1000) {
@@ -237,13 +299,14 @@ export default function GameCanvas({ width, height }: Props) {
         fps,
         Math.round(state.elapsedMs / 1000),
         state.frameCount,
+        state.enemies.length,
       );
       fpsAccumMs.value = 0;
       fpsFrameCount.value = 0;
     }
   });
 
-  // ─── Render ────────────────────────────────────────────────────────────────
+  // ─── Hero render ──────────────────────────────────────────────────────────
   const bodyImage = spriteState.isMoving ? (walkImages[spriteState.frame] ?? null) : null;
   const weaponImage = weaponIdleImages[spriteState.weaponPose];
 
@@ -258,9 +321,38 @@ export default function GameCanvas({ width, height }: Props) {
         {/* TODO Phase 5: wrap world rendering in <Group> with camera transform.
             scale = zoom level, translate = camera offset following player.
             Visual sprite scale (currently 2×) will likely need tuning once
-            tiles + enemies + HUD are visible on screen — the right scale
-            can't be determined until Phase 5 has all elements present. */}
+            tiles + enemies + HUD are visible on screen together. */}
         <Canvas style={StyleSheet.absoluteFill}>
+
+          {/* ── Enemies (below player) ────────────────────────────────────── */}
+          {enemyRenderData.map((rd) => {
+            const images = rd.type === 'scav' ? scavWalkImages : raiderFireImages;
+            const img = images[rd.walkFrame] ?? null;
+            if (!img) return null;
+            const w = img.width() * rd.scale;
+            const h = img.height() * rd.scale;
+            return (
+              <Group
+                key={rd.id}
+                transform={[
+                  { translateX: rd.x },
+                  { translateY: rd.y },
+                  { rotate: rd.rotation + SPRITE_ROTATION_OFFSET },
+                ]}
+              >
+                <Image
+                  image={img}
+                  x={-w / 2}
+                  y={-h / 2}
+                  width={w}
+                  height={h}
+                  sampling={{ filter: FilterMode.Nearest, mipmap: MipmapMode.None }}
+                />
+              </Group>
+            );
+          })}
+
+          {/* ── Player (above enemies) ────────────────────────────────────── */}
           <Group transform={groupTransform}>
             {/* Bottom layer: animated walk legs (only while moving) */}
             {bodyImage && (
@@ -285,6 +377,7 @@ export default function GameCanvas({ width, height }: Props) {
               />
             )}
           </Group>
+
         </Canvas>
 
         {/* Debug weapon cycle button — top-left.
@@ -300,15 +393,16 @@ export default function GameCanvas({ width, height }: Props) {
           <Text style={[styles.debugText, styles.tapHint]}>tap to cycle</Text>
         </Pressable>
 
-        {/* FPS overlay — top-right. */}
+        {/* Debug overlay — top-right. */}
         {/* TODO Phase 7: replace hardcoded insets with real safe-area values. */}
         <View
           style={[styles.debugOverlay, { top: 50, right: 10 }]}
           pointerEvents="none"
         >
           <Text style={styles.debugText}>FPS: {displayFps}</Text>
+          <Text style={styles.debugText}>Enemies: {displayEnemyCount}</Text>
+          <Text style={styles.debugText}>Time: {formatElapsed(displayElapsed)}</Text>
           <Text style={styles.debugText}>Frame: {displayFrameCount}</Text>
-          <Text style={styles.debugText}>Time: {displayElapsed}s</Text>
         </View>
       </View>
     </GestureDetector>

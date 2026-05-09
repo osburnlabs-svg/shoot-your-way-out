@@ -10,17 +10,20 @@
  *   - Hero moves at full PLAYER_MOVE_SPEED_PX_PER_SEC in that direction
  *   - No "stop at target" logic — hero moves continuously while input is active
  *
- * Future phases extend GameState:
- *   Phase 3:  enemies[], projectiles[]
- *   Phase 4a: xp, level, skills[]
- *   Phase 4b: activeCrates[], throwables[]
+ * Phase 3 G1 additions:
+ *   - EnemyState type (id, type, position, hp, walk animation offset)
+ *   - GameState extended with enemies[], nextEnemyId, spawnAccMs
+ *   - canvasWidth/canvasHeight stored in state so spawner can compute screen edges
+ *   - updateGameState calls tickEnemies from enemyEngine (spawner + AI)
  */
 
 import type { HeroWeaponPose } from './sprites';
+import type { EnemyType } from '../data/enemies';
 import {
   PLAYER_MOVE_SPEED_PX_PER_SEC,
   PLAYER_MAX_ANGULAR_SPEED_RAD_PER_SEC,
 } from '../data/gameConstants';
+import { tickEnemies } from './enemyEngine';
 
 export type PlayerState = {
   x: number;
@@ -42,8 +45,37 @@ export type PlayerState = {
   walkStartedAtMs: number;
 };
 
+/**
+ * Runtime enemy entity. Lives inside the single GameState shared value.
+ *
+ * walkStartedAtMs is set at spawn (= state.elapsedMs at that moment).
+ * Walk frame = getCurrentFrame(config, elapsedMs - enemy.walkStartedAtMs).
+ * This matches exactly how the hero walk frame is computed — same animation system.
+ *
+ * hp is stored even in G1 (where enemies can't die) so the shape doesn't change in G2.
+ * contactDamage is on EnemyProfile in data/enemies.ts, not here — no per-instance variance.
+ */
+export type EnemyState = {
+  id: number;
+  type: EnemyType;
+  x: number;
+  y: number;
+  hp: number;
+  /** elapsedMs at spawn — used to offset walk animation so enemies don't all sync frames. */
+  walkStartedAtMs: number;
+};
+
 export type GameState = {
   player: PlayerState;
+  /** All currently live enemies. Filtered/replaced each tick — no mutation. */
+  enemies: EnemyState[];
+  /** Monotonically increasing counter — ensures every enemy has a unique id. */
+  nextEnemyId: number;
+  /** Spawn time accumulator in ms — carries sub-interval remainder across ticks. */
+  spawnAccMs: number;
+  /** Canvas dimensions stored once at init — spawner uses them to place enemies at edges. */
+  canvasWidth: number;
+  canvasHeight: number;
   elapsedMs: number;  // total ms the game has been running
   frameCount: number; // total fixed-step frames processed
 };
@@ -61,6 +93,11 @@ export function createInitialGameState(canvasWidth: number, canvasHeight: number
       isMoving: false,
       walkStartedAtMs: 0,
     },
+    enemies: [],
+    nextEnemyId: 0,
+    spawnAccMs: 0,
+    canvasWidth,
+    canvasHeight,
     elapsedMs: 0,
     frameCount: 0,
   };
@@ -74,6 +111,10 @@ export function createInitialGameState(canvasWidth: number, canvasHeight: number
  *   - Hero moves at full speed in that direction while inputVector is non-null
  *   - Rotation smoothly tracks the input direction, capped at max angular speed
  *   - No overshoot concern — target is a direction, not a position
+ *
+ * Enemy tick is delegated to tickEnemies (lib/enemyEngine.ts):
+ *   - Spawner: respects delay, ramps rate, places at screen edges
+ *   - AI: moves each enemy toward current player position at profile speed
  */
 export function updateGameState(state: GameState, dtMs: number): GameState {
   'worklet';
@@ -112,7 +153,7 @@ export function updateGameState(state: GameState, dtMs: number): GameState {
     }
   }
 
-  return {
+  const stateAfterPlayer: GameState = {
     ...state,
     elapsedMs: state.elapsedMs + dtMs,
     frameCount: state.frameCount + 1,
@@ -126,4 +167,6 @@ export function updateGameState(state: GameState, dtMs: number): GameState {
       walkStartedAtMs: newWalkStartedAtMs,
     },
   };
+
+  return tickEnemies(stateAfterPlayer, dtMs);
 }

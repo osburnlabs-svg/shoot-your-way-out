@@ -83,3 +83,63 @@ export const HeroSprites = {
 } as const;
 
 export type HeroWeaponPose = 'pistol' | 'rifle' | 'machinegun' | 'grenade_launcher' | 'flamethrower';
+
+/**
+ * Enemy sprite registry — same require() / asset-map pattern as HeroSprites.
+ *
+ * Scav  = Soldier (kit 1a): 7-frame walk, 1-frame shot, 4-frame die.
+ * Raider = Soldier 02 (kit 1a): 5-frame fire (used as walk cycle), 4-frame die.
+ *   Raider has no separate walk frames — fire frames are used for locomotion
+ *   (gives a "charging with weapon raised" look, keeps Raider visually distinct).
+ *
+ * Shot and die frames are imported now (one asset-import pass for all of Phase 3)
+ * even though G1 only uses walk/fire frames for rendering.
+ */
+export const EnemySprites = {
+  scav: {
+    walk: [
+      require('../../assets/sprites/enemies/scav/walk/SW_01.png'),
+      require('../../assets/sprites/enemies/scav/walk/SW_02.png'),
+      require('../../assets/sprites/enemies/scav/walk/SW_03.png'),
+      require('../../assets/sprites/enemies/scav/walk/SW_04.png'),
+      require('../../assets/sprites/enemies/scav/walk/SW_05.png'),
+      require('../../assets/sprites/enemies/scav/walk/SW_06.png'),
+      require('../../assets/sprites/enemies/scav/walk/SW_07.png'),
+    ],
+    shot: [
+      require('../../assets/sprites/enemies/scav/shot/Soldier_Shot.png'),
+    ],
+    die: [
+      require('../../assets/sprites/enemies/scav/die/SD_01.png'),
+      require('../../assets/sprites/enemies/scav/die/SD_02.png'),
+      require('../../assets/sprites/enemies/scav/die/SD_03.png'),
+      require('../../assets/sprites/enemies/scav/die/SD_04.png'),
+    ],
+  },
+  raider: {
+    /** Fire frames used as walk/move animation (no separate walk cycle in kit). */
+    fire: [
+      require('../../assets/sprites/enemies/raider/fire/SF_01.png'),
+      require('../../assets/sprites/enemies/raider/fire/SF_02.png'),
+      require('../../assets/sprites/enemies/raider/fire/SF_03.png'),
+      require('../../assets/sprites/enemies/raider/fire/SF_04.png'),
+      require('../../assets/sprites/enemies/raider/fire/SF_05.png'),
+    ],
+    die: [
+      require('../../assets/sprites/enemies/raider/die/SD2_01.png'),
+      require('../../assets/sprites/enemies/raider/die/SD2_02.png'),
+      require('../../assets/sprites/enemies/raider/die/SD2_03.png'),
+      require('../../assets/sprites/enemies/raider/die/SD2_04.png'),
+    ],
+  },
+} as const;
+
+/**
+ * Pickup sprite registry — staged here for Phase 3 use.
+ * Money_Small is used by G3 (drop on kill). Not rendered in G1.
+ */
+export const PickupSprites = {
+  money: {
+    small: require('../../assets/sprites/pickups/money/Money_Small.png'),
+  },
+} as const;
