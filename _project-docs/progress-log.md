@@ -130,11 +130,58 @@ See "Native Dependency Hygiene" section in v3 master context for the full guidel
 
 ---
 
-## Phase 3 — Enemies + auto-fire
+## Phase 3 — Group 1: Enemy entities, spawning, AI tick
 
-**Goal:** Scav and Raider enemies spawn in waves, scale with time, basic AI walks toward player, player auto-fires at nearest enemy, projectiles damage enemies, enemies drop XP gems.
+**Status:** Complete (with one issue queued for G1 followup)
+**Final commit:** c47e000
+**Verification:** On device — hero moves at normal speed, FPS stable ~70 standing and moving, enemies (Scav + Raider) spawn off-screen and walk toward player, walk animation cycles, density ramps over time, debug overlay shows enemy count and elapsed time.
 
-**Status:** Not started
+### What was built
+
+- Enemy entity type and storage in shared game state (50-slot fixed array, soft-cap concurrent enemies)
+- `data/enemies.ts` populated for Scav and Raider profiles (HP, speed, contact damage, XP-on-kill)
+- Spawner: spawns at random position on circle outside screen edge, rate scales with elapsed time, tunable curve in `gameConstants.ts`
+- AI tick: per-frame heading-toward-player + position update via `moveSpeed * dt`
+- Asset import: Scav (Soldier kit walk/shot/die), Raider (Soldier 02 fire/die), Money_Small.png staged for G3
+- Renderer: enemy data exposed via `getEnemyRenderData`, follows the renderer-returns-data pattern from Phase 2
+- Debug overlay extended with `Enemies: N` and `Time: M:SS`
+
+### What this group cost
+
+Five commits to ship — one initial implementation and four bug fixes. The implementation was correct in shape; the bugs were all framework-level interactions between Reanimated, RNGH, and Skia that didn't surface until 50 enemy entities were on screen with an active gesture handler.
+
+The bugs and fixes:
+1. **Original Issue 1 (commit 83755c9):** initial G1 had `runOnJS(updateEnemyRenderData)` called every frame inside `useFrameCallback`. Created a per-frame React-state-update feedback loop. FPS read 1100, hero crawled at boot. Diagnosed as runOnJS-in-frame-callback feedback loop.
+2. **First fix (ff17633):** moved enemy data through 50 `useDerivedValue` slot hooks (one per enemy slot), each subscribing to `gameState`. Removed the runOnJS-per-frame pattern. Hero moved normally, but FPS settled at 100–200 due to 50 Skia animated-prop subscribers cascading.
+3. **Plan B fix (09ba5ff):** collapsed 50 hooks into 1 useDerivedValue returning an array, with `useAnimatedReaction → runOnJS` to push the array into React state. Re-introduced the feedback loop with the call site moved (reaction callback instead of frame callback). FPS back to 1100.
+4. **Hero sprite bridge fix (1fe8291, 6bcc3c0):** discovered that even after all enemy fixes, a hero sprite-bridge `runOnJS` call inside `useFrameCallback` was still firing ~10×/sec while moving, contributing to elevated FPS. Moved hero sprite-frame selection into a setInterval polling shared values from JS thread. Useful but did not fully fix symptom.
+5. **Real fix (c47e000):** discovered the actual cause was a known Reanimated bug where RNGH gesture events synchronously call `__flushAnimationFrame`, which drains the requestAnimationFrame queue and fires `useFrameCallback` once per gesture event. Android digitizers fire 120–240 events/sec while finger is moving. Fix: add `.runOnJS(true)` to the Pan gesture, routing events through JS thread and bypassing the flush. Single-line fix.
+
+### Architectural decisions made during G1 (now permanent)
+
+- **Zero gameplay-data `runOnJS` calls inside `useFrameCallback`.** Hard rule going forward. Sprite-frame selection and similar slow-updating JS-side state must use a separate setInterval polling shared values directly. This applies to projectiles, pickups, etc. in subsequent groups.
+- **50-slot fixed-size enemy array** with `null`-rendering for inactive slots. Provides stable hook count for rules-of-hooks compliance and breaks Skia subscriptions for empty slots. Same pattern will be reused for projectile slots in G2.
+- **Pan gesture is on JS thread, not UI thread.** Tradeoff is ~1ms input latency. Acceptable for analog joystick input. Re-evaluate only if precision input (aiming, etc.) is added later.
+- **Sprite-frame timer at 100ms.** Reads hero and enemy state in one tick, updates React state once. Decoupled from the frame callback. ~10fps animation update rate; visually indistinguishable from the ideal 8fps.
+
+### Issue 2 (queued for G1 followup, not yet fixed)
+
+Soldier kit ships two-layer sprites (legs + upper body) like the hero kit. G1 imported only legs for both Scav and Raider, plus upper body for Raider via BAZOOKA.png. Result on device:
+- Raider renders with upper body (BAZOOKA visible on top of fire-frame legs) — works correctly
+- Scav renders legs only (Soldier.png upper body not imported or composited)
+
+Fix scope: import `Soldier.png` for Scav, render as second Skia layer over the walk frames using the same compositing pattern the hero uses. Possible additional investigation: kit also ships `SoldierWaepon.png` (32×32) and `Soldier02.png` (96×96) — roles unclear without rendering, may or may not be needed.
+
+To be addressed before G2 begins.
+
+### What this group taught us about working in this stack
+
+Captured in the new "Known Framework Quirks" section of the context doc. Briefly:
+- Reanimated gesture handlers force-flush the animation frame queue on every gesture event (Android, fixed via `.runOnJS(true)`)
+- Per-frame `runOnJS` from `useFrameCallback` creates a scheduler feedback loop
+- Many `useDerivedValue` subscriptions to one shared value cascade into elevated frame rate
+
+Future debugging of similar symptoms starts there.
 
 ---
 
