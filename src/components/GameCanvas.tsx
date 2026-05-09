@@ -33,7 +33,7 @@
  *   JS thread  — React state (sprite frame/weapon selection, FPS display, enemy data)
  */
 
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import {
   Canvas,
@@ -45,19 +45,30 @@ import {
 } from '@shopify/react-native-skia';
 import {
   runOnJS,
-  useAnimatedReaction,
   useDerivedValue,
   useFrameCallback,
   useSharedValue,
+  type SharedValue,
 } from 'react-native-reanimated';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 
 import { HeroSprites, EnemySprites } from '../lib/sprites';
 import type { HeroWeaponPose } from '../lib/sprites';
-import { HERO_SPRITE_SCALE, JOYSTICK_DEADZONE_PX } from '../data/gameConstants';
+import {
+  ENEMY_SOFT_CAP,
+  ENEMY_SPRITE_SCALE,
+  HERO_SPRITE_SCALE,
+  JOYSTICK_DEADZONE_PX,
+  RAIDER_WALK_FRAME_COUNT,
+  RAIDER_WALK_FRAME_DURATION_MS,
+  SCAV_WALK_FRAME_COUNT,
+  SCAV_WALK_FRAME_DURATION_MS,
+} from '../data/gameConstants';
+import type { EnemyType } from '../data/enemies';
 import { createInitialGameState, updateGameState } from '../lib/gameEngine';
-import { getPlayerRenderData, getEnemyRenderData } from '../lib/gameRenderer';
-import type { EnemyRenderData } from '../lib/gameRenderer';
+import type { GameState } from '../lib/gameEngine';
+import { getPlayerRenderData } from '../lib/gameRenderer';
+import { getCurrentFrame } from '../lib/animation';
 import { computeSteps, FIXED_STEP_MS } from '../lib/gameLoop';
 
 // Cycle order and display labels for the debug weapon button.
@@ -76,6 +87,30 @@ const WEAPON_LABELS: Record<HeroWeaponPose, string> = {
 // Subtract π/2 to align with atan2 convention (0 = right).
 // Applied to both hero and enemy transforms.
 const SPRITE_ROTATION_OFFSET = -Math.PI / 2;
+
+/**
+ * Per-slot enemy transform — one useDerivedValue per pre-allocated slot.
+ * Returns position + heading for the enemy at enemies[slotIndex], or an
+ * off-screen zero transform when the slot is empty.
+ *
+ * IMPORTANT: only render <Group transform={result}> when the slot is active
+ * (enemySlotTypes[slotIndex] !== null). An inactive slot is never subscribed
+ * to as a Skia animated prop, so its per-tick recalculation causes zero Skia
+ * notifications — even though the returned array is a new object each tick.
+ */
+function useEnemySlotTransform(gameState: SharedValue<GameState>, slotIndex: number) {
+  return useDerivedValue(() => {
+    const enemy = gameState.value.enemies[slotIndex];
+    if (!enemy) return [{ translateX: 0 }, { translateY: 0 }, { rotate: 0 }];
+    const dx = gameState.value.player.x - enemy.x;
+    const dy = gameState.value.player.y - enemy.y;
+    return [
+      { translateX: enemy.x },
+      { translateY: enemy.y },
+      { rotate: Math.atan2(dy, dx) + SPRITE_ROTATION_OFFSET },
+    ];
+  });
+}
 
 /** Format elapsed seconds as M:SS for the debug overlay. */
 function formatElapsed(totalSec: number): string {
@@ -197,17 +232,108 @@ export default function GameCanvas({ width, height }: Props) {
     [],
   );
 
-  // ─── Enemy render data (React state, bridged via useAnimatedReaction) ────────
-  // ONE derived value watches the full enemy array each frame.
-  // useAnimatedReaction bridges it to React state; JSX uses static transforms.
-  // Net result: 0 Skia animated-prop subscriptions for enemies (was 50).
-  const [enemyRenderData, setEnemyRenderData] = useState<EnemyRenderData[]>([]);
-
-  const allEnemyData = useDerivedValue(() => getEnemyRenderData(gameState.value));
-  useAnimatedReaction(
-    () => allEnemyData.value,
-    (current) => { runOnJS(setEnemyRenderData)(current); },
+  // ─── Enemy slot state (sprite selection, updated by timer) ──────────────────
+  // Slot i = enemies[i]. Only type + walk frame index are bridged to React;
+  // positions/rotations live entirely on the UI thread (per-slot useDerivedValue).
+  const [enemySlotTypes, setEnemySlotTypes] = useState<Array<EnemyType | null>>(
+    () => Array.from({ length: ENEMY_SOFT_CAP }, () => null as EnemyType | null),
   );
+  const [enemySlotFrames, setEnemySlotFrames] = useState<number[]>(
+    () => Array.from({ length: ENEMY_SOFT_CAP }, () => 0),
+  );
+
+  // Fixed-rate timer — reads gameState.value directly on the JS thread every
+  // 100ms. Completely decoupled from useFrameCallback; cannot contribute to
+  // the runOnJS feedback loop. No runOnJS needed (already on JS thread).
+  useEffect(() => {
+    const id = setInterval(() => {
+      const state = gameState.value;
+      const types = Array.from({ length: ENEMY_SOFT_CAP }, () => null as EnemyType | null);
+      const frames = Array.from({ length: ENEMY_SOFT_CAP }, () => 0);
+      for (let i = 0; i < state.enemies.length; i++) {
+        const enemy = state.enemies[i];
+        const isScav = enemy.type === 'scav';
+        types[i] = enemy.type;
+        frames[i] = getCurrentFrame(
+          {
+            frameCount: isScav ? SCAV_WALK_FRAME_COUNT : RAIDER_WALK_FRAME_COUNT,
+            frameDurationMs: isScav ? SCAV_WALK_FRAME_DURATION_MS : RAIDER_WALK_FRAME_DURATION_MS,
+            loop: true,
+          },
+          state.elapsedMs - enemy.walkStartedAtMs,
+        );
+      }
+      setEnemySlotTypes(types);
+      setEnemySlotFrames(frames);
+    }, 100);
+    return () => clearInterval(id);
+  }, [gameState]);
+
+  // ─── Per-slot enemy transforms (UI thread, no runOnJS) ────────────────────
+  // One useDerivedValue per slot. Only slots with an active enemy are rendered
+  // in JSX, so only those create Skia animated-prop subscriptions.
+  const eTransform0  = useEnemySlotTransform(gameState, 0);
+  const eTransform1  = useEnemySlotTransform(gameState, 1);
+  const eTransform2  = useEnemySlotTransform(gameState, 2);
+  const eTransform3  = useEnemySlotTransform(gameState, 3);
+  const eTransform4  = useEnemySlotTransform(gameState, 4);
+  const eTransform5  = useEnemySlotTransform(gameState, 5);
+  const eTransform6  = useEnemySlotTransform(gameState, 6);
+  const eTransform7  = useEnemySlotTransform(gameState, 7);
+  const eTransform8  = useEnemySlotTransform(gameState, 8);
+  const eTransform9  = useEnemySlotTransform(gameState, 9);
+  const eTransform10 = useEnemySlotTransform(gameState, 10);
+  const eTransform11 = useEnemySlotTransform(gameState, 11);
+  const eTransform12 = useEnemySlotTransform(gameState, 12);
+  const eTransform13 = useEnemySlotTransform(gameState, 13);
+  const eTransform14 = useEnemySlotTransform(gameState, 14);
+  const eTransform15 = useEnemySlotTransform(gameState, 15);
+  const eTransform16 = useEnemySlotTransform(gameState, 16);
+  const eTransform17 = useEnemySlotTransform(gameState, 17);
+  const eTransform18 = useEnemySlotTransform(gameState, 18);
+  const eTransform19 = useEnemySlotTransform(gameState, 19);
+  const eTransform20 = useEnemySlotTransform(gameState, 20);
+  const eTransform21 = useEnemySlotTransform(gameState, 21);
+  const eTransform22 = useEnemySlotTransform(gameState, 22);
+  const eTransform23 = useEnemySlotTransform(gameState, 23);
+  const eTransform24 = useEnemySlotTransform(gameState, 24);
+  const eTransform25 = useEnemySlotTransform(gameState, 25);
+  const eTransform26 = useEnemySlotTransform(gameState, 26);
+  const eTransform27 = useEnemySlotTransform(gameState, 27);
+  const eTransform28 = useEnemySlotTransform(gameState, 28);
+  const eTransform29 = useEnemySlotTransform(gameState, 29);
+  const eTransform30 = useEnemySlotTransform(gameState, 30);
+  const eTransform31 = useEnemySlotTransform(gameState, 31);
+  const eTransform32 = useEnemySlotTransform(gameState, 32);
+  const eTransform33 = useEnemySlotTransform(gameState, 33);
+  const eTransform34 = useEnemySlotTransform(gameState, 34);
+  const eTransform35 = useEnemySlotTransform(gameState, 35);
+  const eTransform36 = useEnemySlotTransform(gameState, 36);
+  const eTransform37 = useEnemySlotTransform(gameState, 37);
+  const eTransform38 = useEnemySlotTransform(gameState, 38);
+  const eTransform39 = useEnemySlotTransform(gameState, 39);
+  const eTransform40 = useEnemySlotTransform(gameState, 40);
+  const eTransform41 = useEnemySlotTransform(gameState, 41);
+  const eTransform42 = useEnemySlotTransform(gameState, 42);
+  const eTransform43 = useEnemySlotTransform(gameState, 43);
+  const eTransform44 = useEnemySlotTransform(gameState, 44);
+  const eTransform45 = useEnemySlotTransform(gameState, 45);
+  const eTransform46 = useEnemySlotTransform(gameState, 46);
+  const eTransform47 = useEnemySlotTransform(gameState, 47);
+  const eTransform48 = useEnemySlotTransform(gameState, 48);
+  const eTransform49 = useEnemySlotTransform(gameState, 49);
+  const allSlotTransforms = [
+    eTransform0,  eTransform1,  eTransform2,  eTransform3,  eTransform4,
+    eTransform5,  eTransform6,  eTransform7,  eTransform8,  eTransform9,
+    eTransform10, eTransform11, eTransform12, eTransform13, eTransform14,
+    eTransform15, eTransform16, eTransform17, eTransform18, eTransform19,
+    eTransform20, eTransform21, eTransform22, eTransform23, eTransform24,
+    eTransform25, eTransform26, eTransform27, eTransform28, eTransform29,
+    eTransform30, eTransform31, eTransform32, eTransform33, eTransform34,
+    eTransform35, eTransform36, eTransform37, eTransform38, eTransform39,
+    eTransform40, eTransform41, eTransform42, eTransform43, eTransform44,
+    eTransform45, eTransform46, eTransform47, eTransform48, eTransform49,
+  ];
 
   // ─── Debug weapon cycle button ─────────────────────────────────────────────
   const cycleWeapon = useCallback(() => {
@@ -324,22 +450,20 @@ export default function GameCanvas({ width, height }: Props) {
         <Canvas style={StyleSheet.absoluteFill}>
 
           {/* ── Enemies (below player) ────────────────────────────────────── */}
-          {/* Static transforms from React state — 0 Skia animated-prop subs. */}
-          {enemyRenderData.map((enemy) => {
-            const images = enemy.type === 'scav' ? scavWalkImages : raiderFireImages;
-            const img = images[enemy.walkFrame] ?? null;
+          {/* transform = per-slot useDerivedValue (UI thread, no runOnJS).   */}
+          {/* Only active slots render a <Group>, so only they create Skia    */}
+          {/* animated-prop subscriptions. Inactive slots: no subscription,   */}
+          {/* no Skia notification, even though their derived value recalcs.  */}
+          {allSlotTransforms.map((transform, i) => {
+            const type = enemySlotTypes[i];
+            if (!type) return null;
+            const images = type === 'scav' ? scavWalkImages : raiderFireImages;
+            const img = images[enemySlotFrames[i]] ?? null;
             if (!img) return null;
-            const w = img.width() * enemy.scale;
-            const h = img.height() * enemy.scale;
+            const w = img.width() * ENEMY_SPRITE_SCALE;
+            const h = img.height() * ENEMY_SPRITE_SCALE;
             return (
-              <Group
-                key={enemy.id}
-                transform={[
-                  { translateX: enemy.x },
-                  { translateY: enemy.y },
-                  { rotate: enemy.rotation + SPRITE_ROTATION_OFFSET },
-                ]}
-              >
+              <Group key={i} transform={transform}>
                 <Image
                   image={img}
                   x={-w / 2}
