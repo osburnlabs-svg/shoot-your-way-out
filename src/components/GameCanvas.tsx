@@ -350,6 +350,7 @@ export default function GameCanvas({ width, height }: Props) {
 
   // ─── Virtual joystick gesture ──────────────────────────────────────────────
   const panGesture = Gesture.Pan()
+    .runOnJS(true)
     .onBegin((e) => {
       joystickOriginX.value = e.x;
       joystickOriginY.value = e.y;
