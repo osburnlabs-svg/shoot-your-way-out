@@ -26,7 +26,7 @@ Status legend:
 | 0 — Pre-build setup | 🟢 Complete | 2026-05-08 | n/a | n/a | Directories, kits, context doc, accounts |
 | 1 — Project scaffold | 🟢 Complete | 2026-05-08 | a85087b | Yes | Placeholder screen confirmed on device via Expo Go |
 | 2 — Player + drag-to-move | 🟢 Complete | 2026-05-08 | G1: fe57417 G2: 9116c45 G3: 3f618d0 G4: 78fa367 | Yes — all 4 groups | All groups complete |
-| 3 — Enemies + auto-fire | 🟡 In Progress | | G1: c47e000 G2: 083d28d G3: pending | G1 ✅ G2 ✅ G3 pending | G1+G2 device-tested |
+| 3 — Enemies + auto-fire | 🟡 In Progress | | G1: c47e000 G2: 083d28d G3: 5715c19 | G1 ✅ G2 ✅ G3 ✅ | G1+G2+G3 device-tested |
 | 4a — Stat skills + level-up | ⚪ | | | | |
 | 4b — Ability skills + crates | ⚪ | | | | |
 | 5 — Maps + obstacles + vehicle enemies | ⚪ | | | | |
@@ -303,8 +303,8 @@ Found during G3 device test: money pickup magnet works correctly when player is 
 
 ## Phase 3 — Group 3: Money pickups, magnet pull, contact damage, death state
 
-**Status:** Pending device verification
-**Commit:** pending
+**Status:** Complete 🟢
+**Commit:** 5715c19
 
 ### What was built
 
