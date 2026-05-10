@@ -464,7 +464,7 @@ Single-line gate in `lib/combatEngine.ts`: added `&& !player.isMoving` to the au
 - `data/gameConstants.ts` gains `HIT_FLASH_DURATION_MS = 80`
 - `lib/enemyEngine.ts`: `hitFlashUntilMs` threaded through spawn and movement copies
 - `lib/combatEngine.ts`: `hitFlashUntilMs` set on damage, threaded through all EnemyState copies
-- `GameCanvas.tsx`: `useEnemySlotFlash` hook (50 useDerivedValue instances, same pattern as slot transforms) returns flash opacity (0 or 0.65) checked every frame on the UI thread. White `<Rect>` overlay added inside each active enemy `<Group>`, `opacity` prop driven by the derived value — no runOnJS, no polling lag.
+- `GameCanvas.tsx`: `useEnemySlotFlash` hook (50 useDerivedValue instances, same pattern as slot transforms) returns flash opacity (0 or 0.75) checked every frame on the UI thread. Red `<Circle>` (color `#cc2020`, radius = `ENEMY_COLLISION_RADIUS_PX`) rendered on top of each enemy's sprite layers, `opacity` prop driven by the derived value — no runOnJS, no polling lag.
 
 **Audio cleanup:**
 - Removed `audioEngine.playSFX('enemy_die')` from `combatEngine.ts`. Per "Feedback design philosophy" Rule 2 — no standalone kill sounds. The gunshot + impact pair already communicates the kill.
@@ -473,12 +473,12 @@ Single-line gate in `lib/combatEngine.ts`: added `&& !player.isMoving` to the au
 ### Design decisions made during G4c
 
 - **Flash runs on UI thread via useDerivedValue, not the 100ms timer.** HIT_FLASH_DURATION_MS = 80ms would be invisible through 100ms polling. Derived value checks `elapsedMs < enemy.hitFlashUntilMs` every frame — sub-millisecond response. Adds 50 derived values (same cost as the existing slot transforms, which proved acceptable for FPS).
-- **White Rect overlay instead of Skia color filter.** Simpler implementation — no ColorMatrix math. White at 0.65 opacity composites cleanly over the pixel-art sprites and reads unmistakably as a hit. Adjustable via `HIT_FLASH_DURATION_MS` and the 0.65 opacity constant in `useEnemySlotFlash`.
+- **Red Circle primitive instead of Skia color filter.** Three color-filter approaches were tried and failed in Skia v2.2.12: (1) `<Rect>` overlay filled the full bounding box including transparent sprite areas; (2) `<Paint><ColorMatrix />` as child of `<Image>` had no visible effect — Skia v2.2.12 does not apply Paint children to Image draws; (3) `<Paint><ColorMatrix />` as child of `<Group>` also had no visible effect. `Skia.Paint()` called from a worklet would crash (confirmed in G1 with Skia.PictureRecorder — same runtime). Red Circle centered on the enemy at ENEMY_COLLISION_RADIUS_PX radius is worklet-safe and reads clearly as an impact splash at 0.75 opacity.
 - **`enemy_die` call removed, not replaced.** There is no alternative kill sound — the absence is intentional. See "Feedback design philosophy" entry for the permanent rule.
 
 ### Verification targets
 
-1. Shoot an enemy → brief white flash on hit (~80ms), returns to normal
+1. Shoot an enemy → brief red flash on hit (~80ms), returns to normal
 2. Shoot again → flash repeats
 3. Kill it → flash on kill shot, die animation plays normally, no audio cue at death moment
 4. FPS stable ~70 with 30+ enemies on screen

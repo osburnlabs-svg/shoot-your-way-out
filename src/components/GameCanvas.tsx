@@ -54,12 +54,10 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import {
   Canvas,
   Circle,
-  ColorMatrix,
   FilterMode,
   Group,
   Image,
   MipmapMode,
-  Paint,
   useImage,
 } from '@shopify/react-native-skia';
 import {
@@ -74,6 +72,7 @@ import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { HeroSprites, EnemySprites, PickupSprites } from '../lib/sprites';
 import type { HeroWeaponPose } from '../lib/sprites';
 import {
+  ENEMY_COLLISION_RADIUS_PX,
   ENEMY_SOFT_CAP,
   ENEMY_SPRITE_SCALE,
   HERO_SPRITE_SCALE,
@@ -168,29 +167,20 @@ function usePickupSlotTransform(gameState: SharedValue<GameState>, slotIndex: nu
 }
 
 /**
- * Per-slot hit-flash color matrix — one useDerivedValue per pre-allocated enemy slot.
- * Returns a 20-element Skia ColorMatrix:
- *   - Identity matrix when not flashing (no visual change)
- *   - Brightening matrix when hitFlashUntilMs is in the future (adds 0.5 to R/G/B channels)
- *
- * Applied via <Paint><ColorMatrix matrix={...} /></Paint> as a child of each sprite <Image>,
- * so the tint follows the sprite's exact shape (including transparency) — no rect overflow.
+ * Per-slot hit-flash opacity — one useDerivedValue per pre-allocated enemy slot.
+ * Returns 0.75 while hitFlashUntilMs is in the future, 0 otherwise.
+ * Drives a red <Circle> rendered on top of each enemy sprite in JSX.
  * Checked every frame on the UI thread — no runOnJS, no 100ms polling lag.
+ *
+ * NOTE: Sprite color-filter approaches (ColorMatrix on <Image> or via <Group layer>)
+ * do not work in Skia v2.2.12 — <Paint> children are ignored for Image draws, and
+ * Skia.Paint() cannot be called from Reanimated worklets (same crash as G1). Red
+ * circle is the worklet-safe solution.
  */
 function useEnemySlotFlash(gameState: SharedValue<GameState>, slotIndex: number) {
-  return useDerivedValue((): number[] => {
+  return useDerivedValue((): number => {
     const enemy = gameState.value.enemies[slotIndex];
-    const flashing = !!enemy && gameState.value.elapsedMs < enemy.hitFlashUntilMs;
-    // Red flash: boost R channel +0.8, reduce G and B by 0.4.
-    // Saturated and clearly visible — tune down via these offsets if too aggressive.
-    const r = flashing ? 0.8 : 0;
-    const gb = flashing ? -0.4 : 0;
-    return [
-      1, 0, 0, 0, r,
-      0, 1, 0, 0, gb,
-      0, 0, 1, 0, gb,
-      0, 0, 0, 1, 0,
-    ];
+    return !!enemy && gameState.value.elapsedMs < enemy.hitFlashUntilMs ? 0.75 : 0;
   });
 }
 
@@ -511,7 +501,7 @@ export default function GameCanvas({ width, height }: Props) {
   const eFlash47 = useEnemySlotFlash(gameState, 47);
   const eFlash48 = useEnemySlotFlash(gameState, 48);
   const eFlash49 = useEnemySlotFlash(gameState, 49);
-  const allSlotFlashMatrices = [
+  const allSlotFlashOpacities = [
     eFlash0,  eFlash1,  eFlash2,  eFlash3,  eFlash4,
     eFlash5,  eFlash6,  eFlash7,  eFlash8,  eFlash9,
     eFlash10, eFlash11, eFlash12, eFlash13, eFlash14,
@@ -799,34 +789,35 @@ export default function GameCanvas({ width, height }: Props) {
 
             return (
               <Group key={i} transform={transform}>
-                {/* Inner group scopes the hit-flash color filter to the sprite layers only.
-                    <Paint> as child of <Group> sets the paint context for all draws within.
-                    ColorMatrix boosts R and suppresses G/B during hitFlashUntilMs window. */}
-                <Group>
-                  <Paint>
-                    <ColorMatrix matrix={allSlotFlashMatrices[i]} />
-                  </Paint>
-                  {/* Bottom layer: walk/fire frame (alive) or die frame (dying) */}
+                {/* Bottom layer: walk/fire frame (alive) or die frame (dying) */}
+                <Image
+                  image={img}
+                  x={-w / 2}
+                  y={-h / 2}
+                  width={w}
+                  height={h}
+                  sampling={{ filter: FilterMode.Nearest, mipmap: MipmapMode.None }}
+                />
+                {/* Top layer: Scav upper body — only while alive */}
+                {bodyOverlay && (
                   <Image
-                    image={img}
-                    x={-w / 2}
-                    y={-h / 2}
-                    width={w}
-                    height={h}
+                    image={bodyOverlay}
+                    x={-bw / 2}
+                    y={-bh / 2}
+                    width={bw}
+                    height={bh}
                     sampling={{ filter: FilterMode.Nearest, mipmap: MipmapMode.None }}
                   />
-                  {/* Top layer: Scav upper body — only while alive */}
-                  {bodyOverlay && (
-                    <Image
-                      image={bodyOverlay}
-                      x={-bw / 2}
-                      y={-bh / 2}
-                      width={bw}
-                      height={bh}
-                      sampling={{ filter: FilterMode.Nearest, mipmap: MipmapMode.None }}
-                    />
-                  )}
-                </Group>
+                )}
+                {/* Hit-flash: red circle centered on enemy, visible for HIT_FLASH_DURATION_MS.
+                    Sprite color-filter is not supported for <Image> in Skia v2.2.12. */}
+                <Circle
+                  cx={0}
+                  cy={0}
+                  r={ENEMY_COLLISION_RADIUS_PX}
+                  color="#cc2020"
+                  opacity={allSlotFlashOpacities[i]}
+                />
               </Group>
             );
           })}
