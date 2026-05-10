@@ -283,6 +283,41 @@ Each time the player taps Deploy, the scatter algorithm uses the current time as
 - Engine reads JSON, applies scatter, places landmark, draws atmosphere overlay
 - Mo will tune density and parameters by playing each map and adjusting; CC implements the system, Mo iterates the values
 
+### Enemy ranged fire — to land in Phase 5
+
+Decision made during Phase 3 G4a brainstorm: enemies that visually carry weapons should actually fire them. Currently all enemies are melee (walk up and contact-damage the player). This is appropriate for Scav (basic infantry rushing) but mismatched for Raider (who visually carries a weapon in raised pose) and definitionally wrong for Sniper, Gunner, and vehicle enemies once they arrive.
+
+**The change:**
+
+Ranged enemies stop at their preferred firing range and fire projectiles at the player. Each enemy type gets its own weapon profile (damage, range, fire rate, projectile speed). Sniper has long range and high damage. Gunner has medium range and high fire rate. Raider has short-to-medium range and moderate damage. Scav stays melee. Vehicles (Humvee, BTR, Panzer, ACS) fire too, per their kit.
+
+**Why this matters:**
+
+- Matches the visual fantasy — an enemy holding a weapon should use it
+- Adds a tactical dimension beyond positioning (dodge incoming fire, use cover)
+- Differentiates enemy types meaningfully — each one plays differently
+- On-brand for military theme — distinguishes this game from melee-swarm survivor-likes (Vampire Survivors, Brotato)
+- Pairs naturally with Phase 5's obstacles — cover finally has a reason to exist
+
+**Implementation scope (Phase 5):**
+
+The combat infrastructure for this already exists in `lib/combatEngine.ts` from Phase 3 G2 — targeting, projectile motion, collision, damage. The new work is mirroring those systems for enemy-owned projectiles:
+
+- Add weapon profile fields to `data/enemies.ts` per enemy type (range, fire rate, damage, projectile speed). Scav has none — it's melee.
+- Extend enemy AI in `enemyEngine.ts`: if in firing range, stop and fire on cooldown; else walk toward player. Currently AI is always "walk toward player."
+- Add `owner: 'player' | 'enemy'` field to `ProjectileState`. Update collision logic to handle both directions: player projectiles damage enemies (existing), enemy projectiles damage player (new).
+- Enemy projectile rendering — color or sprite-differentiated from player projectiles so the player can read what's coming at them.
+- Audio stubs for enemy fire (`enemy_shoot_pistol`, `enemy_shoot_rifle`, etc.) at the right call sites.
+
+**Why Phase 5 (not earlier):**
+
+1. Phase 5 introduces the rest of the ranged enemy roster (Gunner, Sniper, Humvee, BTR, Panzer, ACS). Building enemy-fire infrastructure once for the full roster, including retrofitting Raider, is cleaner than doing it for Raider now and rebuilding for the others later.
+2. Without obstacles (Phase 5's other deliverable), enemy fire would be brutal — no cover means no way to dodge. The two features are paired by design.
+3. Phase 3's combat loop is already satisfying for what it is. Don't expand scope.
+4. The context doc already implies ranged fire as Phase 5 (Sniper "long range, red laser warning"). This entry formalizes that implication.
+
+**Implementation note for Phase 5:** the infrastructure groundwork (the `owner` field on `ProjectileState`, the projectile-vs-player collision path) could optionally be added earlier as scaffolding if it makes Phase 5 cleaner. Decide at Phase 5 planning.
+
 ### Magnet feel tuning — to land in Phase 3 G4
 
 Found during G3 device test: money pickup magnet works correctly when player is stationary or close, but is weak when player moves past a pickup. Pickups appear to "follow the player's last position" rather than catch up. Pickup eventually arrives if the player stops; if the player keeps moving, the pickup tail-chases without catching up.
