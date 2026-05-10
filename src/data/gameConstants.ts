@@ -71,16 +71,28 @@ export const RAIDER_WALK_FRAME_DURATION_MS = 110;
 // ─── Enemy spawner ────────────────────────────────────────────────────────────
 
 /** Ms after game start before first enemy spawns. */
-export const SPAWN_INITIAL_DELAY_MS = 2000;
+export const SPAWN_INITIAL_DELAY_MS = 3000;
 
-/** Enemies per second at game start. */
-export const SPAWN_RATE_INITIAL = 0.5;
+/**
+ * Enemies per second at game start.
+ * 0.25/s = one enemy every 4 seconds — sparse, comfortable opening.
+ * Players need time to orient before pressure builds.
+ */
+export const SPAWN_RATE_INITIAL = 0.25;
 
-/** Enemies per second at peak (reached after SPAWN_RATE_RAMP_DURATION_MS). */
-export const SPAWN_RATE_MAX = 3.0;
+/**
+ * Enemies per second at peak (reached after SPAWN_RATE_RAMP_DURATION_MS).
+ * 2.0/s at peak; player pistol kills ~1.25 Scavs/sec (400ms cooldown, 2 shots each).
+ * Spawn rate crosses kill rate at ~70s — enemies accumulate and death follows shortly after.
+ */
+export const SPAWN_RATE_MAX = 2.0;
 
-/** Time (ms) over which spawn rate ramps from INITIAL to MAX. */
-export const SPAWN_RATE_RAMP_DURATION_MS = 60000;
+/**
+ * Time (ms) over which spawn rate ramps from INITIAL to MAX.
+ * 120s ramp gives a real arc: comfortable → pressured → overwhelmed.
+ * Rate crosses player kill capacity (~1.25/sec) at ~70s → first-death window 70-90s.
+ */
+export const SPAWN_RATE_RAMP_DURATION_MS = 120000;
 
 /** Max concurrent live enemies. Spawner pauses above this. */
 export const ENEMY_SOFT_CAP = 50;
@@ -162,14 +174,25 @@ export const CONTACT_DAMAGE_INTERVAL_MS = 500;
  */
 export const PICKUP_SLOT_COUNT = 50;
 
-/** Distance (px) at which the magnet pull activates toward the player. */
-export const MAGNET_RANGE_PX = 80;
+/**
+ * Distance (px) at which the magnet pull activates toward the player.
+ * 120px gives pickup enough time to build speed before player exits the range.
+ * At 80px the player (250px/s) crossed the zone too fast for acceleration to bite.
+ */
+export const MAGNET_RANGE_PX = 120;
 
-/** Acceleration applied toward the player while in magnet range (px/sec²). */
-export const MAGNET_ACCELERATION_PX_PER_SEC_SQ = 1200;
+/**
+ * Acceleration applied toward the player while in magnet range (px/sec²).
+ * 4000px/s² reaches 250px/s (player speed) in ~0.06s — fast enough to overtake
+ * a moving player well within the magnet range window. Primary fix for tail-chase.
+ */
+export const MAGNET_ACCELERATION_PX_PER_SEC_SQ = 4000;
 
-/** Maximum speed a pickup can reach under magnet pull (px/sec). */
-export const MAGNET_MAX_SPEED_PX_PER_SEC = 800;
+/**
+ * Maximum speed a pickup can reach under magnet pull (px/sec).
+ * 1200px/s = 4.8× player speed — once up to speed, pickup closes at 950px/s net.
+ */
+export const MAGNET_MAX_SPEED_PX_PER_SEC = 1200;
 
 /** Distance (px) at which a pickup is collected (overlaps player center). */
 export const COLLECT_RADIUS_PX = 12;

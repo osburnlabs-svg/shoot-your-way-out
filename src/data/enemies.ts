@@ -32,16 +32,20 @@ export const ENEMY_PROFILES: Record<EnemyType, EnemyProfile> = {
   scav: {
     id: 'scav',
     displayName: 'Scav',
-    hp: 15,
+    // hp=20: dies in 2 shots at pistol damage=12 (20/12=1.67→2 shots)
+    hp: 20,
     moveSpeed: 1.2,
+    // contactDamage=5: 10 HP/sec from one overlapping Scav — player has time to react
     contactDamage: 5,
     xpOnKill: 3,
   },
   raider: {
     id: 'raider',
     displayName: 'Raider',
+    // hp=40: dies in 4 shots at pistol damage=12 (40/12=3.33→4 shots)
     hp: 40,
     moveSpeed: 1.8,
+    // contactDamage=12: meaningfully more threatening than Scav; 24 HP/sec from one Raider
     contactDamage: 12,
     xpOnKill: 8,
   },

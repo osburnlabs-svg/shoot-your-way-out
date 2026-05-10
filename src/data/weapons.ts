@@ -36,10 +36,13 @@ export const WEAPON_PROFILES: Record<string, WeaponProfile> = {
     id: 'pistol',
     displayName: 'MP-443 Pistol',
     animationPose: 'pistol',
-    damage: 8,
+    // damage=12: kills Scav (20HP) in 2 shots, Raider (40HP) in 4 shots at 400ms cooldown
+    damage: 12,
     cooldownMs: 400,
-    rangePx: 180,
-    projectileSpeedPxPerSec: 400,
+    // rangePx=280: feels like actual ranged combat vs the original 180px melee distance
+    rangePx: 280,
+    // 500px/s: bullet crosses 280px range in 0.56s — snappy without feeling hitscan
+    projectileSpeedPxPerSec: 500,
   },
   // Phase 4a:
   // aks74u: { animationPose: 'pistol', damage: 6, cooldownMs: 150, rangePx: 220, ... },
