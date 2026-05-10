@@ -12,15 +12,16 @@
 // numbers carry forward without re-validation.
 
 /**
- * Purpose: this file is documentation, not runtime code. It does not affect
- * game behavior and is not imported by any engine module. Its value is as a
- * diff target: if future tuning shifts balance unexpectedly, compare the live
- * values in weapons.ts / enemies.ts / gameConstants.ts against this file to
- * identify what drifted and why.
+ * This file has two purposes:
  *
- * How to use it: if the game feels noticeably easier or harder than intended
- * and you're not sure why, search for any value here that differs from its
- * counterpart in the data files. The mismatch is the culprit.
+ * 1. RUNTIME: xpForLevel() is a real exported function used by progressionEngine.ts.
+ *    It is marked 'worklet' — safe to call from the Reanimated UI thread.
+ *
+ * 2. DOCUMENTATION: V1_BASELINE is a diff target for the Phase 3 balance snapshot.
+ *    It does not affect game behavior and is not imported by any engine module.
+ *    If the game feels noticeably easier or harder than intended, compare the live
+ *    values in weapons.ts / enemies.ts / gameConstants.ts against V1_BASELINE to
+ *    identify what drifted and why.
  *
  * Tuning rationale is inline. Key design target:
  *   - First-death (stationary player) at 60-90 seconds
@@ -28,6 +29,44 @@
  *   - Scav dies in 2 shots, Raider in 4 shots (pistol, 400ms cooldown)
  *   - Magnet catches pickups even when player is moving at full speed
  */
+
+// ─── XP curve ─────────────────────────────────────────────────────────────────
+
+/**
+ * Total XP required to reach `level` from the start of a run.
+ *
+ * Formula: Math.round(125 * (1.4^(level-1) - 1))
+ *   Derived from the closed-form sum of a geometric series starting at 50 XP
+ *   with a 1.4× growth factor per level.
+ *
+ * Resulting thresholds:
+ *   Level  2 →     50 XP   (~5 kills at 10 XP each — quick first level-up)
+ *   Level  3 →    120 XP
+ *   Level  4 →    218 XP
+ *   Level  5 →    355 XP
+ *   Level  6 →    547 XP
+ *   Level  7 →    816 XP
+ *   Level  8 →  1,193 XP
+ *   Level  9 →  1,721 XP
+ *   Level 10 →  2,460 XP
+ *   Level 11 →  3,494 XP
+ *   Level 12 →  4,942 XP   (~4 min at max kill rate, ~8 min at average)
+ *   Level 15 → 13,780 XP   (upper end of 5-10 min skilled play target)
+ *
+ * Design target: skilled player reaches level 12-15 in a 5-10 minute run.
+ * At 60 kills/min × 10 XP/kill = 600 XP/min: L12 at ~8 min, L15 at ~23 min
+ * when all pickups are collected. In practice additional XP sources (Raider
+ * bonus XP, HP/Armor pickup XP, Phase 4b sources) will accelerate progression
+ * in full v1 — these numbers are calibrated for Phase 4a standalone testing.
+ *
+ * Level 1 returns 0 (player starts at level 1 with 0 XP needed).
+ * Levels beyond the table follow the same formula continuously.
+ */
+export function xpForLevel(level: number): number {
+  'worklet';
+  if (level <= 1) return 0;
+  return Math.round(125 * (Math.pow(1.4, level - 1) - 1));
+}
 
 export const V1_BASELINE = {
 

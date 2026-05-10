@@ -29,6 +29,14 @@
  *   - PlayerState gains hp, maxHp, score, xp, lastDamagedAtMs
  *   - GameState gains pickups[], nextPickupId, isDead
  *   - updateGameState freezes all ticks when isDead; chains tickPickups last
+ *
+ * Phase 4a G1 additions:
+ *   - PlayerState gains level (initialized to 1)
+ *   - GameState gains pendingLevelUp + pendingLevelUpCount
+ *   - updateGameState freezes when pendingLevelUp (same pattern as isDead)
+ *   - tickProgression (progressionEngine) runs after tickPickups; detects XP
+ *     threshold crossings and sets pendingLevelUp. Level does not increment
+ *     until the player selects a skill in G3.
  */
 
 import type { HeroWeaponPose } from './sprites';
@@ -42,6 +50,7 @@ import {
 import { tickEnemies } from './enemyEngine';
 import { tickCombat } from './combatEngine';
 import { tickPickups } from './pickupEngine';
+import { tickProgression } from './progressionEngine';
 
 export type PlayerState = {
   x: number;
@@ -82,6 +91,12 @@ export type PlayerState = {
    * Stored for future hit-flash effect in G4.
    */
   lastDamagedAtMs: number;
+  /**
+   * Current player level. Initialized to 1. Increments in G3 when the player
+   * selects a skill from the level-up modal — NOT when the XP threshold is crossed.
+   * tickProgression reads this to determine which threshold to check next.
+   */
+  level: number;
 };
 
 /**
@@ -193,6 +208,18 @@ export type GameState = {
    * Real restart/menu wiring is Phase 7.
    */
   isDead: boolean;
+  /**
+   * True when the player has accumulated enough XP to level up and is waiting
+   * to select a skill. updateGameState freezes all ticks when true (same pattern
+   * as isDead). Cleared in G3 when the player confirms a skill selection.
+   */
+  pendingLevelUp: boolean;
+  /**
+   * Number of level-up selections still pending. Normally 1 when pendingLevelUp
+   * is true. Can be >1 if a single XP grant crossed multiple thresholds in one tick.
+   * G3 decrements this on each selection; clears pendingLevelUp when it reaches 0.
+   */
+  pendingLevelUpCount: number;
   /** Canvas dimensions stored once at init — spawner uses them to place enemies at edges. */
   canvasWidth: number;
   canvasHeight: number;
@@ -219,6 +246,7 @@ export function createInitialGameState(canvasWidth: number, canvasHeight: number
       score: 0,
       xp: 0,
       lastDamagedAtMs: 0,
+      level: 1,
     },
     enemies: [],
     nextEnemyId: 0,
@@ -229,6 +257,8 @@ export function createInitialGameState(canvasWidth: number, canvasHeight: number
     pickups: [],
     nextPickupId: 0,
     isDead: false,
+    pendingLevelUp: false,
+    pendingLevelUpCount: 0,
     canvasWidth,
     canvasHeight,
     elapsedMs: 0,
@@ -239,7 +269,9 @@ export function createInitialGameState(canvasWidth: number, canvasHeight: number
 /**
  * Advance game state by one fixed timestep (FIXED_STEP_MS).
  *
- * Returns state unchanged when isDead — game freezes until Phase 7 wires restart.
+ * Returns state unchanged when isDead or pendingLevelUp — both conditions
+ * freeze all simulation until the relevant flag is cleared (isDead: Phase 7
+ * restart wiring; pendingLevelUp: G3 skill selection).
  *
  * Tick ordering within one step:
  *   1. Player movement + rotation
@@ -248,6 +280,7 @@ export function createInitialGameState(canvasWidth: number, canvasHeight: number
  *      collision, damage, death transitions, die-animation cleanup,
  *      pickup spawning on death, contact damage (tickCombat)
  *   4. Pickup magnet pull + collection (tickPickups)
+ *   5. XP threshold check — sets pendingLevelUp if a level was earned (tickProgression)
  */
 export function updateGameState(state: GameState, dtMs: number): GameState {
   'worklet';
@@ -255,6 +288,10 @@ export function updateGameState(state: GameState, dtMs: number): GameState {
   // Freeze all simulation when the player is dead.
   // Phase 7 will set isDead = false via a restart action.
   if (state.isDead) return state;
+
+  // Freeze all simulation while a level-up selection is pending.
+  // G3 will clear pendingLevelUp after the player picks a skill.
+  if (state.pendingLevelUp) return state;
 
   const { player } = state;
   const { inputVector } = player;
@@ -308,5 +345,6 @@ export function updateGameState(state: GameState, dtMs: number): GameState {
 
   const stateAfterEnemies = tickEnemies(stateAfterPlayer, dtMs);
   const stateAfterCombat = tickCombat(stateAfterEnemies, dtMs);
-  return tickPickups(stateAfterCombat, dtMs);
+  const stateAfterPickups = tickPickups(stateAfterCombat, dtMs);
+  return tickProgression(stateAfterPickups);
 }

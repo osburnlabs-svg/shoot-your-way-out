@@ -316,10 +316,11 @@ export default function GameCanvas({ width, height }: Props) {
     () => Array.from({ length: ENEMY_SOFT_CAP }, () => 0),
   );
 
-  // ─── Player vitals + death flag (React, updated by 100ms timer) ──────────
+  // ─── Player vitals + death flag + level (React, updated by 100ms timer) ──
   const [displayHp, setDisplayHp] = useState(100);
   const [displayScore, setDisplayScore] = useState(0);
   const [displayXp, setDisplayXp] = useState(0);
+  const [displayLevel, setDisplayLevel] = useState(1);
   const [displayIsDead, setDisplayIsDead] = useState(false);
 
   // Fixed-rate timer — reads gameState.value directly on the JS thread every
@@ -339,10 +340,11 @@ export default function GameCanvas({ width, height }: Props) {
         : 0;
       setSpriteState({ isMoving: player.isMoving, frame: heroWalkFrame, weaponPose: player.weaponPose });
 
-      // Player vitals and death flag.
+      // Player vitals, level, and death flag.
       setDisplayHp(Math.ceil(player.hp));
       setDisplayScore(Math.floor(player.score));
       setDisplayXp(Math.floor(player.xp));
+      setDisplayLevel(player.level);
       setDisplayIsDead(state.isDead);
 
       // Enemy slot sprite state.
@@ -873,6 +875,7 @@ export default function GameCanvas({ width, height }: Props) {
           <Text style={styles.debugText}>HP: {displayHp}</Text>
           <Text style={styles.debugText}>Score: {displayScore}</Text>
           <Text style={styles.debugText}>XP: {displayXp}</Text>
+          <Text style={styles.debugText}>Level: {displayLevel}</Text>
           <Text style={styles.debugText}>Enemies: {displayEnemyCount}</Text>
           <Text style={styles.debugText}>Kills: {displayKillCount}</Text>
           <Text style={styles.debugText}>Time: {formatElapsed(displayElapsed)}</Text>
