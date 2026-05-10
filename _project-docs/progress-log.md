@@ -214,6 +214,35 @@ Deliberately deferred to Phase 6, where muzzle flash work will need to compute t
 
 ---
 
+## Design Decisions Pending Implementation
+
+### Stop-to-fire mechanic (Archero-style) — to land in Phase 3 G4
+
+Decision made during G2 brainstorm: shift from constant auto-fire to Archero-style "auto-fire only while standing still." Player still doesn't aim — targeting and aim remain automatic. The only change is that movement gates firing.
+
+**Mechanic:**
+- Player is moving → no projectiles spawn (weapon "holstered")
+- Player stops → auto-fire resumes immediately, targets nearest enemy as it does today
+
+**Why this change:**
+- Better fit for the military-tactical theme than constant-spray-while-sprinting
+- Pairs with Phase 5 obstacles to create real tactical play (use cover, stop behind objects, fire, move)
+- Adds decision-per-second engagement without requiring aim input — preserves one-thumb mobile UX
+- Tiny code change (roughly 3 lines in the auto-fire targeting/fire path)
+
+**Why defer to G4 instead of changing G3 now:**
+- G4 is where game-feel tuning lives anyway
+- Playing G3 with the current auto-fire model gives a real reference point to compare against when G4 flips it on
+- Bundles cleanly with other G4 polish work
+
+**Implementation note for G4:**
+- Gate is at the top of the auto-fire logic: if `player.isMoving`, skip targeting/firing for this tick
+- Open question for G4: should weapon cooldown pause while moving, or keep ticking so the weapon is "ready" the moment the player stops? Decide during G4 by feel.
+
+**Doc-update reminder:** When this lands in G4, the context doc's auto-fire description (lines 30, 34, 255) should be updated from "auto-fires constantly at nearest enemy" to "auto-fires at nearest enemy when standing still." That's not an errata fix — it's a deliberate design change captured here.
+
+---
+
 ## Phase 4a — Stat skills + level-up
 
 **Goal:** XP gems collected, level-up modal opens (using kit Upgrade Preset), 10 stat-modifier skills selectable, weapon progression unlocks at levels 4/8/12/16.
