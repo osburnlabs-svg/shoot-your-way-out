@@ -104,23 +104,19 @@ export const V1_BASELINE = {
   // ─── Magnet ────────────────────────────────────────────────────────────────
 
   /**
-   * magnetRangePx=120 — activation radius. Widened from 80px to give pickup
-   * enough time to build speed before player exits the range zone.
-   * At 80px, player (250px/s) crossed the zone in 0.32s — too fast for acceleration.
+   * magnetRangePx=120 — activation radius.
+   * Once within this distance the pickup snaps to direct-pull behavior.
    */
   magnetRangePx: 120,
 
   /**
-   * magnetAccelerationPxPerSec2=4000 — primary fix for tail-chase bug.
-   * Reaches player move speed (250px/s) in 0.06s. Pickup overtakes a fleeing
-   * player well within the 120px activation window.
-   * Previous value (1200) took 0.21s to reach player speed — too slow.
-   */
-  magnetAccelerationPxPerSec2: 4000,
-
-  /**
-   * magnetMaxSpeedPxPerSec=1200 — 4.8× player move speed.
-   * Net closing speed once at max = 1200 - 250 = 950px/s. Pickup arrives fast.
+   * magnetMaxSpeedPxPerSec=1200 — speed of direct-pull toward player.
+   *
+   * Magnet model: direct-pull, not physics-based acceleration.
+   * Each tick: vx = nx * magnetMaxSpeedPxPerSec, vy = ny * magnetMaxSpeedPxPerSec.
+   * No momentum, no acceleration constant. Pickup always moves at full speed
+   * toward current player position — eliminates tail-chase entirely.
+   * Net closing speed (player moving away): 1200 - 250 = 950px/s.
    */
   magnetMaxSpeedPxPerSec: 1200,
 

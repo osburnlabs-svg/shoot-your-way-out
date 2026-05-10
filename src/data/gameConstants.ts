@@ -182,13 +182,6 @@ export const PICKUP_SLOT_COUNT = 50;
 export const MAGNET_RANGE_PX = 120;
 
 /**
- * Acceleration applied toward the player while in magnet range (px/sec²).
- * 4000px/s² reaches 250px/s (player speed) in ~0.06s — fast enough to overtake
- * a moving player well within the magnet range window. Primary fix for tail-chase.
- */
-export const MAGNET_ACCELERATION_PX_PER_SEC_SQ = 4000;
-
-/**
  * Maximum speed a pickup can reach under magnet pull (px/sec).
  * 1200px/s = 4.8× player speed — once up to speed, pickup closes at 950px/s net.
  */

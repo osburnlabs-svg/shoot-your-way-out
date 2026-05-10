@@ -6,9 +6,8 @@
  *   For each active pickup:
  *     1. Compute distance to player center
  *     2. If within COLLECT_RADIUS_PX: collect (add score + xp, despawn)
- *     3. If within MAGNET_RANGE_PX: accelerate toward player, cap at max speed,
- *        advance position
- *     4. Otherwise: pickup stays still (velocity preserved for when player re-enters range)
+ *     3. If within MAGNET_RANGE_PX: move directly toward player at MAGNET_MAX_SPEED_PX_PER_SEC
+ *     4. Otherwise: pickup stays still, velocity explicitly zeroed
  *
  * Threading contract:
  *   - All logic runs on the UI thread (worklet).
@@ -16,17 +15,15 @@
  *   - No runOnJS calls. No React state reads or writes.
  *
  * Magnet model:
- *   Constant acceleration toward player position each tick.
- *   Speed capped at MAGNET_MAX_SPEED_PX_PER_SEC to prevent teleportation.
- *   Acceleration applied in normalized direction — pickup curves toward player
- *   as both move, giving the visual "chasing" effect.
+ *   Direct-pull: velocity recomputed each tick as unit-vector-toward-player × max speed.
+ *   No acceleration, no momentum. Pickup always moves at full speed toward current
+ *   player position — no tail-chase, no drift.
  */
 
 import type { GameState, PickupState } from './gameEngine';
 import { audioEngine } from './audioEngine';
 import {
   MAGNET_RANGE_PX,
-  MAGNET_ACCELERATION_PX_PER_SEC_SQ,
   MAGNET_MAX_SPEED_PX_PER_SEC,
   COLLECT_RADIUS_PX,
 } from '../data/gameConstants';
@@ -34,7 +31,6 @@ import {
 /** Squared thresholds — avoid sqrt in the hot loop until needed for normalization. */
 const MAGNET_RANGE_SQ = MAGNET_RANGE_PX * MAGNET_RANGE_PX;
 const COLLECT_RADIUS_SQ = COLLECT_RADIUS_PX * COLLECT_RADIUS_PX;
-const MAX_SPEED_SQ = MAGNET_MAX_SPEED_PX_PER_SEC * MAGNET_MAX_SPEED_PX_PER_SEC;
 
 export function tickPickups(state: GameState, dtMs: number): GameState {
   'worklet';
@@ -65,38 +61,25 @@ export function tickPickups(state: GameState, dtMs: number): GameState {
 
     // ─── Magnet pull ────────────────────────────────────────────────────────
     if (distSq < MAGNET_RANGE_SQ) {
-      // Normalize direction toward player (sqrt needed here for direction unit vector).
+      // Direct-pull: recompute velocity fresh each tick — no momentum.
       const dist = Math.sqrt(distSq);
-      const nx = dx / dist;
-      const ny = dy / dist;
-
-      // Apply acceleration toward player this tick.
-      let newVx = pickup.vxPxPerSec + nx * MAGNET_ACCELERATION_PX_PER_SEC_SQ * dtSec;
-      let newVy = pickup.vyPxPerSec + ny * MAGNET_ACCELERATION_PX_PER_SEC_SQ * dtSec;
-
-      // Cap speed magnitude at MAGNET_MAX_SPEED_PX_PER_SEC.
-      const speedSq = newVx * newVx + newVy * newVy;
-      if (speedSq > MAX_SPEED_SQ) {
-        const spd = Math.sqrt(speedSq);
-        newVx = (newVx / spd) * MAGNET_MAX_SPEED_PX_PER_SEC;
-        newVy = (newVy / spd) * MAGNET_MAX_SPEED_PX_PER_SEC;
-      }
+      const vx = (dx / dist) * MAGNET_MAX_SPEED_PX_PER_SEC;
+      const vy = (dy / dist) * MAGNET_MAX_SPEED_PX_PER_SEC;
 
       survivingPickups.push({
         id: pickup.id,
-        x: pickup.x + newVx * dtSec,
-        y: pickup.y + newVy * dtSec,
-        vxPxPerSec: newVx,
-        vyPxPerSec: newVy,
+        x: pickup.x + vx * dtSec,
+        y: pickup.y + vy * dtSec,
+        vxPxPerSec: vx,
+        vyPxPerSec: vy,
         type: pickup.type,
         scoreValue: pickup.scoreValue,
         xpValue: pickup.xpValue,
         spawnedAtMs: pickup.spawnedAtMs,
       });
     } else {
-      // Out of magnet range — stationary this tick.
-      // Velocity is preserved so if player re-enters range, acceleration resumes.
-      survivingPickups.push(pickup);
+      // Out of magnet range — stationary, velocity explicitly zeroed (no drift).
+      survivingPickups.push({ ...pickup, vxPxPerSec: 0, vyPxPerSec: 0 });
     }
   }
 
