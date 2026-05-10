@@ -27,7 +27,7 @@ Status legend:
 | 1 — Project scaffold | 🟢 Complete | 2026-05-08 | a85087b | Yes | Placeholder screen confirmed on device via Expo Go |
 | 2 — Player + drag-to-move | 🟢 Complete | 2026-05-08 | G1: fe57417 G2: 9116c45 G3: 3f618d0 G4: 78fa367 | Yes — all 4 groups | All groups complete |
 | 3 — Enemies + auto-fire | 🟢 Complete | 2026-05-10 | G1: c47e000 G2: 083d28d G3: 5715c19 G4b: 738ab95 G4c: a095517 | G1 ✅ G2 ✅ G3 ✅ G4b ✅ G4c ✅ | |
-| 4a — Stat skills + level-up | ⚪ | | | | |
+| 4a — Stat skills + level-up | 🟡 In Progress | 2026-05-10 | G1: c4daad8 | G1 ✅ | G1 complete — XP curve, level field, level-up freeze |
 | 4b — Ability skills + crates | ⚪ | | | | |
 | 5 — Maps + obstacles + vehicle enemies | ⚪ | | | | |
 | 6 — Audio + atmospheric effects | ⚪ | | | | |
@@ -43,6 +43,8 @@ Status legend:
 |---|---|---|---|
 | SafeAreaProvider native ViewManager not registering on Fabric — react-native-safe-area-context's `RNCSafeAreaProvider` is missing from the New Architecture build despite the package being installed | Phase 2 Group 2 | Hardcoded inset values in DebugOverlay (`top: 50, right: 10`) | Phase 7 — HUD requires real safe-area awareness for notch / dynamic island / home indicator |
 | No camera/zoom system — world renders at 1:1 with no `<Group>` wrapper, sprite scale hardcoded per element | Phase 2 G3 | `HERO_SPRITE_SCALE` constant in `gameConstants.ts` as a tunable | Phase 5 — tile rendering and obstacle placement need a camera that follows the player; multiple sprite scales need a unified zoom |
+| **YOU DIED overlay** — custom RN `<View>` with red "YOU DIED" text, opacity-gated in the JSX tree; not a kit asset | Phase 3 G3 | `displayIsDead` opacity toggle in `GameCanvas.tsx` (opacity 0/1, always in tree, pointerEvents none) | Phase 7 — replace with kit `Mission Failed/BG.png` + `BG Preset.png`, hero death animation (4-frame loop), stats panel (score / time / level / kills), `BTN Retry.png` (REDEPLOY) + `BTN MENU.png` (RETURN TO HQ), revive prompt per Game Over spec |
+| **Debug overlay** — plain RN `<Text>` lines for HP/Score/XP/Level + Enemies/Kills/Time/Frame; hardcoded safe-area offsets; not kit assets | Phase 2 G2 (extended through Phase 3 and 4a G1) | Hardcoded `top: 50, right: 10` in `GameCanvas.tsx`; extended in each phase as new fields arrive | Phase 7 — replace with kit HUD assets: `HUD/CHARACTER HUD/HP ARMOR AMMO HUD.png`, `HUD/MONEY PANEL/Money Panel HUD.png`, `HUD/WEAPON ICONS/` per equipped weapon, bottom-center XP bar with current level; safe-area insets via real `useSafeAreaInsets` once SafeAreaProvider is fixed |
 
 ---
 
@@ -490,7 +492,36 @@ Single-line gate in `lib/combatEngine.ts`: added `&& !player.isMoving` to the au
 
 **Goal:** XP gems collected, level-up modal opens (using kit Upgrade Preset), 10 stat-modifier skills selectable, weapon progression unlocks at levels 4/8/12/16.
 
-**Status:** Not started
+**Status:** 🟡 In Progress
+
+**Groups:**
+- G1 🟢 — XP curve, level field, level-up engine freeze (commit c4daad8, device-tested)
+- G2 ⚪ — 10 stat-modifier skills + skill state on PlayerState
+- G3 ⚪ — Level-up modal (kit Upgrade Preset), skill selection, game resume
+- G4 ⚪ — Weapon progression unlocks at levels 4/8/12/16
+
+---
+
+## Phase 4a — Group 1: XP curve, level field, level-up engine freeze
+
+**Status:** Complete 🟢
+**Commit:** c4daad8
+**Verification:** On device — game launches and plays normally with Level: 1 visible in debug overlay from boot. After collecting ~5 money pickups (50 XP), the game freezes cleanly: enemies stop walking, projectiles stop, joystick input has no effect. Debug overlay continues updating (its own 100ms timer is unaffected by the engine freeze) and still shows Level: 1. All Phase 3 systems — stop-to-fire, hit flashes, magnet pickup, contact damage, YOU DIED overlay — work correctly up to the freeze point. No console warnings or errors.
+
+### What was built
+
+- `src/data/balance.ts`: `xpForLevel(level)` exported as a real worklet function (previously the file was documentation-only). Formula: `Math.round(125 * (Math.pow(1.4, level - 1) - 1))`. L2 = 50 XP, L3 = 120, L4 = 218 … L12 ≈ 4942, L15 ≈ 13780. Header comment updated to document both the runtime and documentation purposes of the file.
+- `src/lib/progressionEngine.ts` (new): `tickProgression` worklet. Loops `while player.xp >= xpForLevel(checkLevel + 1)` to count thresholds crossed in a single tick, sets `pendingLevelUp = true`, increments `pendingLevelUpCount`, fires `audioEngine.playSFX('level_up_chime')` stub.
+- `src/lib/gameEngine.ts`: `level: number` added to `PlayerState` (initialized to 1); `pendingLevelUp: boolean` and `pendingLevelUpCount: number` added to `GameState` (initialized to false/0); `pendingLevelUp` freeze guard added immediately after the `isDead` guard in `updateGameState`; `tickProgression` imported and chained as step 5 after `tickPickups`.
+- `src/components/GameCanvas.tsx`: `displayLevel` React state added; read from `player.level` in the 100ms timer alongside HP/Score/XP; `Level: {displayLevel}` line added to the debug overlay.
+
+### Architectural decisions made during G1
+
+- **`tickProgression` lives in its own file.** Follows the established domain-engine pattern (`combatEngine`, `pickupEngine`, `enemyEngine`). Progression logic will grow in G2 (skill modifier application) and G3 (skill selection + level increment) — isolating it now avoids bloating the orchestrator as it expands.
+- **Freeze pattern reuses the `isDead` early-return model.** Two sequential guards in `updateGameState`: `if (state.isDead) return state` then `if (state.pendingLevelUp) return state`. Same semantics — return state unchanged — same cost. The symmetry makes the intent obvious and G3's clear-and-resume pattern straightforward to add.
+- **`level` does not increment in G1; it increments on skill selection in G3.** Considered alternative: increment immediately when the threshold is crossed, track pending picks separately. Rejected: the level-up modal shows "leveling UP to level N," so the increment logically belongs at selection time, not detection time. This keeps `player.level` as the authoritative source of truth for "what level has been confirmed by a player choice."
+- **`pendingLevelUpCount` tracks thresholds crossed in a single tick.** Rare in Phase 4a (money_small gives 10 XP per pickup; crossing two thresholds at once requires a gap of only 10 XP, possible only between L2 and L3 early in a run). Included because the infrastructure cost is one integer and the alternative — silently losing a level-up — is worse than the complexity of tracking it.
+- **XP curve numbers are starting points, not final values.** The formula is designed to be tunable via a single multiplier in `balance.ts`. Expect retuning once Phase 4a is fully running with skills active, weapon upgrades unlocking, and real run pacing measured on device. The Phase 3 balance note applies here: don't assume these numbers carry forward without re-validation against actual run length.
 
 ---
 
