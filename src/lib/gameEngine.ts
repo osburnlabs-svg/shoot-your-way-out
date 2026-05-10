@@ -275,23 +275,16 @@ export function createInitialGameState(canvasWidth: number, canvasHeight: number
       xp: 0,
       lastDamagedAtMs: 0,
       level: 1,
-      // TEMPORARY G2 VERIFICATION SEED — remove before phase close
-      // Expected outcomes:
-      //   ammo_545bt ×4  → damage 12 × 1.8 = 21.6  (1-shots Scav at 20 HP)
-      //   optics_red_dot ×2  → range 280 × 1.3 = 364 px
-      //   gear_tactical_boots ×1  → speed 250 × 1.12 = 280 px/s
-      //   provisions_painkillers ×1  → +2 HP/sec regen (visible in tickRegen)
-      //   ammo_tracer ×1  → pierce 1 (projectile hits 2 enemies)
       skillStacks: {
-        ammo_545bt: 4,
+        ammo_545bt: 0,
         ammo_subsonic: 0,
-        ammo_tracer: 1,
-        optics_red_dot: 2,
+        ammo_tracer: 0,
+        optics_red_dot: 0,
         optics_pso_scope: 0,
         gear_plate_carrier: 0,
-        gear_tactical_boots: 1,
+        gear_tactical_boots: 0,
         gear_mre: 0,
-        provisions_painkillers: 1,
+        provisions_painkillers: 0,
         provisions_stims: 0,
       },
     },

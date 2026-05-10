@@ -70,7 +70,7 @@ export type SkillDefinition = {
 export const SKILLS: Record<SkillId, SkillDefinition> = {
   ammo_545bt: {
     id: 'ammo_545bt',
-    displayName: '5.45 BT',
+    displayName: 'Armor-Piercing Rounds',
     description: '+20% damage per stack.',
     category: 'ammo',
     maxStacks: 3,
@@ -78,7 +78,7 @@ export const SKILLS: Record<SkillId, SkillDefinition> = {
   },
   ammo_subsonic: {
     id: 'ammo_subsonic',
-    displayName: 'Subsonic',
+    displayName: 'Subsonic Rounds',
     description: '+10% fire rate per stack.',
     category: 'ammo',
     maxStacks: 3,
@@ -86,7 +86,7 @@ export const SKILLS: Record<SkillId, SkillDefinition> = {
   },
   ammo_tracer: {
     id: 'ammo_tracer',
-    displayName: 'Tracer',
+    displayName: 'Tracer Rounds',
     description: 'Projectiles pierce +1 enemy per stack.',
     category: 'ammo',
     maxStacks: 3,
@@ -102,7 +102,7 @@ export const SKILLS: Record<SkillId, SkillDefinition> = {
   },
   optics_pso_scope: {
     id: 'optics_pso_scope',
-    displayName: 'PSO Scope',
+    displayName: 'Holographic Sight',
     description: '+30% range, -10% fire rate per stack.',
     category: 'optics',
     maxStacks: 2,
