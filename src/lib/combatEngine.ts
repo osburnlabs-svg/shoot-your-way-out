@@ -20,16 +20,18 @@
  *   - No runOnJS calls. audioEngine.playSFX is worklet-safe (stub with 'worklet' directive).
  *   - No React state reads or writes. No SharedValue mutation outside GameState.
  *
- * Collision model:
+ * Collision model (G2):
  *   Circle-vs-circle. Radii from gameConstants (ENEMY_COLLISION_RADIUS_PX +
- *   PROJECTILE_COLLISION_RADIUS_PX). One projectile = one hit (no piercing in G2).
- *   An enemy can receive multiple simultaneous hits if multiple projectiles land
- *   in the same tick (unlikely at Pistol's 400ms cooldown, handled correctly).
+ *   PROJECTILE_COLLISION_RADIUS_PX). Projectiles track pierceRemaining + hitEnemyIds.
+ *   pierceRemaining = 0 → consumed after 1 hit. pierceRemaining = N → hits N+1 enemies.
+ *   An enemy can receive multiple simultaneous hits from different projectiles.
+ *   A projectile cannot re-hit the same enemy (hitEnemyIds check).
  */
 
 import type { GameState, EnemyState, ProjectileState, PickupState } from './gameEngine';
 import { WEAPON_PROFILES } from '../data/weapons';
 import { ENEMY_PROFILES } from '../data/enemies';
+import { getEffectiveStats } from '../data/skills';
 import { audioEngine } from './audioEngine';
 import {
   ENEMY_COLLISION_RADIUS_PX,
@@ -67,6 +69,9 @@ export function tickCombat(state: GameState, dtMs: number): GameState {
   // Weapon profile lookup failed — should never happen, but bail gracefully.
   if (!weapon) return state;
 
+  // Compute effective stats once per tick — threads skill bonuses into all combat logic.
+  const effective = getEffectiveStats(player.skillStacks, weapon, player.maxHp);
+
   const dtSec = dtMs / 1000;
 
   // ─── 1. Advance weapon cooldown ───────────────────────────────────────────
@@ -84,7 +89,7 @@ export function tickCombat(state: GameState, dtMs: number): GameState {
   }
 
   // ─── 2. Find nearest alive enemy within range ─────────────────────────────
-  const rangeSq = weapon.rangePx * weapon.rangePx;
+  const rangeSq = effective.rangePx * effective.rangePx;
   let targetIdx = -1;
   let minDistSq = rangeSq + 1; // just beyond range so any in-range enemy beats it
 
@@ -123,11 +128,13 @@ export function tickCombat(state: GameState, dtMs: number): GameState {
       vyPxPerSec: ny * spd,
       speedPxPerSec: spd,
       distanceTraveledPx: 0,
-      maxRangePx: weapon.rangePx,
-      damage: weapon.damage,
+      maxRangePx: effective.rangePx,
+      damage: effective.damage,
+      pierceRemaining: effective.pierce,
+      hitEnemyIds: [],
     });
     nextProjectileId += 1;
-    weaponCooldownMs = weapon.cooldownMs;
+    weaponCooldownMs = effective.cooldownMs;
     audioEngine.playSFX('shoot_pistol');
   }
 
@@ -147,6 +154,8 @@ export function tickCombat(state: GameState, dtMs: number): GameState {
       distanceTraveledPx: newDist,
       maxRangePx: p.maxRangePx,
       damage: p.damage,
+      pierceRemaining: p.pierceRemaining,
+      hitEnemyIds: p.hitEnemyIds,
     });
   }
 
@@ -159,34 +168,59 @@ export function tickCombat(state: GameState, dtMs: number): GameState {
     damageAccum.push(0);
   }
 
-  // Track which projectile IDs were consumed (hit an enemy).
-  const consumedIds: number[] = [];
+  // Pierce-aware collision loop.
+  // Each projectile tracks its own pierceRemaining and hitEnemyIds.
+  // A projectile is consumed when pierceRemaining drops below 0.
+  // hitEnemyIds prevents re-hitting the same enemy across multiple ticks of travel.
+  const finalProjectiles: ProjectileState[] = [];
 
   for (let pi = 0; pi < movedProjectiles.length; pi++) {
     const proj = movedProjectiles[pi];
+    let pierceRemaining = proj.pierceRemaining;
+    // Copy hitEnemyIds for mutation within this tick.
+    const hitEnemyIds: number[] = [];
+    for (let k = 0; k < proj.hitEnemyIds.length; k++) {
+      hitEnemyIds.push(proj.hitEnemyIds[k]);
+    }
+
     for (let ei = 0; ei < enemies.length; ei++) {
       const enemy = enemies[ei];
       if (enemy.status !== 'alive') continue;
+
+      // Skip enemies this projectile has already hit.
+      let alreadyHit = false;
+      for (let k = 0; k < hitEnemyIds.length; k++) {
+        if (hitEnemyIds[k] === enemy.id) { alreadyHit = true; break; }
+      }
+      if (alreadyHit) continue;
+
       const dx = proj.x - enemy.x;
       const dy = proj.y - enemy.y;
       if (dx * dx + dy * dy < PROJ_ENEMY_COLLISION_R_SQ) {
         damageAccum[ei] += proj.damage;
-        consumedIds.push(proj.id);
+        hitEnemyIds.push(enemy.id);
         audioEngine.playSFX('impact_flesh');
-        break; // one projectile = one hit
+        pierceRemaining -= 1;
+        if (pierceRemaining < 0) break; // projectile fully consumed
       }
     }
-  }
 
-  // Filter out consumed projectiles.
-  const finalProjectiles: ProjectileState[] = [];
-  for (let i = 0; i < movedProjectiles.length; i++) {
-    const p = movedProjectiles[i];
-    let consumed = false;
-    for (let j = 0; j < consumedIds.length; j++) {
-      if (consumedIds[j] === p.id) { consumed = true; break; }
+    // Keep projectile if it still has pierce capacity (pierceRemaining >= 0).
+    if (pierceRemaining >= 0) {
+      finalProjectiles.push({
+        id: proj.id,
+        x: proj.x,
+        y: proj.y,
+        vxPxPerSec: proj.vxPxPerSec,
+        vyPxPerSec: proj.vyPxPerSec,
+        speedPxPerSec: proj.speedPxPerSec,
+        distanceTraveledPx: proj.distanceTraveledPx,
+        maxRangePx: proj.maxRangePx,
+        damage: proj.damage,
+        pierceRemaining,
+        hitEnemyIds,
+      });
     }
-    if (!consumed) finalProjectiles.push(p);
   }
 
   // Apply damage to enemies, transition dying ones, spawn pickups on death.
@@ -267,7 +301,7 @@ export function tickCombat(state: GameState, dtMs: number): GameState {
       elapsedMs - enemy.lastHitPlayerAtMs >= CONTACT_DAMAGE_INTERVAL_MS
     ) {
       const profile = ENEMY_PROFILES[enemy.type];
-      newPlayerHp = Math.max(0, newPlayerHp - profile.contactDamage);
+      newPlayerHp = Math.max(0, newPlayerHp - profile.contactDamage * effective.damageTakenMult);
       newLastDamagedAtMs = elapsedMs;
       audioEngine.playSFX('hit_grunt');
       contactCheckedEnemies.push({

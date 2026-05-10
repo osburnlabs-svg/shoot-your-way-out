@@ -37,20 +37,29 @@
  *   - tickProgression (progressionEngine) runs after tickPickups; detects XP
  *     threshold crossings and sets pendingLevelUp. Level does not increment
  *     until the player selects a skill in G3.
+ *
+ * Phase 4a G2 additions:
+ *   - PlayerState gains skillStacks: Record<SkillId, number>
+ *   - ProjectileState gains pierceRemaining + hitEnemyIds (pierce support)
+ *   - createInitialGameState includes a verification seed (dev-only skill stacks)
+ *   - updateGameState movement block uses effective.moveSpeedPxPerSec instead of
+ *     the bare PLAYER_MOVE_SPEED_PX_PER_SEC constant
+ *   - updateGameState chains tickRegen after tickPickups, before tickProgression
  */
 
 import type { HeroWeaponPose } from './sprites';
 import type { EnemyType } from '../data/enemies';
-import { STARTING_WEAPON_ID } from '../data/weapons';
+import { STARTING_WEAPON_ID, WEAPON_PROFILES } from '../data/weapons';
 import {
-  PLAYER_MOVE_SPEED_PX_PER_SEC,
   PLAYER_MAX_ANGULAR_SPEED_RAD_PER_SEC,
   PLAYER_STARTING_HP,
 } from '../data/gameConstants';
+import type { SkillId } from '../data/skills';
+import { getEffectiveStats } from '../data/skills';
 import { tickEnemies } from './enemyEngine';
 import { tickCombat } from './combatEngine';
 import { tickPickups } from './pickupEngine';
-import { tickProgression } from './progressionEngine';
+import { tickProgression, tickRegen } from './progressionEngine';
 
 export type PlayerState = {
   x: number;
@@ -97,6 +106,12 @@ export type PlayerState = {
    * tickProgression reads this to determine which threshold to check next.
    */
   level: number;
+  /**
+   * Active skill stack counts for this run. Key = SkillId; value = number of stacks.
+   * Initialized in createInitialGameState (dev seed in G2; cleared to {} in G3 real runs).
+   * Read by getEffectiveStats every tick to compute live weapon/player stats.
+   */
+  skillStacks: Record<SkillId, number>;
 };
 
 /**
@@ -160,6 +175,19 @@ export type ProjectileState = {
   distanceTraveledPx: number;
   maxRangePx: number;
   damage: number;
+  /**
+   * Remaining pierce penetrations. Decremented on each enemy hit.
+   * When it falls below 0 the projectile is consumed.
+   * 0 = non-piercing (consumed after 1 hit), 1 = pierces 1 extra enemy, etc.
+   * Set at spawn from effective.pierce; never increases after spawn.
+   */
+  pierceRemaining: number;
+  /**
+   * IDs of enemies already hit by this projectile in prior ticks.
+   * Checked before collision so a piercing projectile cannot re-hit the same enemy.
+   * Plain number[] — avoids Set/Map which are not worklet-safe.
+   */
+  hitEnemyIds: number[];
 };
 
 /**
@@ -247,6 +275,25 @@ export function createInitialGameState(canvasWidth: number, canvasHeight: number
       xp: 0,
       lastDamagedAtMs: 0,
       level: 1,
+      // TEMPORARY G2 VERIFICATION SEED — remove before phase close
+      // Expected outcomes:
+      //   ammo_545bt ×4  → damage 12 × 1.8 = 21.6  (1-shots Scav at 20 HP)
+      //   optics_red_dot ×2  → range 280 × 1.3 = 364 px
+      //   gear_tactical_boots ×1  → speed 250 × 1.12 = 280 px/s
+      //   provisions_painkillers ×1  → +2 HP/sec regen (visible in tickRegen)
+      //   ammo_tracer ×1  → pierce 1 (projectile hits 2 enemies)
+      skillStacks: {
+        ammo_545bt: 4,
+        ammo_subsonic: 0,
+        ammo_tracer: 1,
+        optics_red_dot: 2,
+        optics_pso_scope: 0,
+        gear_plate_carrier: 0,
+        gear_tactical_boots: 1,
+        gear_mre: 0,
+        provisions_painkillers: 1,
+        provisions_stims: 0,
+      },
     },
     enemies: [],
     nextEnemyId: 0,
@@ -280,7 +327,8 @@ export function createInitialGameState(canvasWidth: number, canvasHeight: number
  *      collision, damage, death transitions, die-animation cleanup,
  *      pickup spawning on death, contact damage (tickCombat)
  *   4. Pickup magnet pull + collection (tickPickups)
- *   5. XP threshold check — sets pendingLevelUp if a level was earned (tickProgression)
+ *   5. HP regen from provisions_painkillers / provisions_stims (tickRegen)
+ *   6. XP threshold check — sets pendingLevelUp if a level was earned (tickProgression)
  */
 export function updateGameState(state: GameState, dtMs: number): GameState {
   'worklet';
@@ -318,7 +366,10 @@ export function updateGameState(state: GameState, dtMs: number): GameState {
       player.rotation + Math.sign(rotDiff) * Math.min(Math.abs(rotDiff), maxDelta);
 
     // Move at full speed in input direction (inputVector is already normalized).
-    const speed = PLAYER_MOVE_SPEED_PX_PER_SEC * (dtMs / 1000);
+    // Speed is drawn from effective stats so gear_tactical_boots stacks apply.
+    const weapon = WEAPON_PROFILES[player.equippedWeaponId];
+    const effective = getEffectiveStats(player.skillStacks, weapon, player.maxHp);
+    const speed = effective.moveSpeedPxPerSec * (dtMs / 1000);
     newX = player.x + inputVector.x * speed;
     newY = player.y + inputVector.y * speed;
 
@@ -346,5 +397,6 @@ export function updateGameState(state: GameState, dtMs: number): GameState {
   const stateAfterEnemies = tickEnemies(stateAfterPlayer, dtMs);
   const stateAfterCombat = tickCombat(stateAfterEnemies, dtMs);
   const stateAfterPickups = tickPickups(stateAfterCombat, dtMs);
-  return tickProgression(stateAfterPickups);
+  const stateAfterRegen = tickRegen(stateAfterPickups, dtMs);
+  return tickProgression(stateAfterRegen);
 }
