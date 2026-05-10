@@ -25,6 +25,18 @@ This project is built by a non-technical solo developer working with Claude as t
 
 **Communication style:** Mo prefers honest tradeoffs over confident recommendations. If two approaches are reasonable, say so. If you're uncertain, say so. Don't bury caveats. Don't paper over disagreements with the docs — the doc has known errata and Mo will catch drift faster than you will.
 
+**The three-stage workflow.** Work on this project flows through three stages, in order. Skipping a stage tends to produce wrong-direction work that's expensive to undo.
+
+1. **Strategic planning (Mo + Claude in chat).** Scope, decisions, tradeoffs, design direction. No code is written. Claude pushes back where appropriate and surfaces things Mo might not see; Mo drives direction and catches strategic drift. Output: an aligned understanding of what to build and why, plus locked decisions on anything contestable.
+
+2. **Prompt drafting and CC pre-review (Claude writes, CC reviews).** Claude writes a CC prompt that captures the goal, locked decisions, scope (in and out), and verification criteria. CC reads the context docs and the relevant code, then confirms understanding in 2-3 sentences and flags any ambiguity, stale information, or technical concerns before writing code. Mo reviews CC's confirmation — if it's off, Mo corrects before approving. If it's right, Mo approves with a short go-ahead.
+
+3. **Execution and verification (CC + Mo).** CC writes the code. Mo runs on device, reports what works and what doesn't, and commits. Each group's work is independently verifiable — one focused change at a time, no stacked speculative fixes.
+
+**Why the three stages matter.** The pre-review checkpoint in stage 2 is the most important and least obvious part of the workflow. It catches mistakes before any code is written: scope drift (CC understood the wrong group), stale data (constant values that have changed), technical incompatibilities (a function that won't work from a worklet, a sprite asset that doesn't exist). Each catch in pre-review saves an execute-test-revert cycle. This checkpoint is not optional — even when the prompt feels obviously correct, the confirmation step is the safety rail.
+
+**When stages overlap.** Sometimes stage 1 and stage 2 collapse together — a tiny fix where the decision is obvious and the prompt is two lines. That's fine. The discipline isn't about adding ceremony to small tasks; it's about not skipping the checkpoint on tasks that actually need it. When in doubt, do all three stages. The cost of an unnecessary confirmation step is 30 seconds; the cost of a missed one can be hours.
+
 ---
 
 ## How to Use This Document
