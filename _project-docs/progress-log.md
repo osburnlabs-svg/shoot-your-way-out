@@ -26,7 +26,7 @@ Status legend:
 | 0 — Pre-build setup | 🟢 Complete | 2026-05-08 | n/a | n/a | Directories, kits, context doc, accounts |
 | 1 — Project scaffold | 🟢 Complete | 2026-05-08 | a85087b | Yes | Placeholder screen confirmed on device via Expo Go |
 | 2 — Player + drag-to-move | 🟢 Complete | 2026-05-08 | G1: fe57417 G2: 9116c45 G3: 3f618d0 G4: 78fa367 | Yes — all 4 groups | All groups complete |
-| 3 — Enemies + auto-fire | 🟡 In Progress | | G1: c47e000 G2: 083d28d G3: 5715c19 G4b: 738ab95 | G1 ✅ G2 ✅ G3 ✅ G4b ✅ | G4c device-test pending |
+| 3 — Enemies + auto-fire | 🟢 Complete | 2026-05-10 | G1: c47e000 G2: 083d28d G3: 5715c19 G4b: 738ab95 G4c: a095517 | G1 ✅ G2 ✅ G3 ✅ G4b ✅ G4c ✅ | |
 | 4a — Stat skills + level-up | ⚪ | | | | |
 | 4b — Ability skills + crates | ⚪ | | | | |
 | 5 — Maps + obstacles + vehicle enemies | ⚪ | | | | |
@@ -455,7 +455,7 @@ Single-line gate in `lib/combatEngine.ts`: added `&& !player.isMoving` to the au
 ## Phase 3 — Group 4c: Hit flashes + audio cleanup
 
 **Status:** Complete 🟢
-**Commit:** [this commit]
+**Commit:** a095517
 
 ### What was built
 
