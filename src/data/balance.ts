@@ -1,6 +1,17 @@
+// V1 DEMO BALANCE — captured at end of Phase 3 G4a.
+//
+// These values target Phase 3 standalone play: pistol-only, no progression,
+// no bosses, no level-ups, no armor/HP pickups. Design target: new player
+// dies in 60-90 seconds.
+//
+// Full v1 balance is a Phase 5+ concern. Once helicopter (minute 2 boss),
+// tier 5-7 enemies (Humvee/BTR/Panzer/ACS), level-ups, weapon upgrades, and
+// skill stacks exist, these numbers WILL need to be retuned. The target then
+// is: new player reaches the first helicopter (minute 2), skilled player
+// reaches multiple helicopter cycles (minutes 6-8). Do not assume Phase 3
+// numbers carry forward without re-validation.
+
 /**
- * V1 balance baseline — canonical reference, captured end of Phase 3 G4a.
- *
  * Purpose: this file is documentation, not runtime code. It does not affect
  * game behavior and is not imported by any engine module. Its value is as a
  * diff target: if future tuning shifts balance unexpectedly, compare the live
