@@ -145,3 +145,29 @@ export const PickupSprites = {
     small: require('../../assets/sprites/pickups/money/Money_Small.png'),
   },
 } as const;
+
+/**
+ * GUI sprite registry — introduced in Phase 4a G3 for the level-up modal.
+ *
+ * upgrade.bg: empty 3×3 slot grid from the kit's Upgrade/BG.png (308×243 px).
+ * skillIcons.*: one icon per skill, sourced from kit weapon HUD and inventory icons.
+ *   ammo / stims share the ammo crate graphic.
+ *   painkillers / mre share the HP icon.
+ */
+export const GuiSprites = {
+  upgrade: {
+    bg: require('../../assets/ui/upgrade/BG.png'),
+  },
+  skillIcons: {
+    ammo_545bt:         require('../../assets/ui/icons/Ammo.png'),
+    ammo_subsonic:      require('../../assets/ui/icons/Ammo.png'),
+    ammo_tracer:        require('../../assets/ui/icons/Ammo.png'),
+    optics_red_dot:     require('../../assets/ui/icons/Pistol_HUD.png'),
+    optics_pso_scope:   require('../../assets/ui/icons/SMG_HUD.png'),
+    gear_plate_carrier: require('../../assets/ui/icons/Armor_Icon.png'),
+    gear_tactical_boots:require('../../assets/ui/icons/Speed_01.png'),
+    gear_mre:           require('../../assets/ui/icons/HP_Icon.png'),
+    provisions_painkillers: require('../../assets/ui/icons/HP_Icon.png'),
+    provisions_stims:   require('../../assets/ui/icons/Ammo.png'),
+  },
+} as const;

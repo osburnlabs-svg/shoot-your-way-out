@@ -71,6 +71,9 @@ import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 
 import { HeroSprites, EnemySprites, PickupSprites } from '../lib/sprites';
 import type { HeroWeaponPose } from '../lib/sprites';
+import { SKILLS, SKILL_IDS } from '../data/skills';
+import type { SkillId } from '../data/skills';
+import LevelUpModal from './LevelUpModal';
 import {
   ENEMY_COLLISION_RADIUS_PX,
   ENEMY_SOFT_CAP,
@@ -323,6 +326,11 @@ export default function GameCanvas({ width, height }: Props) {
   const [displayLevel, setDisplayLevel] = useState(1);
   const [displayIsDead, setDisplayIsDead] = useState(false);
 
+  // ─── Level-up modal display state (React, updated by 100ms timer) ─────────
+  const [displayPendingLevelUp, setDisplayPendingLevelUp] = useState(false);
+  const [displayChoices, setDisplayChoices] = useState<SkillId[]>([]);
+  const [displayPlayerSkillStacks, setDisplayPlayerSkillStacks] = useState<Record<string, number>>({});
+
   // Fixed-rate timer — reads gameState.value directly on the JS thread every
   // 100ms. Completely decoupled from useFrameCallback; zero runOnJS calls
   // for sprite selection. Hero + enemy sprite state + player vitals computed together.
@@ -346,6 +354,35 @@ export default function GameCanvas({ width, height }: Props) {
       setDisplayXp(Math.floor(player.xp));
       setDisplayLevel(player.level);
       setDisplayIsDead(state.isDead);
+
+      // Level-up modal: draw choices on JS thread when pendingLevelUp is first
+      // detected and currentLevelUpChoices is still empty (safe to mutate
+      // gameState.value here — engine is frozen during pendingLevelUp).
+      if (state.pendingLevelUp && state.currentLevelUpChoices.length === 0) {
+        // Build candidate list: skills not yet at max stacks.
+        const candidates: SkillId[] = [];
+        for (let ci = 0; ci < SKILL_IDS.length; ci++) {
+          const sid = SKILL_IDS[ci];
+          const stacks = player.skillStacks[sid] ?? 0;
+          if (stacks < SKILLS[sid].maxStacks) {
+            candidates.push(sid);
+          }
+        }
+        // Fisher-Yates shuffle then take first 3.
+        for (let ci = candidates.length - 1; ci > 0; ci--) {
+          const j = Math.floor(Math.random() * (ci + 1));
+          const tmp = candidates[ci];
+          candidates[ci] = candidates[j]!;
+          candidates[j] = tmp!;
+        }
+        const choices = candidates.slice(0, 3) as SkillId[];
+        gameState.value = { ...state, currentLevelUpChoices: choices };
+        setDisplayChoices(choices);
+      } else {
+        setDisplayChoices(state.currentLevelUpChoices as SkillId[]);
+      }
+      setDisplayPendingLevelUp(state.pendingLevelUp);
+      setDisplayPlayerSkillStacks({ ...player.skillStacks });
 
       // Enemy slot sprite state.
       const types = Array.from({ length: ENEMY_SOFT_CAP }, () => null as EnemyType | null);
@@ -637,6 +674,28 @@ export default function GameCanvas({ width, height }: Props) {
     };
   }, [gameState]);
 
+  // ─── Skill selection handler ───────────────────────────────────────────────
+  // Mutates gameState.value directly on the JS thread — safe because the engine
+  // is frozen (pendingLevelUp guard in updateGameState) during the modal window.
+  // Follows the same pattern as cycleWeapon above.
+  const handleSkillSelect = useCallback((id: SkillId) => {
+    const state = gameState.value;
+    const currentStacks = state.player.skillStacks[id] ?? 0;
+    const newStacks = { ...state.player.skillStacks, [id]: currentStacks + 1 };
+    const newCount = state.pendingLevelUpCount - 1;
+    gameState.value = {
+      ...state,
+      player: {
+        ...state.player,
+        skillStacks: newStacks,
+        level: state.player.level + 1,
+      },
+      pendingLevelUp: newCount > 0,
+      pendingLevelUpCount: newCount,
+      currentLevelUpChoices: [],
+    };
+  }, [gameState]);
+
   // ─── Virtual joystick gesture ──────────────────────────────────────────────
   const panGesture = Gesture.Pan()
     .runOnJS(true)
@@ -890,6 +949,15 @@ export default function GameCanvas({ width, height }: Props) {
         >
           <Text style={styles.deathText}>YOU DIED</Text>
         </View>
+
+        {/* Level-up modal — unmounts when not pending (returns null internally too).
+            Rendered above YOU DIED so both can't simultaneously be the focus. */}
+        <LevelUpModal
+          visible={displayPendingLevelUp}
+          choices={displayChoices}
+          playerSkillStacks={displayPlayerSkillStacks}
+          onSelect={handleSkillSelect}
+        />
       </View>
     </GestureDetector>
   );

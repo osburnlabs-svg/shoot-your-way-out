@@ -27,7 +27,7 @@ Status legend:
 | 1 — Project scaffold | 🟢 Complete | 2026-05-08 | a85087b | Yes | Placeholder screen confirmed on device via Expo Go |
 | 2 — Player + drag-to-move | 🟢 Complete | 2026-05-08 | G1: fe57417 G2: 9116c45 G3: 3f618d0 G4: 78fa367 | Yes — all 4 groups | All groups complete |
 | 3 — Enemies + auto-fire | 🟢 Complete | 2026-05-10 | G1: c47e000 G2: 083d28d G3: 5715c19 G4b: 738ab95 G4c: a095517 | G1 ✅ G2 ✅ G3 ✅ G4b ✅ G4c ✅ | |
-| 4a — Stat skills + level-up | 🟡 In Progress | 2026-05-10 | G1: c4daad8 | G1 ✅ | G1 complete — XP curve, level field, level-up freeze |
+| 4a — Stat skills + level-up | 🟡 In Progress | 2026-05-10 | G1: c4daad8 G2: a095517 G3: (pending commit) | G1 ✅ G2 ✅ | G1: XP curve. G2: 10 skills + pierce + regen. G3: level-up modal (in progress) |
 | 4b — Ability skills + crates | ⚪ | | | | |
 | 5 — Maps + obstacles + vehicle enemies | ⚪ | | | | |
 | 6 — Audio + atmospheric effects | ⚪ | | | | |
@@ -496,8 +496,8 @@ Single-line gate in `lib/combatEngine.ts`: added `&& !player.isMoving` to the au
 
 **Groups:**
 - G1 🟢 — XP curve, level field, level-up engine freeze (commit c4daad8, device-tested)
-- G2 ⚪ — 10 stat-modifier skills + skill state on PlayerState
-- G3 ⚪ — Level-up modal (kit Upgrade Preset), skill selection, game resume
+- G2 🟢 — 10 stat-modifier skills + skill state on PlayerState (commit a095517, device-tested)
+- G3 🟡 — Level-up modal (kit Upgrade/BG.png), skill selection, game resume (in progress)
 - G4 ⚪ — Weapon progression unlocks at levels 4/8/12/16
 
 ---
@@ -522,6 +522,43 @@ Single-line gate in `lib/combatEngine.ts`: added `&& !player.isMoving` to the au
 - **`level` does not increment in G1; it increments on skill selection in G3.** Considered alternative: increment immediately when the threshold is crossed, track pending picks separately. Rejected: the level-up modal shows "leveling UP to level N," so the increment logically belongs at selection time, not detection time. This keeps `player.level` as the authoritative source of truth for "what level has been confirmed by a player choice."
 - **`pendingLevelUpCount` tracks thresholds crossed in a single tick.** Rare in Phase 4a (money_small gives 10 XP per pickup; crossing two thresholds at once requires a gap of only 10 XP, possible only between L2 and L3 early in a run). Included because the infrastructure cost is one integer and the alternative — silently losing a level-up — is worse than the complexity of tracking it.
 - **XP curve numbers are starting points, not final values.** The formula is designed to be tunable via a single multiplier in `balance.ts`. Expect retuning once Phase 4a is fully running with skills active, weapon upgrades unlocking, and real run pacing measured on device. The Phase 3 balance note applies here: don't assume these numbers carry forward without re-validation against actual run length.
+
+---
+
+## Phase 4a — Group 3: Level-up modal, skill selection, game resume
+
+**Status:** 🟡 In Progress (pending device test)
+
+### What was built
+
+- `assets/ui/upgrade/BG.png` — extracted from kit GUI zip (`PNG/Upgrade/BG.png`, 308×243 empty 3×3 slot grid with "UPGRADE" gold header). Chosen over `Upgrade Preset.png` (weapon silhouettes baked into all 9 slots — can't use only 3).
+- `assets/ui/icons/` — 6 icon PNGs: `Ammo.png`, `Pistol_HUD.png`, `SMG_HUD.png`, `Armor_Icon.png`, `HP_Icon.png`, `Speed_01.png`. Icons shared across skill IDs (ammo/subsonic/tracer/stims share Ammo.png; mre/painkillers share HP_Icon.png).
+- `src/lib/sprites.ts`: `GuiSprites` export added with `upgrade.bg` (BG.png) and `skillIcons.*` (10 entries, all `as const`). `skillIcon` is NOT embedded on `SkillDefinition` to avoid pulling sprites.ts into the worklet module closure.
+- `src/lib/gameEngine.ts`: `currentLevelUpChoices: SkillId[]` added to `GameState`; initialized to `[]` in `createInitialGameState`. Populated by the JS thread during the pendingLevelUp freeze window — never read by worklets.
+- `src/components/LevelUpModal.tsx`: Full implementation. Props: `visible`, `choices`, `playerSkillStacks`, `onSelect`. Renders: full-screen dim overlay + BG.png panel (308×243, stretched) + 3 `TouchableOpacity` skill cards absolutely positioned over the top-row slot frames (GRID_TOP=32, SLOT_H=70, SLOT_W=100). Each card shows kit icon + displayName + "Lv X/Y" + description. Returns null when `visible=false` or `choices.length===0`.
+- `src/components/GameCanvas.tsx`:
+  - Imports: `LevelUpModal`, `SKILLS`, `SKILL_IDS`, `SkillId`
+  - React state: `displayPendingLevelUp`, `displayChoices`, `displayPlayerSkillStacks`
+  - 100ms timer extended: detects `state.pendingLevelUp && state.currentLevelUpChoices.length === 0`; draws 3 choices via Fisher-Yates shuffle of non-maxed skills; writes to `gameState.value.currentLevelUpChoices` (safe — engine is frozen)
+  - `handleSkillSelect(id)`: mutates `gameState.value` directly (JS thread, follows `cycleWeapon` precedent); increments `player.skillStacks[id]`; increments `player.level`; decrements `pendingLevelUpCount`; clears `pendingLevelUp` when count reaches 0; resets `currentLevelUpChoices: []`
+  - JSX: `<LevelUpModal>` mounted after YOU DIED overlay; `pointerEvents="box-none"` on overlay wrapper
+
+### Architectural decisions made during G3
+
+- **`skillIcon` stays off `SkillDefinition`.** Embedding it would require `skills.ts` to import `sprites.ts`, pulling the image require chain into the worklet module closure. `GuiSprites.skillIcons` is accessed directly in `LevelUpModal` (React thread only) — no worklet exposure.
+- **Modal background = BG.png (Option B).** `Upgrade Preset.png` has weapon silhouettes permanently baked into all 9 slots, making selective use of 3 slots visually wrong. BG.png has empty slot frames — compositing skill cards over them is clean.
+- **Choice draw runs on JS thread in the 100ms timer.** `Math.random()` cannot be used in worklets. The engine freeze guarantees no concurrent UI-thread writes to `gameState.value` during the draw, so the JS-thread mutation is safe.
+- **3 choices maximum.** With only 10 skill types and some possibly maxed, there may be fewer. The modal handles `choices.length < 3` gracefully by rendering only the available cards.
+
+### Verification targets (on device)
+
+1. Collect ~5 pickups → game freezes, level-up modal appears with BG.png panel and 3 skill cards
+2. Cards show correct icon, name, "Lv 0/N" (or current stack), and description
+3. Tap a card → modal dismisses, game resumes, Level increments in debug overlay, skill stack applied
+4. Equip gear_tactical_boots → move speed visibly increases; equip plate_carrier → survive contact longer
+5. Reach max stacks on a skill → it no longer appears as a choice
+6. If pendingLevelUpCount > 1 (rare), modal re-appears after first selection
+7. YOU DIED overlay still works (isDead still fires correctly)
 
 ---
 

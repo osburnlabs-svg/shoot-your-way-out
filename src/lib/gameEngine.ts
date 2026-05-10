@@ -45,6 +45,11 @@
  *   - updateGameState movement block uses effective.moveSpeedPxPerSec instead of
  *     the bare PLAYER_MOVE_SPEED_PX_PER_SEC constant
  *   - updateGameState chains tickRegen after tickPickups, before tickProgression
+ *
+ * Phase 4a G3 additions:
+ *   - GameState gains currentLevelUpChoices: SkillId[] (populated by JS thread during freeze)
+ *   - LevelUpModal renders on React thread; skill selection mutates gameState.value directly
+ *     (safe during pendingLevelUp freeze window — follows cycleWeapon precedent)
  */
 
 import type { HeroWeaponPose } from './sprites';
@@ -248,6 +253,12 @@ export type GameState = {
    * G3 decrements this on each selection; clears pendingLevelUp when it reaches 0.
    */
   pendingLevelUpCount: number;
+  /**
+   * The 1–3 skill IDs drawn for the current level-up offer. Empty [] when no level-up
+   * is pending. Populated by the JS thread (in the 100ms timer) when pendingLevelUp is
+   * first detected and currentLevelUpChoices is still empty. Never read by worklets.
+   */
+  currentLevelUpChoices: SkillId[];
   /** Canvas dimensions stored once at init — spawner uses them to place enemies at edges. */
   canvasWidth: number;
   canvasHeight: number;
@@ -299,6 +310,7 @@ export function createInitialGameState(canvasWidth: number, canvasHeight: number
     isDead: false,
     pendingLevelUp: false,
     pendingLevelUpCount: 0,
+    currentLevelUpChoices: [],
     canvasWidth,
     canvasHeight,
     elapsedMs: 0,
