@@ -241,6 +241,48 @@ Decision made during G2 brainstorm: shift from constant auto-fire to Archero-sty
 
 **Doc-update reminder:** When this lands in G4, the context doc's auto-fire description (lines 30, 34, 255) should be updated from "auto-fires constantly at nearest enemy" to "auto-fires at nearest enemy when standing still." That's not an errata fix — it's a deliberate design change captured here.
 
+### Map generation system — to land in Phase 5
+
+Decision made during Phase 3 G2 brainstorm: maps in Shoot Your Way Out are procedurally generated each run via seeded scatter, with curated asset pools per map. No hand-authored layouts.
+
+**The model:**
+
+Maps differentiate by what assets are available and how dense they appear, not by where specific objects sit. The Compound feels different from the Outskirts because the asset pool is different (urban junk vs desert sparseness vs forest density), not because we hand-placed every car.
+
+Each map JSON in `data/maps/` specifies:
+- Tileset to use for ground
+- Central landmark (one fixed sprite at map center — house, watchtower, large tree)
+- Obstacle pool (list of valid sprite IDs the scatter can pull from)
+- Obstacle density (low / medium / high, mapping to a target obstacle count)
+- Background dressing pool (parked cars at edges, etc.)
+- Atmosphere parameters (tint, weather, vignette)
+- Gameplay parameters (spawn rate multiplier, sniper damage multiplier, etc.)
+
+**Procedural each run, not locked per map:**
+
+Each time the player taps Deploy, the scatter algorithm uses the current time as the random seed. Layout changes every run on every map. This matches genre conventions (every run feels different) and exploits the variety in the installed asset packs (the civilian cars pack adds value here — different cars in different spots each run).
+
+**Four guard rails on the scatter algorithm (mandatory):**
+
+1. **Player spawn zone protection.** Center 200×200 px area always clear of obstacles. Player has room to start.
+2. **Minimum obstacle spacing.** No two obstacles spawn within ~60 px of each other (tunable). Prevents overlapping or visually crowded placements.
+3. **Central landmark always fixed.** Defined per-map in the JSON. Always sits at the map center regardless of seed. Gives each map a recognizable identity even though everything around it changes.
+4. **No-spawn ring around the central landmark.** ~80 px clearance (tunable). Prevents the landmark getting buried in surrounding obstacles.
+
+**Why this approach:**
+- Less authoring work than hand-placing obstacles
+- Replayability for free — every run looks different on the same map
+- Exploits the variety asset packs (especially civilian cars)
+- Matches survivor-like genre conventions where mastery is about decision-making, not memorizing layouts
+- Procedural-each-run is no harder to implement than locked-per-map — only difference is the seed source
+
+**Implementation notes for Phase 5:**
+- Scatter algorithm + four guard rails are CC's job to implement
+- Three maps spec'd in the context doc (lines ~420-466): The Compound (urban), The Outskirts (desert), The Treeline (forest)
+- Each map = one ~30-line JSON file in `data/maps/`
+- Engine reads JSON, applies scatter, places landmark, draws atmosphere overlay
+- Mo will tune density and parameters by playing each map and adjusting; CC implements the system, Mo iterates the values
+
 ---
 
 ## Phase 4a — Stat skills + level-up
