@@ -54,11 +54,12 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import {
   Canvas,
   Circle,
+  ColorMatrix,
   FilterMode,
   Group,
   Image,
   MipmapMode,
-  Rect,
+  Paint,
   useImage,
 } from '@shopify/react-native-skia';
 import {
@@ -167,16 +168,27 @@ function usePickupSlotTransform(gameState: SharedValue<GameState>, slotIndex: nu
 }
 
 /**
- * Per-slot hit-flash opacity — one useDerivedValue per pre-allocated enemy slot.
- * Returns 0.65 while the enemy's hitFlashUntilMs is in the future, 0 otherwise.
+ * Per-slot hit-flash color matrix — one useDerivedValue per pre-allocated enemy slot.
+ * Returns a 20-element Skia ColorMatrix:
+ *   - Identity matrix when not flashing (no visual change)
+ *   - Brightening matrix when hitFlashUntilMs is in the future (adds 0.5 to R/G/B channels)
+ *
+ * Applied via <Paint><ColorMatrix matrix={...} /></Paint> as a child of each sprite <Image>,
+ * so the tint follows the sprite's exact shape (including transparency) — no rect overflow.
  * Checked every frame on the UI thread — no runOnJS, no 100ms polling lag.
- * Used as the opacity prop on a white Rect overlay inside each active enemy Group.
  */
 function useEnemySlotFlash(gameState: SharedValue<GameState>, slotIndex: number) {
-  return useDerivedValue(() => {
+  return useDerivedValue((): number[] => {
     const enemy = gameState.value.enemies[slotIndex];
-    if (!enemy) return 0;
-    return gameState.value.elapsedMs < enemy.hitFlashUntilMs ? 0.65 : 0;
+    const flashing = !!enemy && gameState.value.elapsedMs < enemy.hitFlashUntilMs;
+    const b = flashing ? 0.5 : 0; // brightness offset added to R, G, B channels
+    // Row per channel: [Rr, Rg, Rb, Ra, Rb_offset, ...]
+    return [
+      1, 0, 0, 0, b,
+      0, 1, 0, 0, b,
+      0, 0, 1, 0, b,
+      0, 0, 0, 1, 0,
+    ];
   });
 }
 
@@ -497,7 +509,7 @@ export default function GameCanvas({ width, height }: Props) {
   const eFlash47 = useEnemySlotFlash(gameState, 47);
   const eFlash48 = useEnemySlotFlash(gameState, 48);
   const eFlash49 = useEnemySlotFlash(gameState, 49);
-  const allSlotFlashOpacities = [
+  const allSlotFlashMatrices = [
     eFlash0,  eFlash1,  eFlash2,  eFlash3,  eFlash4,
     eFlash5,  eFlash6,  eFlash7,  eFlash8,  eFlash9,
     eFlash10, eFlash11, eFlash12, eFlash13, eFlash14,
@@ -785,7 +797,9 @@ export default function GameCanvas({ width, height }: Props) {
 
             return (
               <Group key={i} transform={transform}>
-                {/* Bottom layer: walk/fire frame (alive) or die frame (dying) */}
+                {/* Bottom layer: walk/fire frame (alive) or die frame (dying).
+                    ColorMatrix child applies hit-flash brightening directly to the sprite
+                    pixels — tint follows sprite shape exactly, no bounding-box overflow. */}
                 <Image
                   image={img}
                   x={-w / 2}
@@ -793,8 +807,12 @@ export default function GameCanvas({ width, height }: Props) {
                   width={w}
                   height={h}
                   sampling={{ filter: FilterMode.Nearest, mipmap: MipmapMode.None }}
-                />
-                {/* Top layer: Scav upper body — only while alive */}
+                >
+                  <Paint>
+                    <ColorMatrix matrix={allSlotFlashMatrices[i]} />
+                  </Paint>
+                </Image>
+                {/* Top layer: Scav upper body — only while alive. Same flash applied. */}
                 {bodyOverlay && (
                   <Image
                     image={bodyOverlay}
@@ -803,19 +821,12 @@ export default function GameCanvas({ width, height }: Props) {
                     width={bw}
                     height={bh}
                     sampling={{ filter: FilterMode.Nearest, mipmap: MipmapMode.None }}
-                  />
+                  >
+                    <Paint>
+                      <ColorMatrix matrix={allSlotFlashMatrices[i]} />
+                    </Paint>
+                  </Image>
                 )}
-                {/* Hit flash: white Rect overlay, opacity driven by UI-thread derived value.
-                    Opacity is 0.65 for HIT_FLASH_DURATION_MS after a projectile hit, then 0.
-                    Checked every frame — no polling lag, no runOnJS. */}
-                <Rect
-                  x={-w / 2}
-                  y={-h / 2}
-                  width={w}
-                  height={h}
-                  color="white"
-                  opacity={allSlotFlashOpacities[i]}
-                />
               </Group>
             );
           })}
