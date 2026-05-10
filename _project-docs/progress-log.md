@@ -283,6 +283,22 @@ Each time the player taps Deploy, the scatter algorithm uses the current time as
 - Engine reads JSON, applies scatter, places landmark, draws atmosphere overlay
 - Mo will tune density and parameters by playing each map and adjusting; CC implements the system, Mo iterates the values
 
+### Magnet feel tuning — to land in Phase 3 G4
+
+Found during G3 device test: money pickup magnet works correctly when player is stationary or close, but is weak when player moves past a pickup. Pickups appear to "follow the player's last position" rather than catch up. Pickup eventually arrives if the player stops; if the player keeps moving, the pickup tail-chases without catching up.
+
+**Root cause:** magnet acceleration is too gentle relative to player movement speed. The pickup recomputes direction toward the player each frame, but its acceleration can't build velocity fast enough to overtake a moving target.
+
+**Fix options (in order of how disruptive):**
+
+1. **Bump magnet acceleration and/or max speed in `gameConstants.ts`.** Two-number tuning change. Probably solves 90%+ of the issue. Try first.
+2. **"Lead the player" prediction** — aim pickup at where the player *will be* a few frames ahead based on player velocity. More complex; usually unnecessary if (1) is tuned well.
+3. **"Sticky" homing magnet.** Once a pickup enters magnet range, it commits to reaching the player no matter where they go. Matches Vampire Survivors behavior. Most reliable but requires changing the magnet algorithm structure.
+
+**Recommended approach:** start with (1) during G4 polish. Tune by feel on device. If still unsatisfying after a reasonable range of values, escalate to (3).
+
+**Not a blocker for G3.** All G3 systems (damage, pickups, magnet at-rest, collection, death) work correctly. This is feel polish, which is the explicit purpose of G4.
+
 ---
 
 ## Phase 3 — Group 3: Money pickups, magnet pull, contact damage, death state
