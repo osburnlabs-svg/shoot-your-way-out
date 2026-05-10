@@ -334,6 +334,40 @@ Found during G3 device test: money pickup magnet works correctly when player is 
 
 **Not a blocker for G3.** All G3 systems (damage, pickups, magnet at-rest, collection, death) work correctly. This is feel polish, which is the explicit purpose of G4.
 
+### Feedback design philosophy — grounded, realistic, never "game-noise" ✅ RESOLVED — permanent design rules
+
+Shoot Your Way Out's feedback identity follows Tarkov-style grounded realism, not Vampire Survivors-style chaotic dopamine. Visual and audio feedback should reinforce that the player is in a tactical military situation, not a number-popping action loop. The following rules are permanent — not "for now" deferrals.
+
+**Rule 1: No floating damage numbers, anywhere, ever.**
+
+Damage numbers belong in games where the player optimizes per-hit arithmetic — Borderlands, Diablo, Path of Exile. They break the fiction of a tactical shooter. Effectiveness is communicated through animation (hit flashes, die animations), audio (impact sounds), and visible enemy state, never through numerical readouts above hit targets.
+
+This applies to all weapons, all enemies, all phases, all post-launch updates. If a future feature feels like it wants damage numbers, redesign the feature, not the rule.
+
+**Rule 2: No standalone "kill sounds" on enemy death.**
+
+When an enemy dies, the player hears: the gunshot that killed them + the bullet's impact on flesh. They do not hear a separate "ding," "thunk," or celebratory cue. The death is the natural result of the shot, not a punctuated reward. This is the Tarkov touchstone — kills feel earned and weighty, not gamified.
+
+This applies to common enemies and bosses alike. The helicopter boss may have a death sequence (explosion, falling, crash impact) — that's part of the visual+audio of an exploding helicopter, not a "kill sound." Same principle.
+
+**Rule 3: Player-side feedback is HP-and-screen, not numbers.**
+
+The player's damage feedback is the HP number in the HUD (decreasing) plus screen-level feedback that arrives in Phase 6+ (red vignette flash, brief audio hit indication). No damage numbers floating above the player on hit. Same philosophy as Rule 1, mirrored.
+
+**What's allowed and encouraged:**
+
+- Hit flashes on enemies (brief tint on damage — visual, grounded, shipping in Phase 3 G4c)
+- Die animations on kill (the existing 4-frame sequence — visual feedback that they're dead)
+- Gunshot and impact audio (Phase 6 — diegetic, grounded)
+- HUD HP decrease and visual hit indicators on the player (HUD is information, not gamification)
+
+**For Phase 6 to revisit:** the `xp_absorb` SFX call wired during G3 for money pickup collection. Money pickups currently call `audioEngine.playSFX('xp_absorb')` on collect. Phase 6 should decide whether that sound exists at all, and if so, whether it's a subtle pickup confirmation or whether it gets cut for the same reason kill sounds are cut. The current call site is a stub — removing it during Phase 6 is one-line work.
+
+**Implications for the developer:**
+- When in doubt, ask "would Tarkov do this?" before adding a feedback element
+- "Game feel" achieved through animation, sound, and physics — not text overlays or audio rewards
+- Audio is information about what's happening, not commentary on what's happening
+
 ---
 
 ## Phase 3 — Group 3: Money pickups, magnet pull, contact damage, death state
