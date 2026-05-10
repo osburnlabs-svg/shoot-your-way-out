@@ -6,7 +6,7 @@
  * Tick ordering (called after tickEnemies):
  *   1. Advance weapon cooldown toward 0
  *   2. Find nearest alive enemy within weapon range
- *   3. If cooldown == 0 and target found: spawn projectile, reset cooldown
+ *   3. If cooldown == 0 and target found and player is NOT moving: spawn projectile, reset cooldown
  *   4. Move all active projectiles (straight-line, constant speed)
  *   5. Despawn projectiles that exceeded max range
  *   6. Collision: for each remaining projectile, check all alive enemies
@@ -105,7 +105,7 @@ export function tickCombat(state: GameState, dtMs: number): GameState {
     newProjectiles.push(projectiles[i]);
   }
 
-  if (weaponCooldownMs === 0 && targetIdx !== -1) {
+  if (weaponCooldownMs === 0 && targetIdx !== -1 && !player.isMoving) {
     const target = enemies[targetIdx];
     const dx = target.x - player.x;
     const dy = target.y - player.y;
