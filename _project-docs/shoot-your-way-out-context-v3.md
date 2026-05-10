@@ -37,6 +37,8 @@ This project is built by a non-technical solo developer working with Claude as t
 
 **When stages overlap.** Sometimes stage 1 and stage 2 collapse together — a tiny fix where the decision is obvious and the prompt is two lines. That's fine. The discipline isn't about adding ceremony to small tasks; it's about not skipping the checkpoint on tasks that actually need it. When in doubt, do all three stages. The cost of an unnecessary confirmation step is 30 seconds; the cost of a missed one can be hours.
 
+**Kit-first principle.** The asset kits (`tds-modern-hero-weapons-and-props`, `tds-modern-tilesets-environment`, and the civilian cars pack) are the canonical source for visual content. Before building any custom UI element, sprite, icon, button, panel, or visual effect, check the kit first. If the kit ships an asset that fits the need, use the kit asset. Custom builds — even small ones like placeholder text or a quick rectangle — are only justified when no kit asset is appropriate AND the alternative is blocking progress. When a custom asset is used as a temporary stub (e.g., a placeholder text overlay before the real kit UI ships in a later phase), call it out explicitly in the progress log so it doesn't get forgotten or shipped accidentally. The kits were chosen and paid for to provide visual coherence; bypassing them in small pieces erodes that coherence quickly.
+
 ---
 
 ## How to Use This Document
