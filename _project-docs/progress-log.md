@@ -356,7 +356,7 @@ The player's damage feedback is the HP number in the HUD (decreasing) plus scree
 
 **What's allowed and encouraged:**
 
-- Hit flashes on enemies (brief tint on damage — visual, grounded, shipping in Phase 3 G4c)
+- Hit flashes on enemies (brief tint on damage — visual, grounded, shipping in Phase 3 G4c). Flash color is RED (impact/blood), not white. Red reads as "damage" without breaking military fiction.
 - Die animations on kill (the existing 4-frame sequence — visual feedback that they're dead)
 - Gunshot and impact audio (Phase 6 — diegetic, grounded)
 - HUD HP decrease and visual hit indicators on the player (HUD is information, not gamification)

@@ -181,12 +181,14 @@ function useEnemySlotFlash(gameState: SharedValue<GameState>, slotIndex: number)
   return useDerivedValue((): number[] => {
     const enemy = gameState.value.enemies[slotIndex];
     const flashing = !!enemy && gameState.value.elapsedMs < enemy.hitFlashUntilMs;
-    const b = flashing ? 0.5 : 0; // brightness offset added to R, G, B channels
-    // Row per channel: [Rr, Rg, Rb, Ra, Rb_offset, ...]
+    // Red flash: boost R channel +0.8, reduce G and B by 0.4.
+    // Saturated and clearly visible — tune down via these offsets if too aggressive.
+    const r = flashing ? 0.8 : 0;
+    const gb = flashing ? -0.4 : 0;
     return [
-      1, 0, 0, 0, b,
-      0, 1, 0, 0, b,
-      0, 0, 1, 0, b,
+      1, 0, 0, 0, r,
+      0, 1, 0, 0, gb,
+      0, 0, 1, 0, gb,
       0, 0, 0, 1, 0,
     ];
   });
@@ -797,36 +799,34 @@ export default function GameCanvas({ width, height }: Props) {
 
             return (
               <Group key={i} transform={transform}>
-                {/* Bottom layer: walk/fire frame (alive) or die frame (dying).
-                    ColorMatrix child applies hit-flash brightening directly to the sprite
-                    pixels — tint follows sprite shape exactly, no bounding-box overflow. */}
-                <Image
-                  image={img}
-                  x={-w / 2}
-                  y={-h / 2}
-                  width={w}
-                  height={h}
-                  sampling={{ filter: FilterMode.Nearest, mipmap: MipmapMode.None }}
-                >
+                {/* Inner group scopes the hit-flash color filter to the sprite layers only.
+                    <Paint> as child of <Group> sets the paint context for all draws within.
+                    ColorMatrix boosts R and suppresses G/B during hitFlashUntilMs window. */}
+                <Group>
                   <Paint>
                     <ColorMatrix matrix={allSlotFlashMatrices[i]} />
                   </Paint>
-                </Image>
-                {/* Top layer: Scav upper body — only while alive. Same flash applied. */}
-                {bodyOverlay && (
+                  {/* Bottom layer: walk/fire frame (alive) or die frame (dying) */}
                   <Image
-                    image={bodyOverlay}
-                    x={-bw / 2}
-                    y={-bh / 2}
-                    width={bw}
-                    height={bh}
+                    image={img}
+                    x={-w / 2}
+                    y={-h / 2}
+                    width={w}
+                    height={h}
                     sampling={{ filter: FilterMode.Nearest, mipmap: MipmapMode.None }}
-                  >
-                    <Paint>
-                      <ColorMatrix matrix={allSlotFlashMatrices[i]} />
-                    </Paint>
-                  </Image>
-                )}
+                  />
+                  {/* Top layer: Scav upper body — only while alive */}
+                  {bodyOverlay && (
+                    <Image
+                      image={bodyOverlay}
+                      x={-bw / 2}
+                      y={-bh / 2}
+                      width={bw}
+                      height={bh}
+                      sampling={{ filter: FilterMode.Nearest, mipmap: MipmapMode.None }}
+                    />
+                  )}
+                </Group>
               </Group>
             );
           })}
