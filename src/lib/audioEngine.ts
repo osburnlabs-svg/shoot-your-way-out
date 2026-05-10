@@ -10,6 +10,7 @@ export const audioEngine = {
   },
 
   playSFX: (_id: string, _options?: { volume?: number; pitch?: number }): void => {
+    'worklet';
     // Phase 6: play a sound effect by ID (e.g. 'shoot_pistol', 'pickup_pop')
   },
 

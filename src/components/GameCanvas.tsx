@@ -34,10 +34,19 @@
  *   Enemy die animation: sprite timer detects 'dying' status, switches to die
  *   frames. Body overlay removed on dying Scavs. Kill count in debug overlay.
  *
+ * Phase 3 G3 additions:
+ *   PICKUPS: Money Small drops from killed enemies. 50 pre-allocated pickup
+ *   slot derived values (same always-render pattern as projectiles).
+ *   Pickup rendered as Money_Small.png sprite below projectiles in z-order.
+ *   CONTACT DAMAGE: Enemies deal damage to player on overlap (500ms cooldown).
+ *   DEATH: isDead freezes the game; "YOU DIED" overlay appears centered.
+ *   Debug overlay gains: HP, Score, XP lines.
+ *
  * Thread model:
  *   UI thread  — useFrameCallback, gesture callbacks, groupTransform derived value,
- *                enemy slot transforms, projectile slot transforms
- *   JS thread  — React state (sprite frame/weapon selection, FPS display, enemy data)
+ *                enemy slot transforms, projectile slot transforms, pickup slot transforms
+ *   JS thread  — React state (sprite frame/weapon selection, FPS display, enemy data,
+ *                HP/Score/XP/isDead for debug and overlay)
  */
 
 import React, { useCallback, useEffect, useState } from 'react';
@@ -60,7 +69,7 @@ import {
 } from 'react-native-reanimated';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 
-import { HeroSprites, EnemySprites } from '../lib/sprites';
+import { HeroSprites, EnemySprites, PickupSprites } from '../lib/sprites';
 import type { HeroWeaponPose } from '../lib/sprites';
 import {
   ENEMY_SOFT_CAP,
@@ -75,6 +84,8 @@ import {
   WALK_FRAME_DURATION_MS,
   ENEMY_DIE_FRAME_COUNT,
   ENEMY_DIE_FRAME_DURATION_MS,
+  PICKUP_SLOT_COUNT,
+  PICKUP_SPRITE_SCALE,
 } from '../data/gameConstants';
 import type { EnemyType } from '../data/enemies';
 import { createInitialGameState, updateGameState } from '../lib/gameEngine';
@@ -137,6 +148,20 @@ function useProjectileSlotTransform(gameState: SharedValue<GameState>, slotIndex
     const proj = gameState.value.projectiles[slotIndex];
     if (!proj) return [{ translateX: -9999 }, { translateY: -9999 }];
     return [{ translateX: proj.x }, { translateY: proj.y }];
+  });
+}
+
+/**
+ * Per-slot pickup transform — one useDerivedValue per pre-allocated slot.
+ * Same always-render pattern as projectile slots: inactive slots go to
+ * (-9999, -9999). No React state needed for pickup slot activity — position
+ * updates happen every frame via derived value.
+ */
+function usePickupSlotTransform(gameState: SharedValue<GameState>, slotIndex: number) {
+  return useDerivedValue(() => {
+    const pickup = gameState.value.pickups[slotIndex];
+    if (!pickup) return [{ translateX: -9999 }, { translateY: -9999 }];
+    return [{ translateX: pickup.x }, { translateY: pickup.y }];
   });
 }
 
@@ -216,6 +241,9 @@ export default function GameCanvas({ width, height }: Props) {
   const raiderDie3 = useImage(EnemySprites.raider.die[3]);
   const raiderDieImages = [raiderDie0, raiderDie1, raiderDie2, raiderDie3];
 
+  // ─── Pickup sprite image ──────────────────────────────────────────────────
+  const moneySmallImage = useImage(PickupSprites.money.small);
+
   // ─── Game state ────────────────────────────────────────────────────────────
   const gameState = useSharedValue(createInitialGameState(width, height));
   const accumulator = useSharedValue(0);
@@ -269,9 +297,15 @@ export default function GameCanvas({ width, height }: Props) {
     () => Array.from({ length: ENEMY_SOFT_CAP }, () => 0),
   );
 
+  // ─── Player vitals + death flag (React, updated by 100ms timer) ──────────
+  const [displayHp, setDisplayHp] = useState(100);
+  const [displayScore, setDisplayScore] = useState(0);
+  const [displayXp, setDisplayXp] = useState(0);
+  const [displayIsDead, setDisplayIsDead] = useState(false);
+
   // Fixed-rate timer — reads gameState.value directly on the JS thread every
   // 100ms. Completely decoupled from useFrameCallback; zero runOnJS calls
-  // for sprite selection. Hero + enemy sprite state computed together.
+  // for sprite selection. Hero + enemy sprite state + player vitals computed together.
   useEffect(() => {
     const id = setInterval(() => {
       const state = gameState.value;
@@ -285,6 +319,12 @@ export default function GameCanvas({ width, height }: Props) {
           )
         : 0;
       setSpriteState({ isMoving: player.isMoving, frame: heroWalkFrame, weaponPose: player.weaponPose });
+
+      // Player vitals and death flag.
+      setDisplayHp(Math.ceil(player.hp));
+      setDisplayScore(Math.floor(player.score));
+      setDisplayXp(Math.floor(player.xp));
+      setDisplayIsDead(state.isDead);
 
       // Enemy slot sprite state.
       const types = Array.from({ length: ENEMY_SOFT_CAP }, () => null as EnemyType | null);
@@ -432,6 +472,73 @@ export default function GameCanvas({ width, height }: Props) {
     pTransform25, pTransform26, pTransform27, pTransform28, pTransform29,
   ];
 
+  // ─── Per-slot pickup transforms (UI thread, no runOnJS) ───────────────────
+  // 50 pre-allocated slots. Same always-render pattern as projectiles:
+  // inactive slots sit at (-9999, -9999). No React state needed — the image
+  // is always Money_Small so no per-slot image selection required.
+  const pkTransform0  = usePickupSlotTransform(gameState, 0);
+  const pkTransform1  = usePickupSlotTransform(gameState, 1);
+  const pkTransform2  = usePickupSlotTransform(gameState, 2);
+  const pkTransform3  = usePickupSlotTransform(gameState, 3);
+  const pkTransform4  = usePickupSlotTransform(gameState, 4);
+  const pkTransform5  = usePickupSlotTransform(gameState, 5);
+  const pkTransform6  = usePickupSlotTransform(gameState, 6);
+  const pkTransform7  = usePickupSlotTransform(gameState, 7);
+  const pkTransform8  = usePickupSlotTransform(gameState, 8);
+  const pkTransform9  = usePickupSlotTransform(gameState, 9);
+  const pkTransform10 = usePickupSlotTransform(gameState, 10);
+  const pkTransform11 = usePickupSlotTransform(gameState, 11);
+  const pkTransform12 = usePickupSlotTransform(gameState, 12);
+  const pkTransform13 = usePickupSlotTransform(gameState, 13);
+  const pkTransform14 = usePickupSlotTransform(gameState, 14);
+  const pkTransform15 = usePickupSlotTransform(gameState, 15);
+  const pkTransform16 = usePickupSlotTransform(gameState, 16);
+  const pkTransform17 = usePickupSlotTransform(gameState, 17);
+  const pkTransform18 = usePickupSlotTransform(gameState, 18);
+  const pkTransform19 = usePickupSlotTransform(gameState, 19);
+  const pkTransform20 = usePickupSlotTransform(gameState, 20);
+  const pkTransform21 = usePickupSlotTransform(gameState, 21);
+  const pkTransform22 = usePickupSlotTransform(gameState, 22);
+  const pkTransform23 = usePickupSlotTransform(gameState, 23);
+  const pkTransform24 = usePickupSlotTransform(gameState, 24);
+  const pkTransform25 = usePickupSlotTransform(gameState, 25);
+  const pkTransform26 = usePickupSlotTransform(gameState, 26);
+  const pkTransform27 = usePickupSlotTransform(gameState, 27);
+  const pkTransform28 = usePickupSlotTransform(gameState, 28);
+  const pkTransform29 = usePickupSlotTransform(gameState, 29);
+  const pkTransform30 = usePickupSlotTransform(gameState, 30);
+  const pkTransform31 = usePickupSlotTransform(gameState, 31);
+  const pkTransform32 = usePickupSlotTransform(gameState, 32);
+  const pkTransform33 = usePickupSlotTransform(gameState, 33);
+  const pkTransform34 = usePickupSlotTransform(gameState, 34);
+  const pkTransform35 = usePickupSlotTransform(gameState, 35);
+  const pkTransform36 = usePickupSlotTransform(gameState, 36);
+  const pkTransform37 = usePickupSlotTransform(gameState, 37);
+  const pkTransform38 = usePickupSlotTransform(gameState, 38);
+  const pkTransform39 = usePickupSlotTransform(gameState, 39);
+  const pkTransform40 = usePickupSlotTransform(gameState, 40);
+  const pkTransform41 = usePickupSlotTransform(gameState, 41);
+  const pkTransform42 = usePickupSlotTransform(gameState, 42);
+  const pkTransform43 = usePickupSlotTransform(gameState, 43);
+  const pkTransform44 = usePickupSlotTransform(gameState, 44);
+  const pkTransform45 = usePickupSlotTransform(gameState, 45);
+  const pkTransform46 = usePickupSlotTransform(gameState, 46);
+  const pkTransform47 = usePickupSlotTransform(gameState, 47);
+  const pkTransform48 = usePickupSlotTransform(gameState, 48);
+  const pkTransform49 = usePickupSlotTransform(gameState, 49);
+  const allPickupTransforms = [
+    pkTransform0,  pkTransform1,  pkTransform2,  pkTransform3,  pkTransform4,
+    pkTransform5,  pkTransform6,  pkTransform7,  pkTransform8,  pkTransform9,
+    pkTransform10, pkTransform11, pkTransform12, pkTransform13, pkTransform14,
+    pkTransform15, pkTransform16, pkTransform17, pkTransform18, pkTransform19,
+    pkTransform20, pkTransform21, pkTransform22, pkTransform23, pkTransform24,
+    pkTransform25, pkTransform26, pkTransform27, pkTransform28, pkTransform29,
+    pkTransform30, pkTransform31, pkTransform32, pkTransform33, pkTransform34,
+    pkTransform35, pkTransform36, pkTransform37, pkTransform38, pkTransform39,
+    pkTransform40, pkTransform41, pkTransform42, pkTransform43, pkTransform44,
+    pkTransform45, pkTransform46, pkTransform47, pkTransform48, pkTransform49,
+  ];
+
   // ─── Debug weapon cycle button ─────────────────────────────────────────────
   const cycleWeapon = useCallback(() => {
     const current = gameState.value.player.weaponPose;
@@ -531,16 +638,36 @@ export default function GameCanvas({ width, height }: Props) {
   const weaponW = weaponImage ? weaponImage.width() * HERO_SPRITE_SCALE : 0;
   const weaponH = weaponImage ? weaponImage.height() * HERO_SPRITE_SCALE : 0;
 
+  // ─── Pickup render sizes ──────────────────────────────────────────────────
+  const moneyW = moneySmallImage ? moneySmallImage.width() * PICKUP_SPRITE_SCALE : 0;
+  const moneyH = moneySmallImage ? moneySmallImage.height() * PICKUP_SPRITE_SCALE : 0;
+
   return (
     <GestureDetector gesture={panGesture}>
       <View style={StyleSheet.absoluteFill}>
         {/* TODO Phase 5: wrap world rendering in <Group> with camera transform.
             scale = zoom level, translate = camera offset following player.
             Visual sprite scale (currently 2×) will likely need tuning once
-            tiles + enemies + HUD are visible on screen together. */}
+            tiles + enemies + HUD are all visible together. */}
         <Canvas style={StyleSheet.absoluteFill}>
 
-          {/* ── Projectiles (below enemies, above background) ─────────────── */}
+          {/* ── Pickups (below projectiles and enemies) ───────────────────── */}
+          {/* Always render all 50 slots. Inactive slots sit at (-9999,-9999). */}
+          {/* Z-order: pickups < projectiles < enemies < player < overlays.    */}
+          {moneySmallImage && allPickupTransforms.map((transform, i) => (
+            <Group key={`pickup-${i}`} transform={transform}>
+              <Image
+                image={moneySmallImage}
+                x={-moneyW / 2}
+                y={-moneyH / 2}
+                width={moneyW}
+                height={moneyH}
+                sampling={{ filter: FilterMode.Nearest, mipmap: MipmapMode.None }}
+              />
+            </Group>
+          ))}
+
+          {/* ── Projectiles (below enemies, above pickups) ─────────────────── */}
           {/* Always render all 30 slots. Inactive slots sit at (-9999,-9999). */}
           {allProjectileTransforms.map((transform, i) => (
             <Group key={`proj-${i}`} transform={transform}>
@@ -649,10 +776,22 @@ export default function GameCanvas({ width, height }: Props) {
           pointerEvents="none"
         >
           <Text style={styles.debugText}>FPS: {displayFps}</Text>
+          <Text style={styles.debugText}>HP: {displayHp}</Text>
+          <Text style={styles.debugText}>Score: {displayScore}</Text>
+          <Text style={styles.debugText}>XP: {displayXp}</Text>
           <Text style={styles.debugText}>Enemies: {displayEnemyCount}</Text>
           <Text style={styles.debugText}>Kills: {displayKillCount}</Text>
           <Text style={styles.debugText}>Time: {formatElapsed(displayElapsed)}</Text>
           <Text style={styles.debugText}>Frame: {displayFrameCount}</Text>
+        </View>
+
+        {/* YOU DIED overlay — rendered unconditionally, opacity drives visibility.
+            Pointer events always none — no buttons in G3, wired in Phase 7. */}
+        <View
+          style={[styles.deathOverlay, { opacity: displayIsDead ? 1 : 0 }]}
+          pointerEvents="none"
+        >
+          <Text style={styles.deathText}>YOU DIED</Text>
         </View>
       </View>
     </GestureDetector>
@@ -678,5 +817,21 @@ const styles = StyleSheet.create({
   tapHint: {
     color: '#888',
     fontSize: 9,
+  },
+  deathOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  deathText: {
+    color: '#cc3333',
+    fontSize: 48,
+    fontWeight: 'bold',
+    letterSpacing: 4,
   },
 });

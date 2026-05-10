@@ -22,6 +22,13 @@
  *   - PlayerState gains equippedWeaponId + weaponCooldownMs
  *   - GameState gains projectiles[], nextProjectileId, killCount
  *   - updateGameState chains tickCombat after tickEnemies
+ *
+ * Phase 3 G3 additions:
+ *   - PickupState type (position, velocity, type, values)
+ *   - EnemyState gains lastHitPlayerAtMs (per-enemy contact damage cooldown)
+ *   - PlayerState gains hp, maxHp, score, xp, lastDamagedAtMs
+ *   - GameState gains pickups[], nextPickupId, isDead
+ *   - updateGameState freezes all ticks when isDead; chains tickPickups last
  */
 
 import type { HeroWeaponPose } from './sprites';
@@ -30,9 +37,11 @@ import { STARTING_WEAPON_ID } from '../data/weapons';
 import {
   PLAYER_MOVE_SPEED_PX_PER_SEC,
   PLAYER_MAX_ANGULAR_SPEED_RAD_PER_SEC,
+  PLAYER_STARTING_HP,
 } from '../data/gameConstants';
 import { tickEnemies } from './enemyEngine';
 import { tickCombat } from './combatEngine';
+import { tickPickups } from './pickupEngine';
 
 export type PlayerState = {
   x: number;
@@ -59,6 +68,20 @@ export type PlayerState = {
    * Always decrements toward 0. When 0 and a target is in range, fires immediately.
    */
   weaponCooldownMs: number;
+  /** Current player HP. Reduced by enemy contact damage. Death at 0. */
+  hp: number;
+  /** Maximum HP (used for HP bar scaling in future HUD). */
+  maxHp: number;
+  /** Cumulative score this run. Incremented by pickup collection. */
+  score: number;
+  /** Cumulative XP this run. Incremented by pickup collection; drives level-ups in Phase 4a. */
+  xp: number;
+  /**
+   * elapsedMs when the player last received any contact damage (any enemy).
+   * Not used as a global gate (each enemy has its own cooldown via lastHitPlayerAtMs).
+   * Stored for future hit-flash effect in G4.
+   */
+  lastDamagedAtMs: number;
 };
 
 /**
@@ -72,6 +95,10 @@ export type PlayerState = {
  *            'dying': playing die animation, not collidable, not moving.
  *   dyingStartedAtMs — elapsedMs when status transitioned to 'dying'.
  *                      Used to compute die frame index. 0 when status is 'alive'.
+ *
+ * G3 adds:
+ *   lastHitPlayerAtMs — elapsedMs when this enemy last dealt contact damage.
+ *                       0 at spawn. Each enemy has its own 500ms cooldown gate.
  */
 export type EnemyState = {
   id: number;
@@ -84,6 +111,8 @@ export type EnemyState = {
   status: 'alive' | 'dying';
   /** elapsedMs when the die animation started. 0 when alive. */
   dyingStartedAtMs: number;
+  /** elapsedMs when this enemy last dealt contact damage to the player. 0 at spawn. */
+  lastHitPlayerAtMs: number;
 };
 
 /**
@@ -111,6 +140,28 @@ export type ProjectileState = {
   damage: number;
 };
 
+/**
+ * Runtime pickup entity. Lives inside GameState.pickups[].
+ *
+ * Velocity starts at zero and is accelerated by the magnet system in tickPickups.
+ * Pickups despawn when collected (overlap with player within COLLECT_RADIUS_PX).
+ */
+export type PickupState = {
+  id: number;
+  x: number;
+  y: number;
+  /** Velocity x in px/sec — starts at 0, accelerated by magnet pull. */
+  vxPxPerSec: number;
+  /** Velocity y in px/sec — starts at 0, accelerated by magnet pull. */
+  vyPxPerSec: number;
+  type: 'money_small';
+  /** Score added to player on collection. */
+  scoreValue: number;
+  /** XP added to player on collection. Drives level-ups in Phase 4a. */
+  xpValue: number;
+  spawnedAtMs: number;
+};
+
 export type GameState = {
   player: PlayerState;
   /** All currently live enemies (alive + dying). Filtered/replaced each tick — no mutation. */
@@ -125,6 +176,16 @@ export type GameState = {
   nextProjectileId: number;
   /** Total enemies killed this run. Displayed in debug overlay. */
   killCount: number;
+  /** All active pickups. Filtered/replaced each tick — no mutation. */
+  pickups: PickupState[];
+  /** Monotonically increasing counter — ensures every pickup has a unique id. */
+  nextPickupId: number;
+  /**
+   * True when the player's HP has reached 0.
+   * updateGameState freezes all ticks (returns state unchanged) when true.
+   * Real restart/menu wiring is Phase 7.
+   */
+  isDead: boolean;
   /** Canvas dimensions stored once at init — spawner uses them to place enemies at edges. */
   canvasWidth: number;
   canvasHeight: number;
@@ -146,6 +207,11 @@ export function createInitialGameState(canvasWidth: number, canvasHeight: number
       walkStartedAtMs: 0,
       equippedWeaponId: STARTING_WEAPON_ID,
       weaponCooldownMs: 0,
+      hp: PLAYER_STARTING_HP,
+      maxHp: PLAYER_STARTING_HP,
+      score: 0,
+      xp: 0,
+      lastDamagedAtMs: 0,
     },
     enemies: [],
     nextEnemyId: 0,
@@ -153,6 +219,9 @@ export function createInitialGameState(canvasWidth: number, canvasHeight: number
     projectiles: [],
     nextProjectileId: 0,
     killCount: 0,
+    pickups: [],
+    nextPickupId: 0,
+    isDead: false,
     canvasWidth,
     canvasHeight,
     elapsedMs: 0,
@@ -163,14 +232,23 @@ export function createInitialGameState(canvasWidth: number, canvasHeight: number
 /**
  * Advance game state by one fixed timestep (FIXED_STEP_MS).
  *
+ * Returns state unchanged when isDead — game freezes until Phase 7 wires restart.
+ *
  * Tick ordering within one step:
  *   1. Player movement + rotation
  *   2. Enemy spawning + AI movement (tickEnemies)
  *   3. Combat: weapon cooldown, auto-fire, projectile motion,
- *      collision, damage, death transitions, die-animation cleanup (tickCombat)
+ *      collision, damage, death transitions, die-animation cleanup,
+ *      pickup spawning on death, contact damage (tickCombat)
+ *   4. Pickup magnet pull + collection (tickPickups)
  */
 export function updateGameState(state: GameState, dtMs: number): GameState {
   'worklet';
+
+  // Freeze all simulation when the player is dead.
+  // Phase 7 will set isDead = false via a restart action.
+  if (state.isDead) return state;
+
   const { player } = state;
   const { inputVector } = player;
 
@@ -222,5 +300,6 @@ export function updateGameState(state: GameState, dtMs: number): GameState {
   };
 
   const stateAfterEnemies = tickEnemies(stateAfterPlayer, dtMs);
-  return tickCombat(stateAfterEnemies, dtMs);
+  const stateAfterCombat = tickCombat(stateAfterEnemies, dtMs);
+  return tickPickups(stateAfterCombat, dtMs);
 }

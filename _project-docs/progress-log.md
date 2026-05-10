@@ -26,7 +26,7 @@ Status legend:
 | 0 — Pre-build setup | 🟢 Complete | 2026-05-08 | n/a | n/a | Directories, kits, context doc, accounts |
 | 1 — Project scaffold | 🟢 Complete | 2026-05-08 | a85087b | Yes | Placeholder screen confirmed on device via Expo Go |
 | 2 — Player + drag-to-move | 🟢 Complete | 2026-05-08 | G1: fe57417 G2: 9116c45 G3: 3f618d0 G4: 78fa367 | Yes — all 4 groups | All groups complete |
-| 3 — Enemies + auto-fire | ⚪ | | | | |
+| 3 — Enemies + auto-fire | 🟡 In Progress | | G1: c47e000 G2: 083d28d G3: pending | G1 ✅ G2 ✅ G3 pending | G1+G2 device-tested |
 | 4a — Stat skills + level-up | ⚪ | | | | |
 | 4b — Ability skills + crates | ⚪ | | | | |
 | 5 — Maps + obstacles + vehicle enemies | ⚪ | | | | |
@@ -282,6 +282,48 @@ Each time the player taps Deploy, the scatter algorithm uses the current time as
 - Each map = one ~30-line JSON file in `data/maps/`
 - Engine reads JSON, applies scatter, places landmark, draws atmosphere overlay
 - Mo will tune density and parameters by playing each map and adjusting; CC implements the system, Mo iterates the values
+
+---
+
+## Phase 3 — Group 3: Money pickups, magnet pull, contact damage, death state
+
+**Status:** Pending device verification
+**Commit:** pending
+
+### What was built
+
+- `PickupState` type added to `gameEngine.ts`: id, position, velocity (for magnet), type, scoreValue, xpValue, spawnedAtMs
+- `PlayerState` extended: hp, maxHp, score, xp, lastDamagedAtMs (all new fields)
+- `EnemyState` extended: lastHitPlayerAtMs (per-enemy contact damage cooldown)
+- `GameState` extended: pickups[], nextPickupId, isDead
+- `createInitialGameState` updated with all new fields (hp=100, score=0, xp=0, isDead=false, etc.)
+- `updateGameState` freezes (returns state unchanged) when isDead=true; chains tickPickups as final step
+- `pickupEngine.ts` (new): magnet pull (MAGNET_RANGE_PX=80px, accel=1200px/s², cap=800px/s), collection at COLLECT_RADIUS_PX=12px, score+xp grant, audioEngine.playSFX('xp_absorb') call
+- `combatEngine.ts` extended: spawns money_small pickup at dying enemy position on HP→0; §8 contact damage with per-enemy 500ms cooldown (CONTACT_DAMAGE_INTERVAL_MS), isDead flag set when hp≤0; audio stubs for shoot/impact/death/hit
+- `enemyEngine.ts`: lastHitPlayerAtMs threaded through spawn and movement copies
+- `audioEngine.ts`: added 'worklet' directive to playSFX stub so it's callable from UI-thread worklets
+- `gameConstants.ts`: PLAYER_STARTING_HP=100, PLAYER_COLLISION_RADIUS_PX=16, CONTACT_DAMAGE_INTERVAL_MS=500, PICKUP_SLOT_COUNT=50, MAGNET_RANGE_PX=80, MAGNET_ACCELERATION_PX_PER_SEC_SQ=1200, MAGNET_MAX_SPEED_PX_PER_SEC=800, COLLECT_RADIUS_PX=12, PICKUP_SPRITE_SCALE=2
+- `GameCanvas.tsx`: useImage for Money_Small.png; 50 usePickupSlotTransform hooks (always-render pattern matching projectiles); pickup JSX below projectiles in z-order; 100ms timer extended to read hp/score/xp/isDead; debug overlay gains HP/Score/XP lines; "YOU DIED" RN View overlay (opacity-gated, always in JSX tree)
+
+### Architectural decisions made during G3
+
+- **audioEngine.playSFX marked 'worklet'** so actual call sites (not comments) can live in combat/pickup engine worklets. Phase 6 will change the implementation to an event-queue pattern; call sites need no rework.
+- **Pickup z-order:** pickups < projectiles < enemies < player < overlays. Pickups appear below bullets visually.
+- **Contact damage is in combatEngine** (not pickupEngine) — it's combat logic. pickupEngine stays focused on pickup physics and collection.
+- **Per-enemy lastHitPlayerAtMs** implements the "each enemy has its own 500ms cooldown" requirement. player.lastDamagedAtMs tracks the last hit timestamp globally (available for future G4 hit-flash effect).
+- **isDead set in combatEngine** (§8 contact damage) rather than a separate step — HP reaches 0 there, isDead is the immediate consequence.
+- **50 pickup slots always-render** following the projectile pattern. If FPS impact is observed on device with large pickup counts, can switch to the enemy pattern (null JSX for inactive slots).
+
+### Verification targets (to confirm on device)
+
+1. Stand still in front of Scav. HP drops in debug overlay at ~500ms intervals.
+2. Kill an enemy. Money Small pickup appears at corpse position immediately.
+3. Walk past a pickup at >80px — it stays put.
+4. Walk within 80px — pickup accelerates toward player, gets collected.
+5. On collection: Score and XP increment by 10 in debug overlay.
+6. Take enough hits — game freezes, "YOU DIED" overlay appears centered in red.
+7. With 20+ enemies killed, FPS stays ~70.
+8. Active pickup count returns to 0 when all collected.
 
 ---
 

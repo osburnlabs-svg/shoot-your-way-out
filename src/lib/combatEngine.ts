@@ -1,6 +1,7 @@
 /**
- * Combat tick — auto-fire, projectile motion, collision, damage, death transitions.
- * Runs on the Reanimated UI thread (worklet) as the final step of updateGameState.
+ * Combat tick — auto-fire, projectile motion, collision, damage, death transitions,
+ * pickup spawning on death, and enemy contact damage to player.
+ * Runs on the Reanimated UI thread (worklet) as step 3 of updateGameState.
  *
  * Tick ordering (called after tickEnemies):
  *   1. Advance weapon cooldown toward 0
@@ -9,14 +10,14 @@
  *   4. Move all active projectiles (straight-line, constant speed)
  *   5. Despawn projectiles that exceeded max range
  *   6. Collision: for each remaining projectile, check all alive enemies
- *      On hit: apply damage; if HP <= 0, transition enemy to 'dying'
+ *      On hit: apply damage; if HP <= 0, transition enemy to 'dying' + spawn pickup
  *   7. Cleanup: remove dying enemies whose die animation has completed
+ *   8. Contact damage: for each alive enemy overlapping the player, apply
+ *      contactDamage on a per-enemy 500ms cooldown. Set isDead if HP reaches 0.
  *
  * Threading contract:
  *   - All logic runs on the UI thread (worklet).
- *   - No runOnJS calls. Audio call sites are marked as comments for Phase 6.
- *     Phase 6 will introduce an audio event queue pattern to dispatch SFX
- *     from the UI thread safely without runOnJS-per-event overhead.
+ *   - No runOnJS calls. audioEngine.playSFX is worklet-safe (stub with 'worklet' directive).
  *   - No React state reads or writes. No SharedValue mutation outside GameState.
  *
  * Collision model:
@@ -26,22 +27,35 @@
  *   in the same tick (unlikely at Pistol's 400ms cooldown, handled correctly).
  */
 
-import type { GameState, EnemyState, ProjectileState } from './gameEngine';
+import type { GameState, EnemyState, ProjectileState, PickupState } from './gameEngine';
 import { WEAPON_PROFILES } from '../data/weapons';
+import { ENEMY_PROFILES } from '../data/enemies';
+import { audioEngine } from './audioEngine';
 import {
   ENEMY_COLLISION_RADIUS_PX,
   PROJECTILE_COLLISION_RADIUS_PX,
   ENEMY_DIE_FRAME_COUNT,
   ENEMY_DIE_FRAME_DURATION_MS,
+  PLAYER_COLLISION_RADIUS_PX,
+  CONTACT_DAMAGE_INTERVAL_MS,
 } from '../data/gameConstants';
 
-/** Combined collision radius squared — computed once, used in hot loop. */
-const COLLISION_R_SQ =
+/** Combined projectile-enemy collision radius squared — computed once, used in hot loop. */
+const PROJ_ENEMY_COLLISION_R_SQ =
   (ENEMY_COLLISION_RADIUS_PX + PROJECTILE_COLLISION_RADIUS_PX) *
   (ENEMY_COLLISION_RADIUS_PX + PROJECTILE_COLLISION_RADIUS_PX);
 
+/** Combined player-enemy collision radius squared — used for contact damage. */
+const PLAYER_ENEMY_COLLISION_R_SQ =
+  (PLAYER_COLLISION_RADIUS_PX + ENEMY_COLLISION_RADIUS_PX) *
+  (PLAYER_COLLISION_RADIUS_PX + ENEMY_COLLISION_RADIUS_PX);
+
 /** Total die animation duration in ms. Enemies despawn after this elapses. */
 const DIE_DURATION_MS = ENEMY_DIE_FRAME_COUNT * ENEMY_DIE_FRAME_DURATION_MS;
+
+/** Score and XP value of a Money Small pickup. */
+const MONEY_SMALL_SCORE = 10;
+const MONEY_SMALL_XP = 10;
 
 export function tickCombat(state: GameState, dtMs: number): GameState {
   'worklet';
@@ -59,7 +73,14 @@ export function tickCombat(state: GameState, dtMs: number): GameState {
   if (weaponCooldownMs < 0) weaponCooldownMs = 0;
 
   let nextProjectileId = state.nextProjectileId;
+  let nextPickupId = state.nextPickupId;
   let killCount = state.killCount;
+
+  // Pickup array — carry existing pickups forward; deaths add to it below.
+  const newPickups: PickupState[] = [];
+  for (let i = 0; i < state.pickups.length; i++) {
+    newPickups.push(state.pickups[i]);
+  }
 
   // ─── 2. Find nearest alive enemy within range ─────────────────────────────
   const rangeSq = weapon.rangePx * weapon.rangePx;
@@ -106,7 +127,7 @@ export function tickCombat(state: GameState, dtMs: number): GameState {
     });
     nextProjectileId += 1;
     weaponCooldownMs = weapon.cooldownMs;
-    // Phase 6: audioEngine.playSFX('shoot_pistol')
+    audioEngine.playSFX('shoot_pistol');
   }
 
   // ─── 4 & 5. Move projectiles, despawn range-expired ones ─────────────────
@@ -147,10 +168,10 @@ export function tickCombat(state: GameState, dtMs: number): GameState {
       if (enemy.status !== 'alive') continue;
       const dx = proj.x - enemy.x;
       const dy = proj.y - enemy.y;
-      if (dx * dx + dy * dy < COLLISION_R_SQ) {
+      if (dx * dx + dy * dy < PROJ_ENEMY_COLLISION_R_SQ) {
         damageAccum[ei] += proj.damage;
         consumedIds.push(proj.id);
-        // Phase 6: audioEngine.playSFX('impact_flesh')
+        audioEngine.playSFX('impact_flesh');
         break; // one projectile = one hit
       }
     }
@@ -167,7 +188,7 @@ export function tickCombat(state: GameState, dtMs: number): GameState {
     if (!consumed) finalProjectiles.push(p);
   }
 
-  // Apply damage to enemies, transition dying ones.
+  // Apply damage to enemies, transition dying ones, spawn pickups on death.
   const damagedEnemies: EnemyState[] = [];
   for (let i = 0; i < enemies.length; i++) {
     const enemy = enemies[i];
@@ -180,7 +201,20 @@ export function tickCombat(state: GameState, dtMs: number): GameState {
     const dies = newHp <= 0 && enemy.status === 'alive';
     if (dies) {
       killCount += 1;
-      // Phase 6: audioEngine.playSFX('enemy_die')
+      // Spawn a Money Small pickup at the dying enemy's position.
+      newPickups.push({
+        id: nextPickupId,
+        x: enemy.x,
+        y: enemy.y,
+        vxPxPerSec: 0,
+        vyPxPerSec: 0,
+        type: 'money_small',
+        scoreValue: MONEY_SMALL_SCORE,
+        xpValue: MONEY_SMALL_XP,
+        spawnedAtMs: elapsedMs,
+      });
+      nextPickupId += 1;
+      audioEngine.playSFX('enemy_die');
     }
     damagedEnemies.push({
       id: enemy.id,
@@ -191,6 +225,7 @@ export function tickCombat(state: GameState, dtMs: number): GameState {
       walkStartedAtMs: enemy.walkStartedAtMs,
       status: dies ? 'dying' : enemy.status,
       dyingStartedAtMs: dies ? elapsedMs : enemy.dyingStartedAtMs,
+      lastHitPlayerAtMs: enemy.lastHitPlayerAtMs,
     });
   }
 
@@ -205,15 +240,66 @@ export function tickCombat(state: GameState, dtMs: number): GameState {
     survivingEnemies.push(enemy);
   }
 
+  // ─── 8. Contact damage ────────────────────────────────────────────────────
+  // For each alive enemy overlapping the player, apply contactDamage once per
+  // CONTACT_DAMAGE_INTERVAL_MS. Each enemy has its own independent cooldown
+  // (lastHitPlayerAtMs), so multiple overlapping enemies each deal damage.
+  let newPlayerHp = player.hp;
+  let newLastDamagedAtMs = player.lastDamagedAtMs;
+  const contactCheckedEnemies: EnemyState[] = [];
+
+  for (let i = 0; i < survivingEnemies.length; i++) {
+    const enemy = survivingEnemies[i];
+
+    if (enemy.status !== 'alive') {
+      contactCheckedEnemies.push(enemy);
+      continue;
+    }
+
+    const dx = enemy.x - player.x;
+    const dy = enemy.y - player.y;
+    const distSq = dx * dx + dy * dy;
+
+    if (
+      distSq < PLAYER_ENEMY_COLLISION_R_SQ &&
+      elapsedMs - enemy.lastHitPlayerAtMs >= CONTACT_DAMAGE_INTERVAL_MS
+    ) {
+      const profile = ENEMY_PROFILES[enemy.type];
+      newPlayerHp = Math.max(0, newPlayerHp - profile.contactDamage);
+      newLastDamagedAtMs = elapsedMs;
+      audioEngine.playSFX('hit_grunt');
+      contactCheckedEnemies.push({
+        id: enemy.id,
+        type: enemy.type,
+        x: enemy.x,
+        y: enemy.y,
+        hp: enemy.hp,
+        walkStartedAtMs: enemy.walkStartedAtMs,
+        status: enemy.status,
+        dyingStartedAtMs: enemy.dyingStartedAtMs,
+        lastHitPlayerAtMs: elapsedMs,
+      });
+    } else {
+      contactCheckedEnemies.push(enemy);
+    }
+  }
+
+  const newIsDead = newPlayerHp <= 0;
+
   return {
     ...state,
+    isDead: newIsDead,
     player: {
       ...player,
       weaponCooldownMs,
+      hp: newPlayerHp,
+      lastDamagedAtMs: newLastDamagedAtMs,
     },
-    enemies: survivingEnemies,
+    enemies: contactCheckedEnemies,
     projectiles: finalProjectiles,
     nextProjectileId,
     killCount,
+    pickups: newPickups,
+    nextPickupId,
   };
 }

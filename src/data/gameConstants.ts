@@ -131,3 +131,48 @@ export const ENEMY_DIE_FRAME_COUNT = 4;
  * Matches the context doc spec ("~400ms die animation based on 4 frames").
  */
 export const ENEMY_DIE_FRAME_DURATION_MS = 100;
+
+// ─── Player ───────────────────────────────────────────────────────────────────
+
+/** Starting and maximum HP for the player. */
+export const PLAYER_STARTING_HP = 100;
+
+/**
+ * Circle collision radius for the player (px). Used for enemy contact damage
+ * checks and pickup collection. Hero sprites are ~64px display at 2× scale;
+ * 16px is a fair center-body hitbox.
+ */
+export const PLAYER_COLLISION_RADIUS_PX = 16;
+
+// ─── Contact damage ───────────────────────────────────────────────────────────
+
+/**
+ * Minimum ms between contact damage ticks per enemy.
+ * Each enemy tracks its own cooldown — multiple overlapping enemies each deal
+ * damage independently on their own 500ms timer.
+ */
+export const CONTACT_DAMAGE_INTERVAL_MS = 500;
+
+// ─── Pickups ──────────────────────────────────────────────────────────────────
+
+/**
+ * Pre-allocated pickup slot count — mirrors PROJECTILE_SLOT_COUNT pattern.
+ * 50 useDerivedValue hooks in GameCanvas, always rendered at (-9999,-9999)
+ * when inactive. Money can stack up if the player kites a large swarm.
+ */
+export const PICKUP_SLOT_COUNT = 50;
+
+/** Distance (px) at which the magnet pull activates toward the player. */
+export const MAGNET_RANGE_PX = 80;
+
+/** Acceleration applied toward the player while in magnet range (px/sec²). */
+export const MAGNET_ACCELERATION_PX_PER_SEC_SQ = 1200;
+
+/** Maximum speed a pickup can reach under magnet pull (px/sec). */
+export const MAGNET_MAX_SPEED_PX_PER_SEC = 800;
+
+/** Distance (px) at which a pickup is collected (overlaps player center). */
+export const COLLECT_RADIUS_PX = 12;
+
+/** Pixel-art upscale for pickup sprites. Same as hero/enemy — same kit. */
+export const PICKUP_SPRITE_SCALE = 2;
