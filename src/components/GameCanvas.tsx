@@ -58,6 +58,7 @@ import {
   Group,
   Image,
   MipmapMode,
+  Rect,
   useImage,
 } from '@shopify/react-native-skia';
 import {
@@ -162,6 +163,20 @@ function usePickupSlotTransform(gameState: SharedValue<GameState>, slotIndex: nu
     const pickup = gameState.value.pickups[slotIndex];
     if (!pickup) return [{ translateX: -9999 }, { translateY: -9999 }];
     return [{ translateX: pickup.x }, { translateY: pickup.y }];
+  });
+}
+
+/**
+ * Per-slot hit-flash opacity — one useDerivedValue per pre-allocated enemy slot.
+ * Returns 0.65 while the enemy's hitFlashUntilMs is in the future, 0 otherwise.
+ * Checked every frame on the UI thread — no runOnJS, no 100ms polling lag.
+ * Used as the opacity prop on a white Rect overlay inside each active enemy Group.
+ */
+function useEnemySlotFlash(gameState: SharedValue<GameState>, slotIndex: number) {
+  return useDerivedValue(() => {
+    const enemy = gameState.value.enemies[slotIndex];
+    if (!enemy) return 0;
+    return gameState.value.elapsedMs < enemy.hitFlashUntilMs ? 0.65 : 0;
   });
 }
 
@@ -427,6 +442,72 @@ export default function GameCanvas({ width, height }: Props) {
     eTransform35, eTransform36, eTransform37, eTransform38, eTransform39,
     eTransform40, eTransform41, eTransform42, eTransform43, eTransform44,
     eTransform45, eTransform46, eTransform47, eTransform48, eTransform49,
+  ];
+
+  // ─── Per-slot hit-flash opacities (UI thread, no runOnJS) ────────────────
+  // One useDerivedValue per enemy slot. Returns 0.65 while hitFlashUntilMs is
+  // in the future, 0 otherwise. Drives a white Rect overlay in each enemy Group.
+  const eFlash0  = useEnemySlotFlash(gameState, 0);
+  const eFlash1  = useEnemySlotFlash(gameState, 1);
+  const eFlash2  = useEnemySlotFlash(gameState, 2);
+  const eFlash3  = useEnemySlotFlash(gameState, 3);
+  const eFlash4  = useEnemySlotFlash(gameState, 4);
+  const eFlash5  = useEnemySlotFlash(gameState, 5);
+  const eFlash6  = useEnemySlotFlash(gameState, 6);
+  const eFlash7  = useEnemySlotFlash(gameState, 7);
+  const eFlash8  = useEnemySlotFlash(gameState, 8);
+  const eFlash9  = useEnemySlotFlash(gameState, 9);
+  const eFlash10 = useEnemySlotFlash(gameState, 10);
+  const eFlash11 = useEnemySlotFlash(gameState, 11);
+  const eFlash12 = useEnemySlotFlash(gameState, 12);
+  const eFlash13 = useEnemySlotFlash(gameState, 13);
+  const eFlash14 = useEnemySlotFlash(gameState, 14);
+  const eFlash15 = useEnemySlotFlash(gameState, 15);
+  const eFlash16 = useEnemySlotFlash(gameState, 16);
+  const eFlash17 = useEnemySlotFlash(gameState, 17);
+  const eFlash18 = useEnemySlotFlash(gameState, 18);
+  const eFlash19 = useEnemySlotFlash(gameState, 19);
+  const eFlash20 = useEnemySlotFlash(gameState, 20);
+  const eFlash21 = useEnemySlotFlash(gameState, 21);
+  const eFlash22 = useEnemySlotFlash(gameState, 22);
+  const eFlash23 = useEnemySlotFlash(gameState, 23);
+  const eFlash24 = useEnemySlotFlash(gameState, 24);
+  const eFlash25 = useEnemySlotFlash(gameState, 25);
+  const eFlash26 = useEnemySlotFlash(gameState, 26);
+  const eFlash27 = useEnemySlotFlash(gameState, 27);
+  const eFlash28 = useEnemySlotFlash(gameState, 28);
+  const eFlash29 = useEnemySlotFlash(gameState, 29);
+  const eFlash30 = useEnemySlotFlash(gameState, 30);
+  const eFlash31 = useEnemySlotFlash(gameState, 31);
+  const eFlash32 = useEnemySlotFlash(gameState, 32);
+  const eFlash33 = useEnemySlotFlash(gameState, 33);
+  const eFlash34 = useEnemySlotFlash(gameState, 34);
+  const eFlash35 = useEnemySlotFlash(gameState, 35);
+  const eFlash36 = useEnemySlotFlash(gameState, 36);
+  const eFlash37 = useEnemySlotFlash(gameState, 37);
+  const eFlash38 = useEnemySlotFlash(gameState, 38);
+  const eFlash39 = useEnemySlotFlash(gameState, 39);
+  const eFlash40 = useEnemySlotFlash(gameState, 40);
+  const eFlash41 = useEnemySlotFlash(gameState, 41);
+  const eFlash42 = useEnemySlotFlash(gameState, 42);
+  const eFlash43 = useEnemySlotFlash(gameState, 43);
+  const eFlash44 = useEnemySlotFlash(gameState, 44);
+  const eFlash45 = useEnemySlotFlash(gameState, 45);
+  const eFlash46 = useEnemySlotFlash(gameState, 46);
+  const eFlash47 = useEnemySlotFlash(gameState, 47);
+  const eFlash48 = useEnemySlotFlash(gameState, 48);
+  const eFlash49 = useEnemySlotFlash(gameState, 49);
+  const allSlotFlashOpacities = [
+    eFlash0,  eFlash1,  eFlash2,  eFlash3,  eFlash4,
+    eFlash5,  eFlash6,  eFlash7,  eFlash8,  eFlash9,
+    eFlash10, eFlash11, eFlash12, eFlash13, eFlash14,
+    eFlash15, eFlash16, eFlash17, eFlash18, eFlash19,
+    eFlash20, eFlash21, eFlash22, eFlash23, eFlash24,
+    eFlash25, eFlash26, eFlash27, eFlash28, eFlash29,
+    eFlash30, eFlash31, eFlash32, eFlash33, eFlash34,
+    eFlash35, eFlash36, eFlash37, eFlash38, eFlash39,
+    eFlash40, eFlash41, eFlash42, eFlash43, eFlash44,
+    eFlash45, eFlash46, eFlash47, eFlash48, eFlash49,
   ];
 
   // ─── Per-slot projectile transforms (UI thread, no runOnJS) ──────────────
@@ -724,6 +805,17 @@ export default function GameCanvas({ width, height }: Props) {
                     sampling={{ filter: FilterMode.Nearest, mipmap: MipmapMode.None }}
                   />
                 )}
+                {/* Hit flash: white Rect overlay, opacity driven by UI-thread derived value.
+                    Opacity is 0.65 for HIT_FLASH_DURATION_MS after a projectile hit, then 0.
+                    Checked every frame — no polling lag, no runOnJS. */}
+                <Rect
+                  x={-w / 2}
+                  y={-h / 2}
+                  width={w}
+                  height={h}
+                  color="white"
+                  opacity={allSlotFlashOpacities[i]}
+                />
               </Group>
             );
           })}

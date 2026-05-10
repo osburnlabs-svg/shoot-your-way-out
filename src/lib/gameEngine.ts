@@ -99,6 +99,11 @@ export type PlayerState = {
  * G3 adds:
  *   lastHitPlayerAtMs — elapsedMs when this enemy last dealt contact damage.
  *                       0 at spawn. Each enemy has its own 500ms cooldown gate.
+ *
+ * G4c adds:
+ *   hitFlashUntilMs — elapsedMs until which the enemy renders with a white hit-flash tint.
+ *                     Set to elapsedMs + HIT_FLASH_DURATION_MS on projectile impact.
+ *                     0 when not flashing. Checked every frame on the UI thread.
  */
 export type EnemyState = {
   id: number;
@@ -113,6 +118,8 @@ export type EnemyState = {
   dyingStartedAtMs: number;
   /** elapsedMs when this enemy last dealt contact damage to the player. 0 at spawn. */
   lastHitPlayerAtMs: number;
+  /** elapsedMs until which the enemy renders with a white hit-flash tint. 0 when not flashing. */
+  hitFlashUntilMs: number;
 };
 
 /**

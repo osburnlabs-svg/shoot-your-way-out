@@ -190,5 +190,12 @@ export const MAGNET_MAX_SPEED_PX_PER_SEC = 1200;
 /** Distance (px) at which a pickup is collected (overlaps player center). */
 export const COLLECT_RADIUS_PX = 12;
 
+/**
+ * Duration (ms) of the white hit-flash tint applied to an enemy on projectile impact.
+ * 80ms is visible but short — pop on hit, back to normal before the next shot.
+ * Adjustable here; the flash is checked every frame on the UI thread via useDerivedValue.
+ */
+export const HIT_FLASH_DURATION_MS = 80;
+
 /** Pixel-art upscale for pickup sprites. Same as hero/enemy — same kit. */
 export const PICKUP_SPRITE_SCALE = 2;

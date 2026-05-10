@@ -38,6 +38,7 @@ import {
   ENEMY_DIE_FRAME_DURATION_MS,
   PLAYER_COLLISION_RADIUS_PX,
   CONTACT_DAMAGE_INTERVAL_MS,
+  HIT_FLASH_DURATION_MS,
 } from '../data/gameConstants';
 
 /** Combined projectile-enemy collision radius squared — computed once, used in hot loop. */
@@ -214,7 +215,6 @@ export function tickCombat(state: GameState, dtMs: number): GameState {
         spawnedAtMs: elapsedMs,
       });
       nextPickupId += 1;
-      audioEngine.playSFX('enemy_die');
     }
     damagedEnemies.push({
       id: enemy.id,
@@ -226,6 +226,8 @@ export function tickCombat(state: GameState, dtMs: number): GameState {
       status: dies ? 'dying' : enemy.status,
       dyingStartedAtMs: dies ? elapsedMs : enemy.dyingStartedAtMs,
       lastHitPlayerAtMs: enemy.lastHitPlayerAtMs,
+      // Flash on every hit, including the kill shot — applies to dying enemies too.
+      hitFlashUntilMs: elapsedMs + HIT_FLASH_DURATION_MS,
     });
   }
 
@@ -278,6 +280,7 @@ export function tickCombat(state: GameState, dtMs: number): GameState {
         status: enemy.status,
         dyingStartedAtMs: enemy.dyingStartedAtMs,
         lastHitPlayerAtMs: elapsedMs,
+        hitFlashUntilMs: enemy.hitFlashUntilMs,
       });
     } else {
       contactCheckedEnemies.push(enemy);

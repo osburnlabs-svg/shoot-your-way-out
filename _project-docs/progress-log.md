@@ -26,7 +26,7 @@ Status legend:
 | 0 — Pre-build setup | 🟢 Complete | 2026-05-08 | n/a | n/a | Directories, kits, context doc, accounts |
 | 1 — Project scaffold | 🟢 Complete | 2026-05-08 | a85087b | Yes | Placeholder screen confirmed on device via Expo Go |
 | 2 — Player + drag-to-move | 🟢 Complete | 2026-05-08 | G1: fe57417 G2: 9116c45 G3: 3f618d0 G4: 78fa367 | Yes — all 4 groups | All groups complete |
-| 3 — Enemies + auto-fire | 🟡 In Progress | | G1: c47e000 G2: 083d28d G3: 5715c19 | G1 ✅ G2 ✅ G3 ✅ | G1+G2+G3 device-tested |
+| 3 — Enemies + auto-fire | 🟡 In Progress | | G1: c47e000 G2: 083d28d G3: 5715c19 G4b: 738ab95 | G1 ✅ G2 ✅ G3 ✅ G4b ✅ | G4c device-test pending |
 | 4a — Stat skills + level-up | ⚪ | | | | |
 | 4b — Ability skills + crates | ⚪ | | | | |
 | 5 — Maps + obstacles + vehicle enemies | ⚪ | | | | |
@@ -216,7 +216,7 @@ Deliberately deferred to Phase 6, where muzzle flash work will need to compute t
 
 ## Design Decisions Pending Implementation
 
-### Stop-to-fire mechanic (Archero-style) — to land in Phase 3 G4
+### Stop-to-fire mechanic (Archero-style) ✅ RESOLVED — shipped in Phase 3 G4b (commit 738ab95)
 
 Decision made during G2 brainstorm: shift from constant auto-fire to Archero-style "auto-fire only while standing still." Player still doesn't aim — targeting and aim remain automatic. The only change is that movement gates firing.
 
@@ -409,6 +409,80 @@ The player's damage feedback is the HP number in the HUD (decreasing) plus scree
 6. Take enough hits — game freezes, "YOU DIED" overlay appears centered in red.
 7. With 20+ enemies killed, FPS stays ~70.
 8. Active pickup count returns to 0 when all collected.
+
+---
+
+## Phase 3 — Group 4a: Combat rebalance + balance baseline + magnet direct-pull fix
+
+**Status:** Complete 🟢
+**Commits:** multiple (data files only + magnet fix in pickupEngine.ts)
+
+### What was built
+
+- `data/gameConstants.ts`: spawn curve flattened (initial delay 3s, rate 0.25→2.0/s over 120s, was 0.5→3.0/s over 60s); Raider ratio ramp extended to 90s; magnet range widened to 120px; MAGNET_ACCELERATION_PX_PER_SEC_SQ removed entirely
+- `data/weapons.ts`: Pistol damage 8→12, range 180→280px, projectile speed 400→500px/s
+- `data/enemies.ts`: Scav HP 15→20 (2-shot kill at new damage); Raider unchanged
+- `data/balance.ts` (new): documentation-only file capturing V1 demo balance baseline with full tuning rationale; not imported by any engine module — diff target only
+- `lib/pickupEngine.ts`: magnet pull replaced from physics-based acceleration to direct-pull (vx = nx × max_speed each tick). Eliminates tail-chase bug. No momentum, no drift.
+
+### Design decisions made during G4a
+
+- **Spawn curve is the primary balance lever, not weapon damage.** Math: player kills ~1.25 Scavs/sec at 400ms cooldown + 2-shot kill. New curve crosses kill capacity at ~70s → first-death window 70-90s. Weapon buff is secondary (extended range makes game feel genuinely ranged, not melee).
+- **Direct-pull magnet replaces acceleration-based model.** Acceleration model accumulated velocity in wrong direction when player changed course. Direct-pull recomputes velocity fresh each tick — no history, no drift. See balance.ts for full rationale.
+- **balance.ts is demo balance only.** Explicitly scoped to Phase 3 standalone play. Full v1 balance is Phase 5+ work once helicopter boss, tier 5-7 enemies, and level-ups exist.
+
+---
+
+## Phase 3 — Group 4b: Stop-to-fire mechanic
+
+**Status:** Complete 🟢
+**Commit:** 738ab95
+
+### What was built
+
+Single-line gate in `lib/combatEngine.ts`: added `&& !player.isMoving` to the auto-fire condition. Player movement and firing are now mutually exclusive. Cooldown continues to advance while moving — weapon fires immediately when player stops if cooldown was ready.
+
+`player.isMoving` was already set correctly in `gameEngine.ts` from Phase 2 (true when inputVector is non-null, false on finger lift). No new state, no new types.
+
+### Design decisions made during G4b
+
+- **Strict isMoving check.** Any joystick input = not firing. No threshold. Matches Archero. If wiggle-correction problems surface in playtesting, revisit in a later polish pass.
+- **Cooldown keeps ticking while moving.** First shot fires immediately on stop. Decided during G2 planning — confirmed correct during G4b.
+- **No visual indicator added.** Hero weapon-raised pose (standing still) vs walk cycle (moving) already communicates the state. Stop-to-fire mechanic decision resolved — see "Design Decisions Pending Implementation" for original entry.
+
+---
+
+## Phase 3 — Group 4c: Hit flashes + audio cleanup
+
+**Status:** Complete 🟢
+**Commit:** [this commit]
+
+### What was built
+
+**Hit flashes:**
+- `EnemyState` gains `hitFlashUntilMs: number` (0 at spawn, set to `elapsedMs + HIT_FLASH_DURATION_MS` on each projectile impact including the kill shot)
+- `data/gameConstants.ts` gains `HIT_FLASH_DURATION_MS = 80`
+- `lib/enemyEngine.ts`: `hitFlashUntilMs` threaded through spawn and movement copies
+- `lib/combatEngine.ts`: `hitFlashUntilMs` set on damage, threaded through all EnemyState copies
+- `GameCanvas.tsx`: `useEnemySlotFlash` hook (50 useDerivedValue instances, same pattern as slot transforms) returns flash opacity (0 or 0.65) checked every frame on the UI thread. White `<Rect>` overlay added inside each active enemy `<Group>`, `opacity` prop driven by the derived value — no runOnJS, no polling lag.
+
+**Audio cleanup:**
+- Removed `audioEngine.playSFX('enemy_die')` from `combatEngine.ts`. Per "Feedback design philosophy" Rule 2 — no standalone kill sounds. The gunshot + impact pair already communicates the kill.
+- `shoot_pistol` and `impact_flesh` call sites were already real calls (wired in G3 when 'worklet' directive was added to playSFX). No other `// Phase 6` stubs remained.
+
+### Design decisions made during G4c
+
+- **Flash runs on UI thread via useDerivedValue, not the 100ms timer.** HIT_FLASH_DURATION_MS = 80ms would be invisible through 100ms polling. Derived value checks `elapsedMs < enemy.hitFlashUntilMs` every frame — sub-millisecond response. Adds 50 derived values (same cost as the existing slot transforms, which proved acceptable for FPS).
+- **White Rect overlay instead of Skia color filter.** Simpler implementation — no ColorMatrix math. White at 0.65 opacity composites cleanly over the pixel-art sprites and reads unmistakably as a hit. Adjustable via `HIT_FLASH_DURATION_MS` and the 0.65 opacity constant in `useEnemySlotFlash`.
+- **`enemy_die` call removed, not replaced.** There is no alternative kill sound — the absence is intentional. See "Feedback design philosophy" entry for the permanent rule.
+
+### Verification targets
+
+1. Shoot an enemy → brief white flash on hit (~80ms), returns to normal
+2. Shoot again → flash repeats
+3. Kill it → flash on kill shot, die animation plays normally, no audio cue at death moment
+4. FPS stable ~70 with 30+ enemies on screen
+5. combatEngine.ts has no `enemy_die` playSFX call
 
 ---
 

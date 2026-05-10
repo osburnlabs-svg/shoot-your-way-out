@@ -130,6 +130,7 @@ export function tickEnemies(state: GameState, dtMs: number): GameState {
           status: 'alive',
           dyingStartedAtMs: 0,
           lastHitPlayerAtMs: 0,
+          hitFlashUntilMs: 0,
         });
         nextEnemyId += 1;
         acc -= intervalMs;
@@ -185,6 +186,7 @@ export function tickEnemies(state: GameState, dtMs: number): GameState {
         status: enemy.status,
         dyingStartedAtMs: enemy.dyingStartedAtMs,
         lastHitPlayerAtMs: enemy.lastHitPlayerAtMs,
+        hitFlashUntilMs: enemy.hitFlashUntilMs,
       });
     }
   }
