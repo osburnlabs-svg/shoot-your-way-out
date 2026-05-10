@@ -98,3 +98,36 @@ export const RAIDER_RATIO_MAX = 0.4;
 
 /** Time (ms) over which Raider ratio ramps from INITIAL to MAX. */
 export const RAIDER_RATIO_RAMP_DURATION_MS = 90000;
+
+// ─── Projectiles ──────────────────────────────────────────────────────────────
+
+/**
+ * Fixed pre-allocated slot count for projectile entities in GameCanvas.
+ * Mirrors ENEMY_SOFT_CAP pattern — 30 useDerivedValue hooks, inactive slots
+ * render off-screen. At Pistol's 400ms cooldown, only 1–2 bullets are ever
+ * in flight simultaneously; 30 is comfortable headroom for faster weapons later.
+ */
+export const PROJECTILE_SLOT_COUNT = 30;
+
+// ─── Collision ────────────────────────────────────────────────────────────────
+
+/**
+ * Circle collision radius for enemies (px). Sprites are 64px source × 2× scale
+ * = 128px display, but the actual character body is roughly 40px wide, so 20px
+ * radius is a fair hitbox — not too tight, not too forgiving.
+ */
+export const ENEMY_COLLISION_RADIUS_PX = 20;
+
+/** Circle collision radius for projectiles (px). Matches bullet render size. */
+export const PROJECTILE_COLLISION_RADIUS_PX = 4;
+
+// ─── Enemy death animation ─────────────────────────────────────────────────────
+
+/** Both Scav (SD_01–04) and Raider (SD2_01–04) die cycles: 4 frames. */
+export const ENEMY_DIE_FRAME_COUNT = 4;
+
+/**
+ * Duration per die frame in ms. 4 frames × 100ms = 400ms total death sequence.
+ * Matches the context doc spec ("~400ms die animation based on 4 frames").
+ */
+export const ENEMY_DIE_FRAME_DURATION_MS = 100;

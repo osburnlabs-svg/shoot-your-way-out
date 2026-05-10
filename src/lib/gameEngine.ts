@@ -15,15 +15,24 @@
  *   - GameState extended with enemies[], nextEnemyId, spawnAccMs
  *   - canvasWidth/canvasHeight stored in state so spawner can compute screen edges
  *   - updateGameState calls tickEnemies from enemyEngine (spawner + AI)
+ *
+ * Phase 3 G2 additions:
+ *   - EnemyState gains status ('alive'|'dying') + dyingStartedAtMs
+ *   - ProjectileState type (position, velocity, range tracking, damage)
+ *   - PlayerState gains equippedWeaponId + weaponCooldownMs
+ *   - GameState gains projectiles[], nextProjectileId, killCount
+ *   - updateGameState chains tickCombat after tickEnemies
  */
 
 import type { HeroWeaponPose } from './sprites';
 import type { EnemyType } from '../data/enemies';
+import { STARTING_WEAPON_ID } from '../data/weapons';
 import {
   PLAYER_MOVE_SPEED_PX_PER_SEC,
   PLAYER_MAX_ANGULAR_SPEED_RAD_PER_SEC,
 } from '../data/gameConstants';
 import { tickEnemies } from './enemyEngine';
+import { tickCombat } from './combatEngine';
 
 export type PlayerState = {
   x: number;
@@ -43,6 +52,13 @@ export type PlayerState = {
   isMoving: boolean;
   /** game.elapsedMs when the current walk session began — used to compute walk frame index. */
   walkStartedAtMs: number;
+  /** ID key into WEAPON_PROFILES. Determines firing behavior. Always 'pistol' in G2. */
+  equippedWeaponId: string;
+  /**
+   * Remaining cooldown in ms before the next shot can fire.
+   * Always decrements toward 0. When 0 and a target is in range, fires immediately.
+   */
+  weaponCooldownMs: number;
 };
 
 /**
@@ -50,10 +66,12 @@ export type PlayerState = {
  *
  * walkStartedAtMs is set at spawn (= state.elapsedMs at that moment).
  * Walk frame = getCurrentFrame(config, elapsedMs - enemy.walkStartedAtMs).
- * This matches exactly how the hero walk frame is computed — same animation system.
  *
- * hp is stored even in G1 (where enemies can't die) so the shape doesn't change in G2.
- * contactDamage is on EnemyProfile in data/enemies.ts, not here — no per-instance variance.
+ * G2 adds:
+ *   status — 'alive': walking toward player, collidable.
+ *            'dying': playing die animation, not collidable, not moving.
+ *   dyingStartedAtMs — elapsedMs when status transitioned to 'dying'.
+ *                      Used to compute die frame index. 0 when status is 'alive'.
  */
 export type EnemyState = {
   id: number;
@@ -63,16 +81,50 @@ export type EnemyState = {
   hp: number;
   /** elapsedMs at spawn — used to offset walk animation so enemies don't all sync frames. */
   walkStartedAtMs: number;
+  status: 'alive' | 'dying';
+  /** elapsedMs when the die animation started. 0 when alive. */
+  dyingStartedAtMs: number;
+};
+
+/**
+ * Runtime projectile entity. Lives inside GameState.projectiles[].
+ *
+ * Velocity is stored pre-computed in px/sec (direction × speed).
+ * speedPxPerSec is the cached magnitude — used for distance tracking without
+ * recomputing sqrt every tick.
+ *
+ * Projectile despawns when distanceTraveledPx >= maxRangePx (range expiry)
+ * or when it hits an enemy (collision — handled in combatEngine).
+ */
+export type ProjectileState = {
+  id: number;
+  x: number;
+  y: number;
+  /** x component of velocity, in pixels per second. */
+  vxPxPerSec: number;
+  /** y component of velocity, in pixels per second. */
+  vyPxPerSec: number;
+  /** Cached speed magnitude (px/sec) — avoids sqrt in the motion update. */
+  speedPxPerSec: number;
+  distanceTraveledPx: number;
+  maxRangePx: number;
+  damage: number;
 };
 
 export type GameState = {
   player: PlayerState;
-  /** All currently live enemies. Filtered/replaced each tick — no mutation. */
+  /** All currently live enemies (alive + dying). Filtered/replaced each tick — no mutation. */
   enemies: EnemyState[];
   /** Monotonically increasing counter — ensures every enemy has a unique id. */
   nextEnemyId: number;
   /** Spawn time accumulator in ms — carries sub-interval remainder across ticks. */
   spawnAccMs: number;
+  /** All active projectiles. Filtered/replaced each tick — no mutation. */
+  projectiles: ProjectileState[];
+  /** Monotonically increasing counter — ensures every projectile has a unique id. */
+  nextProjectileId: number;
+  /** Total enemies killed this run. Displayed in debug overlay. */
+  killCount: number;
   /** Canvas dimensions stored once at init — spawner uses them to place enemies at edges. */
   canvasWidth: number;
   canvasHeight: number;
@@ -92,10 +144,15 @@ export function createInitialGameState(canvasWidth: number, canvasHeight: number
       weaponPose: 'pistol',
       isMoving: false,
       walkStartedAtMs: 0,
+      equippedWeaponId: STARTING_WEAPON_ID,
+      weaponCooldownMs: 0,
     },
     enemies: [],
     nextEnemyId: 0,
     spawnAccMs: 0,
+    projectiles: [],
+    nextProjectileId: 0,
+    killCount: 0,
     canvasWidth,
     canvasHeight,
     elapsedMs: 0,
@@ -106,15 +163,11 @@ export function createInitialGameState(canvasWidth: number, canvasHeight: number
 /**
  * Advance game state by one fixed timestep (FIXED_STEP_MS).
  *
- * Virtual joystick movement model:
- *   - inputVector is a pre-normalized direction (x, y both in [-1, 1], magnitude = 1)
- *   - Hero moves at full speed in that direction while inputVector is non-null
- *   - Rotation smoothly tracks the input direction, capped at max angular speed
- *   - No overshoot concern — target is a direction, not a position
- *
- * Enemy tick is delegated to tickEnemies (lib/enemyEngine.ts):
- *   - Spawner: respects delay, ramps rate, places at screen edges
- *   - AI: moves each enemy toward current player position at profile speed
+ * Tick ordering within one step:
+ *   1. Player movement + rotation
+ *   2. Enemy spawning + AI movement (tickEnemies)
+ *   3. Combat: weapon cooldown, auto-fire, projectile motion,
+ *      collision, damage, death transitions, die-animation cleanup (tickCombat)
  */
 export function updateGameState(state: GameState, dtMs: number): GameState {
   'worklet';
@@ -168,5 +221,6 @@ export function updateGameState(state: GameState, dtMs: number): GameState {
     },
   };
 
-  return tickEnemies(stateAfterPlayer, dtMs);
+  const stateAfterEnemies = tickEnemies(stateAfterPlayer, dtMs);
+  return tickCombat(stateAfterEnemies, dtMs);
 }

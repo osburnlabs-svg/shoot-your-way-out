@@ -24,12 +24,19 @@
  *   ENEMIES: Scav + Raider spawn from off-screen edges, walk toward player.
  *   Walk animation cycles using same animation.ts system as hero.
  *   All 21 enemy sprite frames loaded at mount (unconditional useImage calls).
- *   Enemy render data is bridged to React state via runOnJS every frame.
  *   Enemies drawn before the player Group (z-order: enemies below hero).
  *   Debug overlay gains: Enemies count + M:SS elapsed time.
  *
+ * Phase 3 G2 additions:
+ *   COMBAT: Player auto-fires Pistol at nearest enemy in range.
+ *   Projectiles travel as Skia Circle primitives (yellow, 4px radius).
+ *   30 pre-allocated projectile slot derived values (inactive slots off-screen).
+ *   Enemy die animation: sprite timer detects 'dying' status, switches to die
+ *   frames. Body overlay removed on dying Scavs. Kill count in debug overlay.
+ *
  * Thread model:
- *   UI thread  — useFrameCallback, gesture callbacks, groupTransform derived value
+ *   UI thread  — useFrameCallback, gesture callbacks, groupTransform derived value,
+ *                enemy slot transforms, projectile slot transforms
  *   JS thread  — React state (sprite frame/weapon selection, FPS display, enemy data)
  */
 
@@ -37,6 +44,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import {
   Canvas,
+  Circle,
   FilterMode,
   Group,
   Image,
@@ -65,6 +73,8 @@ import {
   SCAV_WALK_FRAME_DURATION_MS,
   WALK_FRAME_COUNT,
   WALK_FRAME_DURATION_MS,
+  ENEMY_DIE_FRAME_COUNT,
+  ENEMY_DIE_FRAME_DURATION_MS,
 } from '../data/gameConstants';
 import type { EnemyType } from '../data/enemies';
 import { createInitialGameState, updateGameState } from '../lib/gameEngine';
@@ -110,6 +120,23 @@ function useEnemySlotTransform(gameState: SharedValue<GameState>, slotIndex: num
       { translateY: enemy.y },
       { rotate: Math.atan2(dy, dx) + SPRITE_ROTATION_OFFSET },
     ];
+  });
+}
+
+/**
+ * Per-slot projectile transform — one useDerivedValue per pre-allocated slot.
+ * Always renders (no null return) — inactive slots go to (-9999, -9999) so the
+ * circle is off-screen. This avoids needing React state to track slot activity
+ * (which would add up to 100ms lag to bullet appearance/disappearance).
+ *
+ * 30 constant Skia subscriptions are safe given the runOnJS(true) gesture fix
+ * that resolved the frame-flush issue in G1.
+ */
+function useProjectileSlotTransform(gameState: SharedValue<GameState>, slotIndex: number) {
+  return useDerivedValue(() => {
+    const proj = gameState.value.projectiles[slotIndex];
+    if (!proj) return [{ translateX: -9999 }, { translateY: -9999 }];
+    return [{ translateX: proj.x }, { translateY: proj.y }];
   });
 }
 
@@ -163,14 +190,16 @@ export default function GameCanvas({ width, height }: Props) {
   // Scav upper body — composited over walk frames (two-layer, same as hero)
   const scavBodyImage = useImage(EnemySprites.scav.body);
 
-  // Scav shot + die (imported now, used in G2)
+  // Scav shot (staged; used in G3+)
   const scavShot0 = useImage(EnemySprites.scav.shot[0]);
+  void scavShot0;
+
+  // Scav die: 4 frames
   const scavDie0 = useImage(EnemySprites.scav.die[0]);
   const scavDie1 = useImage(EnemySprites.scav.die[1]);
   const scavDie2 = useImage(EnemySprites.scav.die[2]);
   const scavDie3 = useImage(EnemySprites.scav.die[3]);
-  // Suppress unused-variable lint — these will be used in G2/G3.
-  void scavShot0; void scavDie0; void scavDie1; void scavDie2; void scavDie3;
+  const scavDieImages = [scavDie0, scavDie1, scavDie2, scavDie3];
 
   // Raider fire: 5 frames (SF_01–05) — used as walk animation
   const raiderFire0 = useImage(EnemySprites.raider.fire[0]);
@@ -180,12 +209,12 @@ export default function GameCanvas({ width, height }: Props) {
   const raiderFire4 = useImage(EnemySprites.raider.fire[4]);
   const raiderFireImages = [raiderFire0, raiderFire1, raiderFire2, raiderFire3, raiderFire4];
 
-  // Raider die (imported now, used in G2)
+  // Raider die: 4 frames
   const raiderDie0 = useImage(EnemySprites.raider.die[0]);
   const raiderDie1 = useImage(EnemySprites.raider.die[1]);
   const raiderDie2 = useImage(EnemySprites.raider.die[2]);
   const raiderDie3 = useImage(EnemySprites.raider.die[3]);
-  void raiderDie0; void raiderDie1; void raiderDie2; void raiderDie3;
+  const raiderDieImages = [raiderDie0, raiderDie1, raiderDie2, raiderDie3];
 
   // ─── Game state ────────────────────────────────────────────────────────────
   const gameState = useSharedValue(createInitialGameState(width, height));
@@ -207,13 +236,15 @@ export default function GameCanvas({ width, height }: Props) {
   const [displayElapsed, setDisplayElapsed] = useState(0);
   const [displayFrameCount, setDisplayFrameCount] = useState(0);
   const [displayEnemyCount, setDisplayEnemyCount] = useState(0);
+  const [displayKillCount, setDisplayKillCount] = useState(0);
 
   const updateDebugDisplay = useCallback(
-    (fps: number, elapsedSec: number, frames: number, enemyCount: number) => {
+    (fps: number, elapsedSec: number, frames: number, enemyCount: number, killCount: number) => {
       setDisplayFps(fps);
       setDisplayElapsed(elapsedSec);
       setDisplayFrameCount(frames);
       setDisplayEnemyCount(enemyCount);
+      setDisplayKillCount(killCount);
     },
     [],
   );
@@ -226,10 +257,13 @@ export default function GameCanvas({ width, height }: Props) {
   }>({ isMoving: false, frame: 0, weaponPose: 'pistol' });
 
   // ─── Enemy slot state (sprite selection, updated by timer) ──────────────────
-  // Slot i = enemies[i]. Only type + walk frame index are bridged to React;
+  // Slot i = enemies[i]. type, status, and frame index are bridged to React;
   // positions/rotations live entirely on the UI thread (per-slot useDerivedValue).
   const [enemySlotTypes, setEnemySlotTypes] = useState<Array<EnemyType | null>>(
     () => Array.from({ length: ENEMY_SOFT_CAP }, () => null as EnemyType | null),
+  );
+  const [enemySlotStatuses, setEnemySlotStatuses] = useState<Array<'alive' | 'dying' | null>>(
+    () => Array.from({ length: ENEMY_SOFT_CAP }, () => null as 'alive' | 'dying' | null),
   );
   const [enemySlotFrames, setEnemySlotFrames] = useState<number[]>(
     () => Array.from({ length: ENEMY_SOFT_CAP }, () => 0),
@@ -254,21 +288,36 @@ export default function GameCanvas({ width, height }: Props) {
 
       // Enemy slot sprite state.
       const types = Array.from({ length: ENEMY_SOFT_CAP }, () => null as EnemyType | null);
+      const statuses = Array.from({ length: ENEMY_SOFT_CAP }, () => null as 'alive' | 'dying' | null);
       const frames = Array.from({ length: ENEMY_SOFT_CAP }, () => 0);
+
       for (let i = 0; i < state.enemies.length; i++) {
         const enemy = state.enemies[i];
-        const isScav = enemy.type === 'scav';
         types[i] = enemy.type;
-        frames[i] = getCurrentFrame(
-          {
-            frameCount: isScav ? SCAV_WALK_FRAME_COUNT : RAIDER_WALK_FRAME_COUNT,
-            frameDurationMs: isScav ? SCAV_WALK_FRAME_DURATION_MS : RAIDER_WALK_FRAME_DURATION_MS,
-            loop: true,
-          },
-          state.elapsedMs - enemy.walkStartedAtMs,
-        );
+        statuses[i] = enemy.status;
+
+        if (enemy.status === 'dying') {
+          // Die animation: 4 frames, non-looping, holds on last frame.
+          frames[i] = getCurrentFrame(
+            { frameCount: ENEMY_DIE_FRAME_COUNT, frameDurationMs: ENEMY_DIE_FRAME_DURATION_MS, loop: false },
+            state.elapsedMs - enemy.dyingStartedAtMs,
+          );
+        } else {
+          // Walk animation: looping, offset by walkStartedAtMs so each enemy cycles independently.
+          const isScav = enemy.type === 'scav';
+          frames[i] = getCurrentFrame(
+            {
+              frameCount: isScav ? SCAV_WALK_FRAME_COUNT : RAIDER_WALK_FRAME_COUNT,
+              frameDurationMs: isScav ? SCAV_WALK_FRAME_DURATION_MS : RAIDER_WALK_FRAME_DURATION_MS,
+              loop: true,
+            },
+            state.elapsedMs - enemy.walkStartedAtMs,
+          );
+        }
       }
+
       setEnemySlotTypes(types);
+      setEnemySlotStatuses(statuses);
       setEnemySlotFrames(frames);
     }, 100);
     return () => clearInterval(id);
@@ -338,6 +387,49 @@ export default function GameCanvas({ width, height }: Props) {
     eTransform35, eTransform36, eTransform37, eTransform38, eTransform39,
     eTransform40, eTransform41, eTransform42, eTransform43, eTransform44,
     eTransform45, eTransform46, eTransform47, eTransform48, eTransform49,
+  ];
+
+  // ─── Per-slot projectile transforms (UI thread, no runOnJS) ──────────────
+  // 30 pre-allocated slots. Always rendered — inactive slots go to (-9999, -9999)
+  // so their circles are off-screen. No React state needed for slot activity;
+  // position updates happen every frame via derived value.
+  const pTransform0  = useProjectileSlotTransform(gameState, 0);
+  const pTransform1  = useProjectileSlotTransform(gameState, 1);
+  const pTransform2  = useProjectileSlotTransform(gameState, 2);
+  const pTransform3  = useProjectileSlotTransform(gameState, 3);
+  const pTransform4  = useProjectileSlotTransform(gameState, 4);
+  const pTransform5  = useProjectileSlotTransform(gameState, 5);
+  const pTransform6  = useProjectileSlotTransform(gameState, 6);
+  const pTransform7  = useProjectileSlotTransform(gameState, 7);
+  const pTransform8  = useProjectileSlotTransform(gameState, 8);
+  const pTransform9  = useProjectileSlotTransform(gameState, 9);
+  const pTransform10 = useProjectileSlotTransform(gameState, 10);
+  const pTransform11 = useProjectileSlotTransform(gameState, 11);
+  const pTransform12 = useProjectileSlotTransform(gameState, 12);
+  const pTransform13 = useProjectileSlotTransform(gameState, 13);
+  const pTransform14 = useProjectileSlotTransform(gameState, 14);
+  const pTransform15 = useProjectileSlotTransform(gameState, 15);
+  const pTransform16 = useProjectileSlotTransform(gameState, 16);
+  const pTransform17 = useProjectileSlotTransform(gameState, 17);
+  const pTransform18 = useProjectileSlotTransform(gameState, 18);
+  const pTransform19 = useProjectileSlotTransform(gameState, 19);
+  const pTransform20 = useProjectileSlotTransform(gameState, 20);
+  const pTransform21 = useProjectileSlotTransform(gameState, 21);
+  const pTransform22 = useProjectileSlotTransform(gameState, 22);
+  const pTransform23 = useProjectileSlotTransform(gameState, 23);
+  const pTransform24 = useProjectileSlotTransform(gameState, 24);
+  const pTransform25 = useProjectileSlotTransform(gameState, 25);
+  const pTransform26 = useProjectileSlotTransform(gameState, 26);
+  const pTransform27 = useProjectileSlotTransform(gameState, 27);
+  const pTransform28 = useProjectileSlotTransform(gameState, 28);
+  const pTransform29 = useProjectileSlotTransform(gameState, 29);
+  const allProjectileTransforms = [
+    pTransform0,  pTransform1,  pTransform2,  pTransform3,  pTransform4,
+    pTransform5,  pTransform6,  pTransform7,  pTransform8,  pTransform9,
+    pTransform10, pTransform11, pTransform12, pTransform13, pTransform14,
+    pTransform15, pTransform16, pTransform17, pTransform18, pTransform19,
+    pTransform20, pTransform21, pTransform22, pTransform23, pTransform24,
+    pTransform25, pTransform26, pTransform27, pTransform28, pTransform29,
   ];
 
   // ─── Debug weapon cycle button ─────────────────────────────────────────────
@@ -413,11 +505,17 @@ export default function GameCanvas({ width, height }: Props) {
     fpsFrameCount.value += 1;
     if (fpsAccumMs.value >= 1000) {
       const fps = Math.round((fpsFrameCount.value / fpsAccumMs.value) * 1000);
+      // Count only alive enemies for the display (dying ones are finishing their animation).
+      let aliveCount = 0;
+      for (let i = 0; i < state.enemies.length; i++) {
+        if (state.enemies[i].status === 'alive') aliveCount += 1;
+      }
       runOnJS(updateDebugDisplay)(
         fps,
         Math.round(state.elapsedMs / 1000),
         state.frameCount,
-        state.enemies.length,
+        aliveCount,
+        state.killCount,
       );
       fpsAccumMs.value = 0;
       fpsFrameCount.value = 0;
@@ -442,27 +540,44 @@ export default function GameCanvas({ width, height }: Props) {
             tiles + enemies + HUD are visible on screen together. */}
         <Canvas style={StyleSheet.absoluteFill}>
 
+          {/* ── Projectiles (below enemies, above background) ─────────────── */}
+          {/* Always render all 30 slots. Inactive slots sit at (-9999,-9999). */}
+          {allProjectileTransforms.map((transform, i) => (
+            <Group key={`proj-${i}`} transform={transform}>
+              <Circle cx={0} cy={0} r={4} color="#f5c842" />
+            </Group>
+          ))}
+
           {/* ── Enemies (below player) ────────────────────────────────────── */}
           {/* transform = per-slot useDerivedValue (UI thread, no runOnJS).   */}
-          {/* Only active slots render a <Group>, so only they create Skia    */}
-          {/* animated-prop subscriptions. Inactive slots: no subscription,   */}
-          {/* no Skia notification, even though their derived value recalcs.  */}
+          {/* Only active slots render a <Group>, breaking Skia subscriptions */}
+          {/* for empty slots.                                                 */}
           {allSlotTransforms.map((transform, i) => {
             const type = enemySlotTypes[i];
             if (!type) return null;
-            const images = type === 'scav' ? scavWalkImages : raiderFireImages;
+            const status = enemySlotStatuses[i];
+            const isDying = status === 'dying';
+
+            // Select image array based on type and current state.
+            // Dying enemies use die frames; alive enemies use walk/fire frames.
+            const images = isDying
+              ? (type === 'scav' ? scavDieImages : raiderDieImages)
+              : (type === 'scav' ? scavWalkImages : raiderFireImages);
+
             const img = images[enemySlotFrames[i]] ?? null;
             if (!img) return null;
             const w = img.width() * ENEMY_SPRITE_SCALE;
             const h = img.height() * ENEMY_SPRITE_SCALE;
-            // Scav: composite upper body (Soldier.png) over walk legs — same two-layer
-            // pattern as the hero (walk frame below, pose/body frame above).
-            const bodyOverlay = type === 'scav' ? scavBodyImage : null;
+
+            // Body overlay: only for alive Scavs.
+            // Dying Scavs show die frames which are full-body — no overlay needed.
+            const bodyOverlay = (type === 'scav' && !isDying) ? scavBodyImage : null;
             const bw = bodyOverlay ? bodyOverlay.width() * ENEMY_SPRITE_SCALE : 0;
             const bh = bodyOverlay ? bodyOverlay.height() * ENEMY_SPRITE_SCALE : 0;
+
             return (
               <Group key={i} transform={transform}>
-                {/* Bottom layer: walk/fire frame (legs) */}
+                {/* Bottom layer: walk/fire frame (alive) or die frame (dying) */}
                 <Image
                   image={img}
                   x={-w / 2}
@@ -471,7 +586,7 @@ export default function GameCanvas({ width, height }: Props) {
                   height={h}
                   sampling={{ filter: FilterMode.Nearest, mipmap: MipmapMode.None }}
                 />
-                {/* Top layer: Scav upper body — only for scav type */}
+                {/* Top layer: Scav upper body — only while alive */}
                 {bodyOverlay && (
                   <Image
                     image={bodyOverlay}
@@ -535,6 +650,7 @@ export default function GameCanvas({ width, height }: Props) {
         >
           <Text style={styles.debugText}>FPS: {displayFps}</Text>
           <Text style={styles.debugText}>Enemies: {displayEnemyCount}</Text>
+          <Text style={styles.debugText}>Kills: {displayKillCount}</Text>
           <Text style={styles.debugText}>Time: {formatElapsed(displayElapsed)}</Text>
           <Text style={styles.debugText}>Frame: {displayFrameCount}</Text>
         </View>

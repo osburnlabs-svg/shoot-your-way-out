@@ -8,10 +8,10 @@
  *   - Spawner: respects initial delay, ramps spawn rate + Raider ratio over time,
  *     enforces soft cap, places enemies at random points just outside screen edge.
  *   - AI tick: per-enemy heading toward player, position advance by moveSpeed * dt.
- *     No avoidance or separation in G1 — enemies clip through each other (acceptable).
+ *     Dying enemies are skipped — they stay in place until despawned by combatEngine.
+ *     No avoidance or separation — enemies clip through each other (acceptable in G2).
  *
  * NOT in scope here (future phases):
- *   - Enemy death / HP deduction (G2)
  *   - Contact damage to player (G3)
  *   - Money pickup spawning on death (G3)
  *   - Gunner/Sniper/vehicle AI variants (Phase 5)
@@ -91,7 +91,8 @@ function randomEdgePos(
  *
  * Phase ordering within one tick:
  *   1. Spawner — may push new enemies onto the array
- *   2. AI movement — advances every enemy's position toward the player
+ *   2. AI movement — advances alive enemies toward the player;
+ *      dying enemies are left in place (combatEngine removes them when done)
  *
  * Returns a new GameState (no mutation of input).
  */
@@ -126,6 +127,8 @@ export function tickEnemies(state: GameState, dtMs: number): GameState {
           y: pos.y,
           hp: ENEMY_PROFILES[type].hp,
           walkStartedAtMs: elapsedMs,
+          status: 'alive',
+          dyingStartedAtMs: 0,
         });
         nextEnemyId += 1;
         acc -= intervalMs;
@@ -144,6 +147,8 @@ export function tickEnemies(state: GameState, dtMs: number): GameState {
   }
 
   // ─── AI movement (walk toward player) ────────────────────────────────────
+  // Dying enemies stay in place — their die animation runs until combatEngine
+  // removes them once the animation completes.
   const px = state.player.x;
   const py = state.player.y;
   const dtSec = dtMs / 1000;
@@ -151,6 +156,13 @@ export function tickEnemies(state: GameState, dtMs: number): GameState {
   const moved: EnemyState[] = [];
   for (let i = 0; i < enemies.length; i++) {
     const enemy = enemies[i];
+
+    if (enemy.status === 'dying') {
+      // Leave in place; combatEngine will remove after die animation completes.
+      moved.push(enemy);
+      continue;
+    }
+
     const profile = ENEMY_PROFILES[enemy.type];
     const speed = profile.moveSpeed * ENEMY_BASE_SPEED_PX_PER_SEC;
 
@@ -169,6 +181,8 @@ export function tickEnemies(state: GameState, dtMs: number): GameState {
         y: enemy.y + (dy / dist) * speed * dtSec,
         hp: enemy.hp,
         walkStartedAtMs: enemy.walkStartedAtMs,
+        status: enemy.status,
+        dyingStartedAtMs: enemy.dyingStartedAtMs,
       });
     }
   }
