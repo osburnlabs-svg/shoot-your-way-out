@@ -199,3 +199,10 @@ export const HIT_FLASH_DURATION_MS = 80;
 
 /** Pixel-art upscale for pickup sprites. Same as hero/enemy — same kit. */
 export const PICKUP_SPRITE_SCALE = 2;
+
+/**
+ * Radius (px) of the red hit-flash Circle rendered on enemy impact.
+ * ~1/3 of ENEMY_COLLISION_RADIUS_PX (20px) so the flash reads as an impact
+ * splash rather than enveloping the whole sprite. Tune on device.
+ */
+export const HIT_FLASH_RADIUS_PX = 7;

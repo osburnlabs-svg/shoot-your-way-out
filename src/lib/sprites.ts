@@ -148,26 +148,28 @@ export const PickupSprites = {
 
 /**
  * GUI sprite registry — introduced in Phase 4a G3 for the level-up modal.
+ * Icon swaps applied in Phase 4a G3 polish:
+ *   ammo_subsonic + ammo_tracer → Ammo_Box.png (ammo box, distinct from single bullet)
+ *   provisions_painkillers → HP_pickup.png (medkit pickup, distinct from abstract HP glyph)
+ *   provisions_stims → Speed_02.png (speed/energy icon matches stims' mechanical identity)
  *
- * upgrade.bg: empty 3×3 slot grid from the kit's Upgrade/BG.png (308×243 px).
- * skillIcons.*: one icon per skill, sourced from kit weapon HUD and inventory icons.
- *   ammo / stims share the ammo crate graphic.
- *   painkillers / mre share the HP icon.
+ * upgrade.bg: top row of kit Upgrade/BG.png, cropped to 308×105 px (banner + 3 slot frames).
+ * skillIcons.*: 7 distinct icons across 10 skills (optics pair shares weapon silhouette pattern).
  */
 export const GuiSprites = {
   upgrade: {
     bg: require('../../assets/ui/upgrade/BG.png'),
   },
   skillIcons: {
-    ammo_545bt:         require('../../assets/ui/icons/Ammo.png'),
-    ammo_subsonic:      require('../../assets/ui/icons/Ammo.png'),
-    ammo_tracer:        require('../../assets/ui/icons/Ammo.png'),
-    optics_red_dot:     require('../../assets/ui/icons/Pistol_HUD.png'),
-    optics_pso_scope:   require('../../assets/ui/icons/SMG_HUD.png'),
-    gear_plate_carrier: require('../../assets/ui/icons/Armor_Icon.png'),
-    gear_tactical_boots:require('../../assets/ui/icons/Speed_01.png'),
-    gear_mre:           require('../../assets/ui/icons/HP_Icon.png'),
-    provisions_painkillers: require('../../assets/ui/icons/HP_Icon.png'),
-    provisions_stims:   require('../../assets/ui/icons/Ammo.png'),
+    ammo_545bt:          require('../../assets/ui/icons/Ammo.png'),
+    ammo_subsonic:       require('../../assets/ui/icons/Ammo_Box.png'),
+    ammo_tracer:         require('../../assets/ui/icons/Ammo_Box.png'),
+    optics_red_dot:      require('../../assets/ui/icons/Pistol_HUD.png'),
+    optics_pso_scope:    require('../../assets/ui/icons/SMG_HUD.png'),
+    gear_plate_carrier:  require('../../assets/ui/icons/Armor_Icon.png'),
+    gear_tactical_boots: require('../../assets/ui/icons/Speed_01.png'),
+    gear_mre:            require('../../assets/ui/icons/HP_Icon.png'),
+    provisions_painkillers: require('../../assets/ui/icons/HP_pickup.png'),
+    provisions_stims:    require('../../assets/ui/icons/Speed_02.png'),
   },
 } as const;

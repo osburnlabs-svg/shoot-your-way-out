@@ -33,9 +33,13 @@ import { GuiSprites } from '../lib/sprites';
 
 // ─── Layout constants (derived from BG.png pixel analysis: 308×243) ───────────
 
-/** Display size of the modal background panel (1:1 with source image). */
+/**
+ * Display size of the modal background panel.
+ * BG.png was cropped to 308×105 (banner + top slot row) in Phase 4a G3 polish
+ * to remove the 6 unused slot cells visible in the original 308×243 image.
+ */
 const MODAL_W = 308;
-const MODAL_H = 243;
+const MODAL_H = 105;
 
 /**
  * Pixel row where the top-row slot grid starts (below the "UPGRADE" header bar).

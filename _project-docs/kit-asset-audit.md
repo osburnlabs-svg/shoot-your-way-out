@@ -129,4 +129,18 @@ These are design proposals only — no commitment to implement. Sorted by confid
 
 ## Section 4 — Summary
 
-The kit ships solid 32x32 prop art and 79x46 weapon silhouettes but no pharmaceutical or stimulant art whatsoever — the stims icon question is definitively answered: use a speed icon. The most impactful fix is the `provisions_stims` → `Speed_02.png` swap, which eliminates a misleading icon that actively confuses the skill's identity. The second most impactful fix is breaking the `HP_Icon.png` collision between MRE and Painkillers by giving Painkillers the `HP_pickup.png` collectible instead. The ammo collision is partially solved by routing `ammo_subsonic` to `Ammo_Box.png` and `ammo_tracer` to `MG_HUD.png`; `ammo_545bt` keeps the single-bullet icon, giving each ammo skill a visually distinct representation for the first time. The optics pair remains on weapon silhouettes — no scope art exists in the kit and they are already distinguishable (pistol vs. SMG). On the new-skill side, `RPG_HUD.png` (one-shot AOE round), `Armor_Small.png` (ceramic plate), and `HP_Box.png` (field medic kit burst heal) are the three strongest candidates: the art is clear, the mechanics are additive stat changes or simple new behaviors, and none require new subsystems. Flamethrower and MG conversion are interesting but push toward Phase 4b weapon-swap scope.
+The kit ships solid 32x32 prop art and 79x46 weapon silhouettes but no pharmaceutical or stimulant art whatsoever — the stims icon question is definitively answered: use a speed icon. The most impactful fix is the `provisions_stims` → `Speed_02.png` swap, which eliminates a misleading icon that actively confuses the skill's identity. The second most impactful fix is breaking the `HP_Icon.png` collision between MRE and Painkillers by giving Painkillers the `HP_pickup.png` collectible instead. The ammo collision is partially solved by routing `ammo_subsonic` and `ammo_tracer` both to `Ammo_Box.png` (ammo box — distinct from the single-bullet `Ammo.png` kept for ammo_545bt). The optics pair remains on weapon silhouettes — no scope art exists in the kit and they are already distinguishable (pistol vs. SMG). On the new-skill side, `RPG_HUD.png` (one-shot AOE round), `Armor_Small.png` (ceramic plate), and `HP_Box.png` (field medic kit burst heal) are the three strongest candidates: the art is clear, the mechanics are additive stat changes or simple new behaviors, and none require new subsystems. Flamethrower and MG conversion are interesting but push toward Phase 4b weapon-swap scope.
+
+---
+
+## Status
+
+**Section 2 icon recommendations applied** in commit `(Phase 4a G3 polish)`. Swaps shipped:
+- `ammo_subsonic` → `Ammo_Box.png`
+- `ammo_tracer` → `Ammo_Box.png` (same icon; sharing within category is acceptable)
+- `provisions_painkillers` → `HP_pickup.png`
+- `provisions_stims` → `Speed_02.png`
+
+Note: audit recommended `MG_HUD.png` for `ammo_tracer`; changed to `Ammo_Box.png` before implementation (owner preference — same icon as subsonic is fine).
+
+**Section 3 new-skill candidates** remain proposals for Phase 4b planning. None implemented.

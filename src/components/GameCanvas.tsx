@@ -90,6 +90,7 @@ import {
   ENEMY_DIE_FRAME_DURATION_MS,
   PICKUP_SLOT_COUNT,
   PICKUP_SPRITE_SCALE,
+  HIT_FLASH_RADIUS_PX,
 } from '../data/gameConstants';
 import type { EnemyType } from '../data/enemies';
 import { createInitialGameState, updateGameState } from '../lib/gameEngine';
@@ -871,11 +872,13 @@ export default function GameCanvas({ width, height }: Props) {
                   />
                 )}
                 {/* Hit-flash: red circle centered on enemy, visible for HIT_FLASH_DURATION_MS.
+                    Radius uses HIT_FLASH_RADIUS_PX (~1/3 of collision radius) so the flash
+                    reads as an impact splash rather than enveloping the sprite.
                     Sprite color-filter is not supported for <Image> in Skia v2.2.12. */}
                 <Circle
                   cx={0}
                   cy={0}
-                  r={ENEMY_COLLISION_RADIUS_PX}
+                  r={HIT_FLASH_RADIUS_PX}
                   color="#cc2020"
                   opacity={allSlotFlashOpacities[i]}
                 />
