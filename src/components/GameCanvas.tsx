@@ -160,6 +160,9 @@ export default function GameCanvas({ width, height }: Props) {
   const scavWalk6 = useImage(EnemySprites.scav.walk[6]);
   const scavWalkImages = [scavWalk0, scavWalk1, scavWalk2, scavWalk3, scavWalk4, scavWalk5, scavWalk6];
 
+  // Scav upper body — composited over walk frames (two-layer, same as hero)
+  const scavBodyImage = useImage(EnemySprites.scav.body);
+
   // Scav shot + die (imported now, used in G2)
   const scavShot0 = useImage(EnemySprites.scav.shot[0]);
   const scavDie0 = useImage(EnemySprites.scav.die[0]);
@@ -452,8 +455,14 @@ export default function GameCanvas({ width, height }: Props) {
             if (!img) return null;
             const w = img.width() * ENEMY_SPRITE_SCALE;
             const h = img.height() * ENEMY_SPRITE_SCALE;
+            // Scav: composite upper body (Soldier.png) over walk legs — same two-layer
+            // pattern as the hero (walk frame below, pose/body frame above).
+            const bodyOverlay = type === 'scav' ? scavBodyImage : null;
+            const bw = bodyOverlay ? bodyOverlay.width() * ENEMY_SPRITE_SCALE : 0;
+            const bh = bodyOverlay ? bodyOverlay.height() * ENEMY_SPRITE_SCALE : 0;
             return (
               <Group key={i} transform={transform}>
+                {/* Bottom layer: walk/fire frame (legs) */}
                 <Image
                   image={img}
                   x={-w / 2}
@@ -462,6 +471,17 @@ export default function GameCanvas({ width, height }: Props) {
                   height={h}
                   sampling={{ filter: FilterMode.Nearest, mipmap: MipmapMode.None }}
                 />
+                {/* Top layer: Scav upper body — only for scav type */}
+                {bodyOverlay && (
+                  <Image
+                    image={bodyOverlay}
+                    x={-bw / 2}
+                    y={-bh / 2}
+                    width={bw}
+                    height={bh}
+                    sampling={{ filter: FilterMode.Nearest, mipmap: MipmapMode.None }}
+                  />
+                )}
               </Group>
             );
           })}

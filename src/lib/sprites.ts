@@ -97,6 +97,8 @@ export type HeroWeaponPose = 'pistol' | 'rifle' | 'machinegun' | 'grenade_launch
  */
 export const EnemySprites = {
   scav: {
+    /** Upper body overlay — composited over walk frames (same two-layer pattern as hero). */
+    body: require('../../assets/sprites/enemies/scav/Soldier.png'),
     walk: [
       require('../../assets/sprites/enemies/scav/walk/SW_01.png'),
       require('../../assets/sprites/enemies/scav/walk/SW_02.png'),
