@@ -32,9 +32,11 @@ export type WeaponProfile = {
 };
 
 export const WEAPON_PROFILES: Record<string, WeaponProfile> = {
+  // ── Guaranteed progression (earned by leveling) ──────────────────────────────
+
   pistol: {
     id: 'pistol',
-    displayName: 'MP-443 Pistol',
+    displayName: 'Pistol',
     animationPose: 'pistol',
     // damage=12: kills Scav (20HP) in 2 shots, Raider (40HP) in 4 shots at 400ms cooldown
     damage: 12,
@@ -44,11 +46,88 @@ export const WEAPON_PROFILES: Record<string, WeaponProfile> = {
     // 500px/s: bullet crosses 280px range in 0.56s — snappy without feeling hitscan
     projectileSpeedPxPerSec: 500,
   },
-  // Phase 4a:
-  // aks74u: { animationPose: 'pistol', damage: 6, cooldownMs: 150, rangePx: 220, ... },
-  // ak74:   { animationPose: 'rifle',  damage: 12, cooldownMs: 200, rangePx: 280, ... },
-  // pkm:    { animationPose: 'machinegun', damage: 14, cooldownMs: 100, rangePx: 260, ... },
-  // svd:    { animationPose: 'rifle',  damage: 45, cooldownMs: 1000, rangePx: 400, ... },
+
+  aks74u: {
+    id: 'aks74u',
+    displayName: 'SMG',
+    animationPose: 'pistol',
+    // High fire rate compensates for lower damage. 6dmg × 1/0.15s = 40dmg/s vs pistol's 30dmg/s.
+    damage: 6,
+    cooldownMs: 150,
+    rangePx: 220,
+    projectileSpeedPxPerSec: 550,
+  },
+
+  ak74: {
+    id: 'ak74',
+    displayName: 'Assault Rifle',
+    animationPose: 'rifle',
+    // Solid all-rounder. Same damage as pistol but faster cooldown and longer range.
+    damage: 12,
+    cooldownMs: 200,
+    rangePx: 280,
+    projectileSpeedPxPerSec: 600,
+  },
+
+  pkm: {
+    id: 'pkm',
+    displayName: 'Machine Gun',
+    animationPose: 'machinegun',
+    // Highest sustained DPS of the guaranteed tier. 14dmg × 10shots/s = 140dmg/s.
+    damage: 14,
+    cooldownMs: 100,
+    rangePx: 260,
+    projectileSpeedPxPerSec: 500,
+  },
+
+  svd: {
+    id: 'svd',
+    displayName: 'Sniper Rifle',
+    animationPose: 'rifle',
+    // One-shots Scavs (20HP), two-shots Raiders (40HP), near-one-shots Gunners (60HP).
+    // Slow fire rate demands stop-to-fire discipline; huge range rewards positioning.
+    damage: 45,
+    cooldownMs: 1000,
+    rangePx: 400,
+    projectileSpeedPxPerSec: 800,
+  },
+
+  // ── Crate-only weapons (Phase 4b) ─────────────────────────────────────────
+  // Stats from context doc table. Not reachable via progression — crate drop only.
+  // Renamed here alongside the guaranteed weapons; combat wiring lands in Phase 4b.
+
+  m870: {
+    id: 'm870',
+    displayName: 'Shotgun',
+    animationPose: 'machinegun',
+    // Each "shot" is one pellet; Phase 4b multi-pellet spread is a combatEngine change.
+    damage: 25,
+    cooldownMs: 800,
+    rangePx: 140,
+    projectileSpeedPxPerSec: 400,
+  },
+
+  gp25: {
+    id: 'gp25',
+    displayName: 'Grenade Launcher',
+    animationPose: 'grenade_launcher',
+    // AOE damage radius handled by Phase 4b combatEngine extension.
+    damage: 35,
+    cooldownMs: 600,
+    rangePx: 220,
+    projectileSpeedPxPerSec: 350,
+  },
+
+  rpo: {
+    id: 'rpo',
+    displayName: 'Flamethrower',
+    animationPose: 'flamethrower',
+    // Per-tick damage; continuous stream handled by Phase 4b combatEngine extension.
+    damage: 6,
+    cooldownMs: 50,
+    rangePx: 110,
+    projectileSpeedPxPerSec: 200,
+  },
 };
 
 /** The weapon every run begins with. */

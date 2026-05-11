@@ -110,6 +110,21 @@ const WEAPON_LABELS: Record<HeroWeaponPose, string> = {
   flamethrower: 'Flamethrower',
 };
 
+/**
+ * Guaranteed weapon floor unlocks — triggers inside handleSkillSelect when
+ * player.level increments to one of these values.
+ * Both equippedWeaponId (combat stats) and weaponPose (animation) are set together.
+ * NOTE: the debug cycle button only mutates weaponPose — it is NOT a reliable
+ * indicator of which weapon is equipped. Verify unlocks via combat behavior
+ * (fire rate, range, damage), not by reading the cycle button face.
+ */
+const WEAPON_UNLOCK_MAP: Record<number, { weaponId: string; weaponPose: HeroWeaponPose }> = {
+  4:  { weaponId: 'aks74u', weaponPose: 'pistol' },
+  8:  { weaponId: 'ak74',   weaponPose: 'rifle' },
+  12: { weaponId: 'pkm',    weaponPose: 'machinegun' },
+  16: { weaponId: 'svd',    weaponPose: 'rifle' },
+};
+
 // Rotation offset: TDS kit sprites face DOWN by default.
 // Subtract π/2 to align with atan2 convention (0 = right).
 // Applied to both hero and enemy transforms.
@@ -665,6 +680,9 @@ export default function GameCanvas({ width, height }: Props) {
   ];
 
   // ─── Debug weapon cycle button ─────────────────────────────────────────────
+  // KNOWN BUG (tech debt): mutates weaponPose (animation) only — does NOT update
+  // equippedWeaponId (combat stats). Cycling shows a different pose but fires with
+  // the previously equipped weapon's stats. Phase 7 removes this button entirely.
   const cycleWeapon = useCallback(() => {
     const current = gameState.value.player.weaponPose;
     const idx = WEAPON_CYCLE.indexOf(current);
@@ -679,17 +697,27 @@ export default function GameCanvas({ width, height }: Props) {
   // Mutates gameState.value directly on the JS thread — safe because the engine
   // is frozen (pendingLevelUp guard in updateGameState) during the modal window.
   // Follows the same pattern as cycleWeapon above.
+  // Order: increment level → check weapon floor unlock → apply skill stack → close modal.
   const handleSkillSelect = useCallback((id: SkillId) => {
     const state = gameState.value;
+    const newLevel = state.player.level + 1;
     const currentStacks = state.player.skillStacks[id] ?? 0;
     const newStacks = { ...state.player.skillStacks, [id]: currentStacks + 1 };
     const newCount = state.pendingLevelUpCount - 1;
+
+    // Weapon floor unlock: levels 4, 8, 12, 16 auto-equip the next weapon tier.
+    // Sets both equippedWeaponId (combat stats) and weaponPose (animation).
+    const unlock = WEAPON_UNLOCK_MAP[newLevel];
+
     gameState.value = {
       ...state,
       player: {
         ...state.player,
         skillStacks: newStacks,
-        level: state.player.level + 1,
+        level: newLevel,
+        ...(unlock !== undefined
+          ? { equippedWeaponId: unlock.weaponId, weaponPose: unlock.weaponPose }
+          : {}),
       },
       pendingLevelUp: newCount > 0,
       pendingLevelUpCount: newCount,
@@ -915,6 +943,8 @@ export default function GameCanvas({ width, height }: Props) {
         </Canvas>
 
         {/* Debug weapon cycle button — top-left.
+            NOTE: mutates weaponPose only, NOT equippedWeaponId — animation changes
+            but combat stats do not. Unreliable as a weapon indicator. Phase 7 removes this.
             TODO Phase 4: remove once LevelUpModal + CrateRevealOverlay wire
             real weapon equipping from player progression. */}
         <Pressable
@@ -925,6 +955,25 @@ export default function GameCanvas({ width, height }: Props) {
             Weapon: {WEAPON_LABELS[spriteState.weaponPose]}
           </Text>
           <Text style={[styles.debugText, styles.tapHint]}>tap to cycle</Text>
+        </Pressable>
+
+        {/* TEMPORARY G4 VERIFICATION DEBUG BUTTON — remove before phase close.
+            Grants 500 XP per tap to drive level-ups for testing weapon unlocks.
+            Verify unlocks by observing combat behavior (fire rate, range, damage),
+            NOT by reading the cycle button face (it does not reflect equippedWeaponId). */}
+        <Pressable
+          style={[styles.debugOverlay, { top: 105, left: 10 }]}
+          onPress={() => {
+            gameState.value = {
+              ...gameState.value,
+              player: {
+                ...gameState.value.player,
+                xp: gameState.value.player.xp + 500,
+              },
+            };
+          }}
+        >
+          <Text style={styles.debugText}>+500 XP</Text>
         </Pressable>
 
         {/* Debug overlay — top-right. */}
