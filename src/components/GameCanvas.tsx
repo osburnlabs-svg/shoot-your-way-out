@@ -836,18 +836,11 @@ export default function GameCanvas({ width, height }: Props) {
   ];
 
   // ─── Per-slot crate transforms (UI thread, no runOnJS) ───────────────────
-  // 10 pre-allocated slots. Always rendered — inactive slots go to (-9999, -9999).
+  // 3 pre-allocated slots — matches CRATE_SLOT_COUNT / CRATE_MAX_ACTIVE exactly.
   const crTransform0 = useCrateSlotTransform(gameState, 0);
   const crTransform1 = useCrateSlotTransform(gameState, 1);
   const crTransform2 = useCrateSlotTransform(gameState, 2);
-  const crTransform3 = useCrateSlotTransform(gameState, 3);
-  const crTransform4 = useCrateSlotTransform(gameState, 4);
-  const crTransform5 = useCrateSlotTransform(gameState, 5);
-  const crTransform6 = useCrateSlotTransform(gameState, 6);
-  const crTransform7 = useCrateSlotTransform(gameState, 7);
-  const crTransform8 = useCrateSlotTransform(gameState, 8);
-  const crTransform9 = useCrateSlotTransform(gameState, 9);
-  const allCrateTransforms = [crTransform0, crTransform1, crTransform2, crTransform3, crTransform4, crTransform5, crTransform6, crTransform7, crTransform8, crTransform9];
+  const allCrateTransforms = [crTransform0, crTransform1, crTransform2];
 
   // ─── Throwable slot arc positions (UI thread, no runOnJS) ────────────────
   // 10 pre-allocated slots. Flying slots interpolate the arc each frame.

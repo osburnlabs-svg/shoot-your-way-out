@@ -314,8 +314,13 @@ export const EFFECT_SPRITE_SCALE = 2;
 
 // ─── Crates ──────────────────────────────────────────────────────────────────
 
-/** Fixed pre-allocated slot count for crate entities. */
-export const CRATE_SLOT_COUNT = 10;
+/**
+ * Fixed pre-allocated slot count for crate entities.
+ * Intentionally equals CRATE_MAX_ACTIVE — crates have no transitional state
+ * (unlike enemies which hold a dying slot), so no headroom is needed.
+ * If CRATE_MAX_ACTIVE is raised, bump this in sync to avoid silent spawn skips.
+ */
+export const CRATE_SLOT_COUNT = 3;
 
 /** Time (ms) between crate spawn events. */
 export const CRATE_SPAWN_INTERVAL_MS = 30000;
