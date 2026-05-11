@@ -51,6 +51,7 @@ import {
   MOLOTOV_DAMAGE_PER_SEC,
   MOLOTOV_TICK_INTERVAL_MS,
   ENEMY_COLLISION_RADIUS_PX,
+  THROWABLE_TARGET_RANGE_PX,
 } from '../data/gameConstants';
 import type { PickupState } from './gameEngine';
 
@@ -374,5 +375,118 @@ export function tickEffectZones(state: GameState, _dtMs: number): GameState {
     pickups,
     nextPickupId,
     killCount,
+  };
+}
+
+/**
+ * Advance throwable skill cooldowns and auto-fire when cooldown expires.
+ *
+ * Called once per fixed step after tickEffectZones and before tickRegen.
+ * Each of the three throwable skills (frag, smoke, molotov) is processed
+ * independently with its own cooldown field on PlayerState.
+ *
+ * Cooldown math:
+ *   Frag:    max(8000  - 2000 * stacks, 4000)  ms
+ *   Smoke:   max(15000 - 3000 * stacks, 9000)  ms
+ *   Molotov: max(12000 - 3000 * stacks, 6000)  ms
+ *
+ * When cooldown reaches 0 or below:
+ *   1. Collect all alive enemies within THROWABLE_TARGET_RANGE_PX of the player.
+ *   2. If none: cooldown stays at 0 — fires instantly when an enemy enters range.
+ *   3. If found: pick one at random (Math.random() is worklet-safe), call
+ *      spawnThrowable(), reset cooldown to the effective duration.
+ *
+ * Cooldown does NOT advance if the player has 0 stacks (skill not selected).
+ * Engine freeze (isDead / pendingLevelUp) suppresses all ticks — no new guard needed.
+ *
+ * Phase 6 audio stub: throwable_spawn SFX call site omitted — wire to audioEngine
+ * when audio system is built. TODO: audioEngine.playSFX('throwable_spawn', type)
+ */
+export function tickThrowableSkills(state: GameState, dtMs: number): GameState {
+  'worklet';
+
+  const fragStacks   = state.player.skillStacks['throwables_frag']    ?? 0;
+  const smokeStacks  = state.player.skillStacks['throwables_smoke']   ?? 0;
+  const molotovStacks = state.player.skillStacks['throwables_molotov'] ?? 0;
+
+  // Fast-path: no throwable skills selected.
+  if (fragStacks === 0 && smokeStacks === 0 && molotovStacks === 0) return state;
+
+  const fragCd    = Math.max(8000  - 2000 * fragStacks,    4000);
+  const smokeCd   = Math.max(15000 - 3000 * smokeStacks,   9000);
+  const molotovCd = Math.max(12000 - 3000 * molotovStacks, 6000);
+
+  let newFragMs    = fragStacks    > 0 ? state.player.fragCooldownMs    - dtMs : state.player.fragCooldownMs;
+  let newSmokeMs   = smokeStacks   > 0 ? state.player.smokeCooldownMs   - dtMs : state.player.smokeCooldownMs;
+  let newMolotovMs = molotovStacks > 0 ? state.player.molotovCooldownMs - dtMs : state.player.molotovCooldownMs;
+
+  // Floor at 0 so cooldown doesn't accumulate negative time.
+  if (newFragMs    < 0) newFragMs    = 0;
+  if (newSmokeMs   < 0) newSmokeMs   = 0;
+  if (newMolotovMs < 0) newMolotovMs = 0;
+
+  let newState = state;
+
+  /**
+   * Pick a random alive enemy within THROWABLE_TARGET_RANGE_PX of the player.
+   * Returns null if no eligible target exists.
+   * Inlined as a closure (no separate function) to avoid additional worklet overhead.
+   */
+  const pickTarget = (): { x: number; y: number } | null => {
+    'worklet';
+    const rangeSq = THROWABLE_TARGET_RANGE_PX * THROWABLE_TARGET_RANGE_PX;
+    const px = newState.player.x;
+    const py = newState.player.y;
+    const eligible: number[] = [];
+    for (let i = 0; i < newState.enemies.length; i++) {
+      const e = newState.enemies[i];
+      if (!e || e.status !== 'alive') continue;
+      const dx = e.x - px;
+      const dy = e.y - py;
+      if (dx * dx + dy * dy <= rangeSq) {
+        eligible.push(i);
+      }
+    }
+    if (eligible.length === 0) return null;
+    const chosen = newState.enemies[eligible[Math.floor(Math.random() * eligible.length)]!]!;
+    return { x: chosen.x, y: chosen.y };
+  };
+
+  // Frag
+  if (fragStacks > 0 && newFragMs <= 0) {
+    const target = pickTarget();
+    if (target !== null) {
+      newState = spawnThrowable(newState, 'frag', target.x, target.y);
+      newFragMs = fragCd;
+    }
+    // No target: cooldown stays at 0, fires instantly on next tick with an enemy in range.
+  }
+
+  // Smoke
+  if (smokeStacks > 0 && newSmokeMs <= 0) {
+    const target = pickTarget();
+    if (target !== null) {
+      newState = spawnThrowable(newState, 'smoke', target.x, target.y);
+      newSmokeMs = smokeCd;
+    }
+  }
+
+  // Molotov
+  if (molotovStacks > 0 && newMolotovMs <= 0) {
+    const target = pickTarget();
+    if (target !== null) {
+      newState = spawnThrowable(newState, 'molotov', target.x, target.y);
+      newMolotovMs = molotovCd;
+    }
+  }
+
+  return {
+    ...newState,
+    player: {
+      ...newState.player,
+      fragCooldownMs:    newFragMs,
+      smokeCooldownMs:   newSmokeMs,
+      molotovCooldownMs: newMolotovMs,
+    },
   };
 }

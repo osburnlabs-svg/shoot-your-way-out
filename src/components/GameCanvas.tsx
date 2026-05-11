@@ -106,7 +106,6 @@ import {
 import type { EnemyType } from '../data/enemies';
 import { createInitialGameState, updateGameState } from '../lib/gameEngine';
 import type { GameState } from '../lib/gameEngine';
-import { spawnThrowable } from '../lib/throwableEngine';
 import { getCurrentFrame } from '../lib/animation';
 import { computeSteps, FIXED_STEP_MS } from '../lib/gameLoop';
 
@@ -844,14 +843,15 @@ export default function GameCanvas({ width, height }: Props) {
     };
   }, [gameState]);
 
-  // ─── Debug throwable spawn buttons ────────────────────────────────────────
-  // TEMPORARY — G5 TODO: remove these buttons when throwable skills are wired.
-  // Spawn target = 100px ahead of player in facing direction.
-  const spawnDebugThrowable = useCallback((type: 'frag' | 'smoke' | 'molotov') => {
+  // ─── TEMPORARY G5 VERIFICATION DEBUG BUTTON — remove before phase close ──
+  // Grants +500 XP to fast-track leveling and verify throwable skill cards appear
+  // in the draw pool and behave correctly on device.
+  const handleAddXp = useCallback(() => {
     const state = gameState.value;
-    const targetX = state.player.x + Math.cos(state.player.rotation) * 100;
-    const targetY = state.player.y + Math.sin(state.player.rotation) * 100;
-    gameState.value = spawnThrowable(state, type, targetX, targetY);
+    gameState.value = {
+      ...state,
+      player: { ...state.player, xp: state.player.xp + 500 },
+    };
   }, [gameState]);
 
   // ─── Skill selection handler ───────────────────────────────────────────────
@@ -1245,19 +1245,16 @@ export default function GameCanvas({ width, height }: Props) {
           <Text style={[styles.debugText, styles.tapHint]}>tap to cycle</Text>
         </Pressable>
 
-        {/* Debug throwable spawn buttons — TEMPORARY, G5 TODO: remove.
-            Spawn target = 100px in front of player facing direction.         */}
-        <View style={[styles.debugOverlay, { top: 110, left: 10 }]} pointerEvents="box-none">
-          <Pressable onPress={() => spawnDebugThrowable('frag')}>
-            <Text style={[styles.debugText, { color: THROWABLE_COLORS.frag }]}>▶ FRAG</Text>
-          </Pressable>
-          <Pressable onPress={() => spawnDebugThrowable('smoke')}>
-            <Text style={[styles.debugText, { color: THROWABLE_COLORS.smoke }]}>▶ SMOKE</Text>
-          </Pressable>
-          <Pressable onPress={() => spawnDebugThrowable('molotov')}>
-            <Text style={[styles.debugText, { color: THROWABLE_COLORS.molotov }]}>▶ MOLOTOV</Text>
-          </Pressable>
-        </View>
+        {/* TEMPORARY G5 VERIFICATION DEBUG BUTTON — remove before phase close.
+            Grants +500 XP to fast-track leveling and verify throwable skill
+            cards appear in the draw pool and fire correctly on device.       */}
+        <Pressable
+          style={[styles.debugOverlay, styles.weaponButton, { top: 110, left: 10 }]}
+          onPress={handleAddXp}
+        >
+          <Text style={styles.debugText}>+500 XP</Text>
+          <Text style={[styles.debugText, styles.tapHint]}>verification only</Text>
+        </Pressable>
 
         {/* Debug overlay — top-right. */}
         {/* TODO Phase 7: replace hardcoded insets with real safe-area values. */}

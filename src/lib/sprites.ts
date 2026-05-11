@@ -179,7 +179,19 @@ export const PickupSprites = {
  *
  * upgrade.bg: kit Upgrade/BG.png (cropped to 308×105). Registered but unreferenced —
  *   BG.png has baked-in weapon placeholder icons; Phase 7 will evaluate kit UI fit.
- * skillIcons.*: 15 skills, 9 distinct icons.
+ * skillIcons.*: 20 skills (after G5), 10 distinct icons.
+ *
+ * Phase 4b G5 icon additions (all three are kit-first placeholders — no grenade/smoke/
+ *   molotov art exists in the kit; flagged for post-Phase-4b sprite sourcing audit):
+ *   throwables_frag    → Ammo_Box.png (military ordnance container; first actual use
+ *     of this asset — was parked since Phase 4a. "Packaged explosive" adjacency.)
+ *     Tech debt: no grenade-shaped art in kit; Phase 7 sourcing audit.
+ *   throwables_smoke   → Ammo.png (shared with all ammo-category skills; no smoke art
+ *     anywhere in kit). Weakest match.
+ *     Tech debt: shares icon with ammo skills; no smoke art in kit; Phase 7 sourcing audit.
+ *   throwables_molotov → Speed_02.png (orange/energy visual; "heat" adjacency; already
+ *     used by provisions_stims so this is a duplicate icon).
+ *     Tech debt: shares icon with provisions_stims; no bottle/flame art in kit; Phase 7.
  */
 /**
  * Effect sprite registry — introduced in Phase 4b G4 for throwable detonations.
@@ -236,5 +248,9 @@ export const GuiSprites = {
     provisions_field_medic_kit: require('../../assets/ui/icons/HP_Box.png'),
     // Phase 4b G3
     gear_backpack:               require('../../assets/ui/icons/Army_Box.png'),
+    // Phase 4b G5 (all placeholders — see registry comment above)
+    throwables_frag:    require('../../assets/ui/icons/Ammo_Box.png'),
+    throwables_smoke:   require('../../assets/ui/icons/Ammo.png'),
+    throwables_molotov: require('../../assets/ui/icons/Speed_02.png'),
   },
 } as const;

@@ -47,7 +47,11 @@ export type SkillId =
   | 'provisions_stims'
   | 'provisions_comms_headset'
   | 'provisions_field_medic_kit'
-  | 'gear_backpack';
+  | 'gear_backpack'
+  // Phase 4b G5
+  | 'throwables_frag'
+  | 'throwables_smoke'
+  | 'throwables_molotov';
 
 // ─── On-selection effect descriptor ──────────────────────────────────────────
 
@@ -93,7 +97,7 @@ export type SkillDefinition = {
   id: SkillId;
   displayName: string;
   description: string;
-  category: 'ammo' | 'optics' | 'gear' | 'provisions';
+  category: 'ammo' | 'optics' | 'gear' | 'provisions' | 'throwables';
   maxStacks: number;
   effect: SkillEffect;
   /**
@@ -259,6 +263,43 @@ export const SKILLS: Record<SkillId, SkillDefinition> = {
     effect: {},
     onSelectEffect: { healHp: 25 },
   },
+
+  // ── Phase 4b G5 ─────────────────────────────────────────────────────────────
+
+  throwables_frag: {
+    id: 'throwables_frag',
+    displayName: 'Frag Grenade',
+    description: 'Auto-throw every 8s',
+    category: 'throwables',
+    maxStacks: 3,
+    // Active on-tick skill: tickThrowableSkills in throwableEngine reads stacks
+    // and fires a frag throwable when cooldown expires and a target is in range.
+    // Cooldown per stack: max(8000 - 2000 * stacks, 4000) ms.
+    // No passive stat contribution — effect: {} is intentional.
+    effect: {},
+  },
+
+  throwables_smoke: {
+    id: 'throwables_smoke',
+    displayName: 'Smoke Grenade',
+    description: 'Smoke cloud every 15s',
+    category: 'throwables',
+    maxStacks: 3,
+    // Active on-tick skill: tickThrowableSkills fires smoke throwable on cooldown.
+    // Cooldown per stack: max(15000 - 3000 * stacks, 9000) ms.
+    effect: {},
+  },
+
+  throwables_molotov: {
+    id: 'throwables_molotov',
+    displayName: 'Molotov',
+    description: 'Fire patch every 12s',
+    category: 'throwables',
+    maxStacks: 3,
+    // Active on-tick skill: tickThrowableSkills fires molotov throwable on cooldown.
+    // Cooldown per stack: max(12000 - 3000 * stacks, 6000) ms.
+    effect: {},
+  },
 };
 
 /**
@@ -286,6 +327,10 @@ export const SKILL_IDS: SkillId[] = [
   // Phase 4b G2
   'provisions_field_medic_kit',
   'gear_backpack',
+  // Phase 4b G5
+  'throwables_frag',
+  'throwables_smoke',
+  'throwables_molotov',
 ];
 
 // ─── Effective stats ──────────────────────────────────────────────────────────

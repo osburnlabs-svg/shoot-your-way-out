@@ -68,7 +68,7 @@ import { tickEnemies } from './enemyEngine';
 import { tickCombat } from './combatEngine';
 import { tickPickups } from './pickupEngine';
 import { tickProgression, tickRegen } from './progressionEngine';
-import { tickThrowables, tickEffectZones } from './throwableEngine';
+import { tickThrowables, tickEffectZones, tickThrowableSkills } from './throwableEngine';
 
 export type PlayerState = {
   x: number;
@@ -128,6 +128,24 @@ export type PlayerState = {
    * immediately on their natural cooldown when the window expires.
    */
   invulnerableUntilMs: number;
+  /**
+   * Remaining cooldown (ms) before the next Frag Grenade auto-throw.
+   * Initialized to 0 — first throw fires the instant the first enemy enters range.
+   * Reset to effective cooldown (max(8000 - 2000*stacks, 4000)) after each throw.
+   * Only active when player has throwables_frag stacks > 0.
+   */
+  fragCooldownMs: number;
+  /**
+   * Remaining cooldown (ms) before the next Smoke Grenade auto-throw.
+   * Same init-at-0 / instant-first-fire semantics as fragCooldownMs.
+   * Effective cooldown: max(15000 - 3000*stacks, 9000).
+   */
+  smokeCooldownMs: number;
+  /**
+   * Remaining cooldown (ms) before the next Molotov auto-throw.
+   * Effective cooldown: max(12000 - 3000*stacks, 6000).
+   */
+  molotovCooldownMs: number;
 };
 
 /**
@@ -394,6 +412,9 @@ export function createInitialGameState(canvasWidth: number, canvasHeight: number
         provisions_stims: 0,
       },
       invulnerableUntilMs: 0,
+      fragCooldownMs: 0,
+      smokeCooldownMs: 0,
+      molotovCooldownMs: 0,
     },
     enemies: emptyEnemies,
     nextEnemyId: 0,
@@ -513,6 +534,7 @@ export function updateGameState(state: GameState, dtMs: number): GameState {
   const stateAfterPickups = tickPickups(stateAfterCombat, dtMs);
   const stateAfterThrowables = tickThrowables(stateAfterPickups, dtMs);
   const stateAfterZones = tickEffectZones(stateAfterThrowables, dtMs);
-  const stateAfterRegen = tickRegen(stateAfterZones, dtMs);
+  const stateAfterThrowableSkills = tickThrowableSkills(stateAfterZones, dtMs);
+  const stateAfterRegen = tickRegen(stateAfterThrowableSkills, dtMs);
   return tickProgression(stateAfterRegen);
 }

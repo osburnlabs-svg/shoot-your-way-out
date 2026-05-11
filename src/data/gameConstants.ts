@@ -218,6 +218,14 @@ export const HIT_FLASH_RADIUS_PX = 7;
 // ─── Throwables ───────────────────────────────────────────────────────────────
 
 /**
+ * Radius (px) within which a throwable skill will target an enemy.
+ * tickThrowableSkills scans all alive enemies and picks a random one inside
+ * this range. If none are found, the cooldown stays at 0 and fires the instant
+ * an enemy enters range on a subsequent tick.
+ */
+export const THROWABLE_TARGET_RANGE_PX = 250;
+
+/**
  * Fixed pre-allocated slot count for throwable entities.
  * Same sparse-array pattern as ENEMY_SOFT_CAP: slots are never compacted,
  * null = empty. 10 slots is generous — the player can only carry 3 of each
