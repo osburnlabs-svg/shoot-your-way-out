@@ -148,13 +148,17 @@ export const PickupSprites = {
 
 /**
  * GUI sprite registry — introduced in Phase 4a G3 for the level-up modal.
- * Icon swaps applied in Phase 4a G3 polish:
- *   ammo_subsonic + ammo_tracer → Ammo_Box.png (ammo box, distinct from single bullet)
+ * Icon swaps applied in Phase 4a G3 polish (reverted in polish r2 where noted):
+ *   ammo_subsonic + ammo_tracer → reverted back to Ammo.png (category coherence;
+ *     all three ammo skills sharing one icon communicates "ammo skill" more clearly
+ *     than box-vs-bullet visual differentiation without semantic value)
  *   provisions_painkillers → HP_pickup.png (medkit pickup, distinct from abstract HP glyph)
  *   provisions_stims → Speed_02.png (speed/energy icon matches stims' mechanical identity)
+ *   Ammo_Box.png kept registered — parked for Phase 4b crate/weapon icons or future skills.
  *
- * upgrade.bg: top row of kit Upgrade/BG.png, cropped to 308×105 px (banner + 3 slot frames).
- * skillIcons.*: 7 distinct icons across 10 skills (optics pair shares weapon silhouette pattern).
+ * upgrade.bg: kit Upgrade/BG.png (cropped to 308×105). Registered but unreferenced —
+ *   BG.png has baked-in weapon placeholder icons; Phase 7 will evaluate kit UI fit.
+ * skillIcons.*: 6 distinct icons across 10 skills (ammo trio shares single-bullet icon).
  */
 export const GuiSprites = {
   upgrade: {
@@ -162,8 +166,8 @@ export const GuiSprites = {
   },
   skillIcons: {
     ammo_545bt:          require('../../assets/ui/icons/Ammo.png'),
-    ammo_subsonic:       require('../../assets/ui/icons/Ammo_Box.png'),
-    ammo_tracer:         require('../../assets/ui/icons/Ammo_Box.png'),
+    ammo_subsonic:       require('../../assets/ui/icons/Ammo.png'),
+    ammo_tracer:         require('../../assets/ui/icons/Ammo.png'),
     optics_red_dot:      require('../../assets/ui/icons/Pistol_HUD.png'),
     optics_pso_scope:    require('../../assets/ui/icons/SMG_HUD.png'),
     gear_plate_carrier:  require('../../assets/ui/icons/Armor_Icon.png'),

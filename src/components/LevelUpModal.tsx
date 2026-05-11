@@ -34,15 +34,15 @@ import { GuiSprites } from '../lib/sprites';
 
 // ─── Layout constants ─────────────────────────────────────────────────────────
 
-/** Card dimensions — kept from G3 to preserve card content layout. */
-const CARD_W = 100;
-const CARD_H = 80;
+/** Card dimensions. Sized for readability at arm's length on a mobile screen. */
+const CARD_W = 105;
+const CARD_H = 140;
 
 /** Gap between the header text and the card row. */
-const HEADER_CARD_GAP = 24;
+const HEADER_CARD_GAP = 20;
 
-/** Gap between cards in the row. */
-const CARD_GAP = 16;
+/** Gap between cards in the row. 3×105 + 2×10 = 335dp — safe on 360dp+ phones. */
+const CARD_GAP = 10;
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
@@ -119,7 +119,7 @@ const styles = StyleSheet.create({
   },
   header: {
     color: '#c9a356',
-    fontSize: 28,
+    fontSize: 32,
     fontWeight: 'bold',
     textAlign: 'center',
     textShadowColor: '#000000',
@@ -136,28 +136,28 @@ const styles = StyleSheet.create({
     width: CARD_W,
     height: CARD_H,
     backgroundColor: 'rgba(10, 13, 8, 0.85)',
-    paddingHorizontal: 4,
-    paddingVertical: 6,
+    paddingHorizontal: 6,
+    paddingVertical: 10,
     alignItems: 'center',
     justifyContent: 'center',
   },
   icon: {
-    width: 30,
-    height: 30,
+    width: 44,
+    height: 44,
   },
   name: {
     color: '#ffffff',
-    fontSize: 7,
+    fontSize: 12,
     fontWeight: 'bold',
     textAlign: 'center',
     textShadowColor: '#000000',
     textShadowRadius: 2,
     textShadowOffset: { width: 1, height: 1 },
-    marginTop: 4,
+    marginTop: 6,
   },
   level: {
     color: '#ffd700',
-    fontSize: 6,
+    fontSize: 11,
     textAlign: 'center',
     textShadowColor: '#000000',
     textShadowRadius: 2,
@@ -165,11 +165,11 @@ const styles = StyleSheet.create({
   },
   desc: {
     color: '#d0d0d0',
-    fontSize: 5,
+    fontSize: 10,
     textAlign: 'center',
     textShadowColor: '#000000',
     textShadowRadius: 1,
     textShadowOffset: { width: 1, height: 1 },
-    marginTop: 1,
+    marginTop: 4,
   },
 });
