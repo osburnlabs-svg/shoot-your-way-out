@@ -72,6 +72,11 @@ export function tickCombat(state: GameState, dtMs: number): GameState {
   // Compute effective stats once per tick — threads skill bonuses into all combat logic.
   const effective = getEffectiveStats(player.skillStacks, weapon, player.maxHp);
 
+  // Inline-effect skill stacks — read once, used in collision and contact-damage blocks.
+  const hollowPointsStacks = player.skillStacks['ammo_hollow_points'] ?? 0;
+  const suppressorStacks   = player.skillStacks['optics_suppressor']  ?? 0;
+  const helmetStacks        = player.skillStacks['gear_helmet']        ?? 0;
+
   const dtSec = dtMs / 1000;
 
   // ─── 1. Advance weapon cooldown ───────────────────────────────────────────
@@ -197,7 +202,24 @@ export function tickCombat(state: GameState, dtMs: number): GameState {
       const dx = proj.x - enemy.x;
       const dy = proj.y - enemy.y;
       if (dx * dx + dy * dy < PROJ_ENEMY_COLLISION_R_SQ) {
-        damageAccum[ei] += proj.damage;
+        // Base damage for this hit — apply conditional skill multipliers before accumulating.
+        let hitDamage = proj.damage;
+
+        // Suppressor: +10% per stack on the very first hit this projectile ever lands.
+        // hitEnemyIds.length === 0 before this push means no prior hits (any tick).
+        if (suppressorStacks > 0 && hitEnemyIds.length === 0) {
+          hitDamage *= 1 + 0.10 * suppressorStacks;
+        }
+
+        // Hollow Points: +50% per stack when target is below 50% of its starting HP.
+        if (hollowPointsStacks > 0) {
+          const enemyMaxHp = ENEMY_PROFILES[enemy.type].hp;
+          if (enemy.hp < 0.5 * enemyMaxHp) {
+            hitDamage *= 1 + 0.50 * hollowPointsStacks;
+          }
+        }
+
+        damageAccum[ei] += hitDamage;
         hitEnemyIds.push(enemy.id);
         audioEngine.playSFX('impact_flesh');
         pierceRemaining -= 1;
@@ -301,9 +323,24 @@ export function tickCombat(state: GameState, dtMs: number): GameState {
       elapsedMs - enemy.lastHitPlayerAtMs >= CONTACT_DAMAGE_INTERVAL_MS
     ) {
       const profile = ENEMY_PROFILES[enemy.type];
-      newPlayerHp = Math.max(0, newPlayerHp - profile.contactDamage * effective.damageTakenMult);
-      newLastDamagedAtMs = elapsedMs;
-      audioEngine.playSFX('hit_grunt');
+
+      // Helmet: probabilistic negate using a worklet-safe deterministic hash.
+      // Math.random() is not worklet-safe — hash of (enemy.id, elapsedMs) gives
+      // effectively random values since elapsedMs shifts ~500ms per contact event.
+      let negated = false;
+      if (helmetStacks > 0) {
+        const helmetChance = Math.min(0.15 * helmetStacks, 0.60);
+        const roll = Math.abs(Math.sin(enemy.id * 127.1 + elapsedMs * 0.31)) % 1;
+        negated = roll < helmetChance;
+      }
+
+      if (!negated) {
+        newPlayerHp = Math.max(0, newPlayerHp - profile.contactDamage * effective.damageTakenMult);
+        newLastDamagedAtMs = elapsedMs;
+        audioEngine.playSFX('hit_grunt');
+      }
+      // Always update lastHitPlayerAtMs: cooldown advances even on negated hits,
+      // preventing the same enemy from re-rolling on every subsequent frame.
       contactCheckedEnemies.push({
         id: enemy.id,
         type: enemy.type,

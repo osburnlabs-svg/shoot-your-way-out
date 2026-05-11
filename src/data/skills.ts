@@ -1,15 +1,19 @@
 /**
- * Phase 4a skills — stat-only upgrades selectable from the level-up modal.
+ * Phase 4a + 4b G1 skills — stat-only upgrades selectable from the level-up modal.
  *
  * Design rules:
- *   - All effects are flat additive modifiers applied multiplicatively to base stats.
+ *   - Most effects are flat additive modifiers applied via getEffectiveStats (worklet-safe).
  *   - Additive stacking: +20% per stack × 3 stacks = 1 + (0.2 × 3) = 1.6× total.
  *   - getEffectiveStats is a pure worklet — safe to call on the Reanimated UI thread.
  *   - No function-valued effect fields — flat number fields only (worklet Babel constraint).
  *   - Circular-dependency guard: takes (skillStacks, weapon, baseMaxHp) instead of
  *     full PlayerState/GameState so data/skills.ts never imports from lib/gameEngine.ts.
  *
- * Phase 4b will add Throwables category and 2 Special skills (Night Vision, Comms Headset).
+ * Inline-effect skills (Phase 4b G1): Hollow Points, Suppressor, Helmet, Comms Headset.
+ *   These skills have effect: {} — their logic is conditional or contextual and cannot be
+ *   expressed as flat modifiers. combatEngine.ts and pickupEngine.ts read skillStacks
+ *   directly and apply the effect inline. The registry entry is still needed for modal
+ *   display (displayName, description, maxStacks, icon).
  */
 
 import { PLAYER_MOVE_SPEED_PX_PER_SEC } from './gameConstants';
@@ -21,13 +25,18 @@ export type SkillId =
   | 'ammo_545bt'
   | 'ammo_subsonic'
   | 'ammo_tracer'
+  | 'ammo_hollow_points'
   | 'optics_red_dot'
   | 'optics_pso_scope'
+  | 'optics_suppressor'
   | 'gear_plate_carrier'
   | 'gear_tactical_boots'
   | 'gear_mre'
+  | 'gear_ceramic_insert'
+  | 'gear_helmet'
   | 'provisions_painkillers'
-  | 'provisions_stims';
+  | 'provisions_stims'
+  | 'provisions_comms_headset';
 
 // ─── Effect descriptor ────────────────────────────────────────────────────────
 
@@ -148,6 +157,53 @@ export const SKILLS: Record<SkillId, SkillDefinition> = {
     maxStacks: 3,
     effect: { damageMultAdd: 0.05, hpRegenPerSecAdd: -2 },
   },
+
+  // ── Phase 4b G1 ─────────────────────────────────────────────────────────────
+
+  ammo_hollow_points: {
+    id: 'ammo_hollow_points',
+    displayName: 'Hollow Points',
+    description: '+50% damage to enemies below 50% HP per stack.',
+    category: 'ammo',
+    maxStacks: 5,
+    // Inline effect: combatEngine reads skillStacks directly at hit time.
+    effect: {},
+  },
+  gear_ceramic_insert: {
+    id: 'gear_ceramic_insert',
+    displayName: 'Ceramic Insert',
+    description: '-8% damage taken per stack.',
+    category: 'gear',
+    maxStacks: 2,
+    effect: { damageTakenMultAdd: -0.08 },
+  },
+  optics_suppressor: {
+    id: 'optics_suppressor',
+    displayName: 'Suppressor',
+    description: '+10% damage to first enemy hit per stack.',
+    category: 'optics',
+    maxStacks: 5,
+    // Inline effect: combatEngine reads skillStacks directly at hit time.
+    effect: {},
+  },
+  provisions_comms_headset: {
+    id: 'provisions_comms_headset',
+    displayName: 'Comms Headset',
+    description: '+30% magnet range per stack.',
+    category: 'provisions',
+    maxStacks: 5,
+    // Inline effect: pickupEngine reads skillStacks directly for magnet range.
+    effect: {},
+  },
+  gear_helmet: {
+    id: 'gear_helmet',
+    displayName: 'Helmet',
+    description: '15% chance per stack to negate a hit (max 60%).',
+    category: 'gear',
+    maxStacks: 4,
+    // Inline effect: combatEngine reads skillStacks directly at contact-damage time.
+    effect: {},
+  },
 };
 
 /**
@@ -155,6 +211,7 @@ export const SKILLS: Record<SkillId, SkillDefinition> = {
  * Iteration order must be stable; index-based loop avoids Object.keys() (not worklet-safe).
  */
 export const SKILL_IDS: SkillId[] = [
+  // Phase 4a
   'ammo_545bt',
   'ammo_subsonic',
   'ammo_tracer',
@@ -165,6 +222,12 @@ export const SKILL_IDS: SkillId[] = [
   'gear_mre',
   'provisions_painkillers',
   'provisions_stims',
+  // Phase 4b G1
+  'ammo_hollow_points',
+  'gear_ceramic_insert',
+  'optics_suppressor',
+  'provisions_comms_headset',
+  'gear_helmet',
 ];
 
 // ─── Effective stats ──────────────────────────────────────────────────────────

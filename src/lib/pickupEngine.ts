@@ -38,6 +38,13 @@ export function tickPickups(state: GameState, dtMs: number): GameState {
   const { pickups, player } = state;
   if (pickups.length === 0) return state;
 
+  // Comms Headset: +30% magnet range per stack.
+  // Computed per-tick here rather than via getEffectiveStats to avoid importing
+  // WEAPON_PROFILES into pickupEngine. Result replaces the module-level constant.
+  const commsStacks = player.skillStacks['provisions_comms_headset'] ?? 0;
+  const effectiveMagnetRange = MAGNET_RANGE_PX * (1 + 0.30 * commsStacks);
+  const effectiveMagnetRangeSq = effectiveMagnetRange * effectiveMagnetRange;
+
   const dtSec = dtMs / 1000;
   let newScore = player.score;
   let newXp = player.xp;
@@ -60,7 +67,7 @@ export function tickPickups(state: GameState, dtMs: number): GameState {
     }
 
     // ─── Magnet pull ────────────────────────────────────────────────────────
-    if (distSq < MAGNET_RANGE_SQ) {
+    if (distSq < effectiveMagnetRangeSq) {
       // Direct-pull: recompute velocity fresh each tick — no momentum.
       const dist = Math.sqrt(distSq);
       const vx = (dx / dist) * MAGNET_MAX_SPEED_PX_PER_SEC;
