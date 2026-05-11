@@ -118,8 +118,9 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   weaponIcon: {
-    width: 80,
-    height: 80,
+    width: 120,
+    height: 120,
+    marginBottom: 4,
   },
   weaponName: {
     color: '#c9a356',

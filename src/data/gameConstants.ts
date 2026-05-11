@@ -329,7 +329,7 @@ export const FLAMETHROWER_CONE_DEG = 45;
 export const FLAMETHROWER_ZONE_COUNT = 3;
 
 /** Radius (px) of each individual flame zone. */
-export const FLAMETHROWER_ZONE_RADIUS_PX = 25;
+export const FLAMETHROWER_ZONE_RADIUS_PX = 35;
 
 /** Duration (ms) each flame zone persists before despawning. */
 export const FLAMETHROWER_ZONE_DURATION_MS = 500;
@@ -338,7 +338,7 @@ export const FLAMETHROWER_ZONE_DURATION_MS = 500;
 export const FLAMETHROWER_ZONE_DAMAGE_PER_SEC = 35;
 
 /** Distance (px) from player center at which flame zones spawn along the cone. */
-export const FLAMETHROWER_SPAWN_DISTANCE_PX = 50;
+export const FLAMETHROWER_SPAWN_DISTANCE_PX = 75;
 
 // ─── Rocket launcher ──────────────────────────────────────────────────────────
 
