@@ -274,11 +274,15 @@ export const SMOKE_DURATION_MS = 4000;
 /** Speed multiplier applied to enemies inside a smoke zone. 0.5 = half speed. */
 export const SMOKE_SLOW_MULT = 0.5;
 
-/** Frame count for the LightSmoke animation (7-frame dissipation sequence). */
+/** Frame count for the LightSmoke animation (7 frames: frame 0 = full cloud, frame 6 = tiny wisp). */
 export const SMOKE_ANIM_FRAME_COUNT = 7;
 
-/** Duration per smoke frame in ms. 7 frames × 150ms ≈ 1050ms/cycle (~3.8 loops over 4000ms). */
-export const SMOKE_ANIM_FRAME_DURATION_MS = 150;
+/** Bloom phase: time (ms) to ramp from wisp → full cloud (frames 6→0). */
+export const SMOKE_BLOOM_DURATION_MS = 1000;
+
+/** Dissipate phase: time (ms) to ramp from full cloud → gone (frames 0→6). */
+export const SMOKE_DISSIPATE_DURATION_MS = 1000;
+// Hold = SMOKE_DURATION_MS - SMOKE_BLOOM_DURATION_MS - SMOKE_DISSIPATE_DURATION_MS = 2000ms.
 
 // ─── Molotov ──────────────────────────────────────────────────────────────────
 

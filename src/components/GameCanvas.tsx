@@ -103,7 +103,8 @@ import {
   EFFECT_SPRITE_SCALE,
   SMOKE_RADIUS_PX,
   SMOKE_ANIM_FRAME_COUNT,
-  SMOKE_ANIM_FRAME_DURATION_MS,
+  SMOKE_BLOOM_DURATION_MS,
+  SMOKE_DISSIPATE_DURATION_MS,
 } from '../data/gameConstants';
 import type { EnemyType } from '../data/enemies';
 import { createInitialGameState, updateGameState } from '../lib/gameEngine';
@@ -552,10 +553,20 @@ export default function GameCanvas({ width, height }: Props) {
         if (!z) continue;
         let zFrame = 0;
         if (z.type === 'smoke') {
-          zFrame = getCurrentFrame(
-            { frameCount: SMOKE_ANIM_FRAME_COUNT, frameDurationMs: SMOKE_ANIM_FRAME_DURATION_MS, loop: true },
-            state.elapsedMs - z.spawnedAtMs,
-          );
+          const elapsed = state.elapsedMs - z.spawnedAtMs;
+          const LAST = SMOKE_ANIM_FRAME_COUNT - 1; // 6 = smallest wisp; 0 = full cloud
+          if (elapsed < SMOKE_BLOOM_DURATION_MS) {
+            // Bloom: 6 → 0 (wisp → full cloud)
+            zFrame = LAST - Math.floor((elapsed / SMOKE_BLOOM_DURATION_MS) * SMOKE_ANIM_FRAME_COUNT);
+          } else if (elapsed < SMOKE_DURATION_MS - SMOKE_DISSIPATE_DURATION_MS) {
+            // Hold: full cloud
+            zFrame = 0;
+          } else {
+            // Dissipate: 0 → 6 (full cloud → gone)
+            const dissElapsed = elapsed - (SMOKE_DURATION_MS - SMOKE_DISSIPATE_DURATION_MS);
+            zFrame = Math.floor((dissElapsed / SMOKE_DISSIPATE_DURATION_MS) * SMOKE_ANIM_FRAME_COUNT);
+          }
+          zFrame = Math.max(0, Math.min(LAST, zFrame));
         }
         // Molotov zone uses a static explode frame — no frame cycling needed (zFrame stays 0).
         zSlots[i] = { type: z.type, x: z.x, y: z.y, frame: zFrame };
