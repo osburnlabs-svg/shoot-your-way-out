@@ -336,3 +336,35 @@ export const CRATE_PICKUP_RADIUS_PX = 30;
 
 /** Margin (px) from each canvas edge within which crates will not spawn. */
 export const CRATE_SPAWN_MARGIN_PX = 50;
+
+// ─── Crate drop table ─────────────────────────────────────────────────────────
+
+export type CrateTier = 'common' | 'uncommon' | 'rare' | 'legendary';
+
+/** Probability weight for each tier. Must sum to 1.0. */
+export const CRATE_TIER_WEIGHTS: Record<CrateTier, number> = {
+  common:    0.40,
+  uncommon:  0.35,
+  rare:      0.20,
+  legendary: 0.05,
+};
+
+/**
+ * Weapon IDs available per tier. Uses actual weapon profile IDs from weapons.ts.
+ * pkm excluded — dormant weapon, not surfaced to the player.
+ */
+export const CRATE_TIER_WEAPONS: Record<CrateTier, string[]> = {
+  common:    ['aks74u'],
+  uncommon:  ['ak74', 'm870'],
+  rare:      ['gp25'],
+  legendary: ['svd', 'rpo'],
+};
+
+// ─── Tier display colors (UI only) ────────────────────────────────────────────
+
+export const TIER_COLORS: Record<CrateTier, string> = {
+  common:    '#bbbbbb',
+  uncommon:  '#4cc36a',
+  rare:      '#4a8fff',
+  legendary: '#ff9a3c',
+};

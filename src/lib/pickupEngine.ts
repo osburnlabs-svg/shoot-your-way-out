@@ -27,7 +27,10 @@ import {
   MAGNET_MAX_SPEED_PX_PER_SEC,
   COLLECT_RADIUS_PX,
   CRATE_PICKUP_RADIUS_PX,
+  CRATE_TIER_WEIGHTS,
+  CRATE_TIER_WEAPONS,
 } from '../data/gameConstants';
+import type { CrateTier } from '../data/gameConstants';
 
 /** Squared thresholds — avoid sqrt in the hot loop until needed for normalization. */
 const MAGNET_RANGE_SQ = MAGNET_RANGE_PX * MAGNET_RANGE_PX;
@@ -93,7 +96,11 @@ export function tickPickups(state: GameState, dtMs: number): GameState {
 
   // ─── Crate pickup ──────────────────────────────────────────────────────────
   let cratesChanged = false;
+  let pendingCrateReveal = state.pendingCrateReveal;
+  let crateRevealWeaponId = state.crateRevealWeaponId;
+  let crateRevealTier = state.crateRevealTier;
   const newCrates: Array<CrateState | null> = state.crates.slice();
+
   for (let i = 0; i < newCrates.length; i++) {
     const crate = newCrates[i];
     if (!crate) continue;
@@ -102,7 +109,27 @@ export function tickPickups(state: GameState, dtMs: number): GameState {
     if (cdx * cdx + cdy * cdy < CRATE_PICKUP_RADIUS_SQ) {
       newCrates[i] = null;
       cratesChanged = true;
-      // TODO Phase 4c G2: grant crate reward.
+
+      // Tier roll — accumulator-weighted, stops at first threshold exceeded.
+      const rand = Math.random();
+      let tier: CrateTier;
+      if (rand < CRATE_TIER_WEIGHTS.common) {
+        tier = 'common';
+      } else if (rand < CRATE_TIER_WEIGHTS.common + CRATE_TIER_WEIGHTS.uncommon) {
+        tier = 'uncommon';
+      } else if (rand < CRATE_TIER_WEIGHTS.common + CRATE_TIER_WEIGHTS.uncommon + CRATE_TIER_WEIGHTS.rare) {
+        tier = 'rare';
+      } else {
+        tier = 'legendary';
+      }
+      const pool = CRATE_TIER_WEAPONS[tier];
+      const weaponId = pool[Math.floor(Math.random() * pool.length)]!;
+
+      pendingCrateReveal = true;
+      crateRevealWeaponId = weaponId;
+      crateRevealTier = tier;
+      audioEngine.playSFX('crate_open');
+      break; // one crate pickup per tick
     }
   }
 
@@ -115,5 +142,8 @@ export function tickPickups(state: GameState, dtMs: number): GameState {
       xp: newXp,
     },
     crates: cratesChanged ? newCrates : state.crates,
+    pendingCrateReveal,
+    crateRevealWeaponId,
+    crateRevealTier,
   };
 }

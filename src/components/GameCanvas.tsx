@@ -76,6 +76,7 @@ import type { SkillId } from '../data/skills';
 import { WEAPON_PROFILES } from '../data/weapons';
 import LevelUpModal from './LevelUpModal';
 import ReviveModal from './ReviveModal';
+import CrateRevealModal from './CrateRevealModal';
 import {
   ENEMY_COLLISION_RADIUS_PX,
   ENEMY_SOFT_CAP,
@@ -110,6 +111,7 @@ import {
   SMOKE_BLOOM_DURATION_MS,
   SMOKE_DISSIPATE_DURATION_MS,
 } from '../data/gameConstants';
+import type { CrateTier } from '../data/gameConstants';
 import type { EnemyType } from '../data/enemies';
 import { createInitialGameState, updateGameState } from '../lib/gameEngine';
 import type { GameState } from '../lib/gameEngine';
@@ -447,6 +449,11 @@ export default function GameCanvas({ width, height }: Props) {
   const [displayChoices, setDisplayChoices] = useState<SkillId[]>([]);
   const [displayPlayerSkillStacks, setDisplayPlayerSkillStacks] = useState<Record<string, number>>({});
 
+  // ─── Crate reveal modal display state (React, updated by 100ms timer) ─────
+  const [displayCrateReveal, setDisplayCrateReveal] = useState(false);
+  const [displayCrateWeaponId, setDisplayCrateWeaponId] = useState<string | null>(null);
+  const [displayCrateTier, setDisplayCrateTier] = useState<CrateTier | null>(null);
+
   // Fixed-rate timer — reads gameState.value directly on the JS thread every
   // 100ms. Completely decoupled from useFrameCallback; zero runOnJS calls
   // for sprite selection. Hero + enemy sprite state + player vitals computed together.
@@ -590,6 +597,11 @@ export default function GameCanvas({ width, height }: Props) {
         zSlots[i] = { type: z.type, x: z.x, y: z.y, frame: zFrame };
       }
       setZoneSlotData(zSlots);
+
+      // Crate reveal modal bridge.
+      setDisplayCrateReveal(state.pendingCrateReveal);
+      setDisplayCrateWeaponId(state.crateRevealWeaponId);
+      setDisplayCrateTier(state.crateRevealTier);
     }, 100);
     return () => clearInterval(id);
   }, [gameState]);
@@ -921,6 +933,44 @@ export default function GameCanvas({ width, height }: Props) {
     const newCrates = state.crates.slice();
     newCrates[slot] = { id: state.nextCrateId, x, y, spawnedAtMs: state.elapsedMs };
     gameState.value = { ...state, crates: newCrates, nextCrateId: state.nextCrateId + 1 };
+  }, [gameState]);
+
+  // ─── Crate reveal handlers ─────────────────────────────────────────────────
+  // Both mutate gameState.value on the JS thread during the pendingCrateReveal
+  // freeze window — same pattern as handleSkillSelect / handleFreeRevive.
+
+  const handleEquip = useCallback(() => {
+    const state = gameState.value;
+    if (!state.crateRevealWeaponId) return;
+    const weapon = WEAPON_PROFILES[state.crateRevealWeaponId];
+    if (!weapon) return;
+    // TODO Phase 6: audioEngine.playSFX('weapon_equip')
+    gameState.value = {
+      ...state,
+      player: {
+        ...state.player,
+        equippedWeaponId: state.crateRevealWeaponId,
+        weaponPose: weapon.animationPose,
+      },
+      pendingCrateReveal: false,
+      crateRevealWeaponId: null,
+      crateRevealTier: null,
+    };
+  }, [gameState]);
+
+  const handleScrap = useCallback(() => {
+    const state = gameState.value;
+    gameState.value = {
+      ...state,
+      player: {
+        ...state.player,
+        score: state.player.score + 50,
+        xp: state.player.xp + 25,
+      },
+      pendingCrateReveal: false,
+      crateRevealWeaponId: null,
+      crateRevealTier: null,
+    };
   }, [gameState]);
 
   // ─── Skill selection handler ───────────────────────────────────────────────
@@ -1386,6 +1436,16 @@ export default function GameCanvas({ width, height }: Props) {
           choices={displayChoices}
           playerSkillStacks={displayPlayerSkillStacks}
           onSelect={handleSkillSelect}
+        />
+
+        {/* Crate reveal modal — shown when player walks over a crate.
+            Engine frozen via pendingCrateReveal while open. */}
+        <CrateRevealModal
+          visible={displayCrateReveal}
+          weaponId={displayCrateWeaponId}
+          tier={displayCrateTier}
+          onEquip={handleEquip}
+          onScrap={handleScrap}
         />
       </View>
     </GestureDetector>

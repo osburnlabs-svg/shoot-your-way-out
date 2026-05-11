@@ -205,6 +205,20 @@ export const GuiSprites = {
   upgrade: {
     bg: require('../../assets/ui/upgrade/BG.png'),
   },
+  /**
+   * Weapon HUD silhouettes for the CrateRevealModal.
+   * Only weapons reachable by the player (crate pool) are listed — pkm excluded.
+   * Tech debt: these are kit placeholder silhouettes (3 icons shared across 6 weapons).
+   *   Replace with custom weapon sprites when sourced.
+   */
+  weaponHudIcons: {
+    aks74u: require('../../assets/ui/icons/SMG_HUD.png'),
+    ak74:   require('../../assets/ui/icons/SMG_HUD.png'),
+    svd:    require('../../assets/ui/icons/MG_HUD.png'),
+    m870:   require('../../assets/ui/icons/Pistol_HUD.png'),
+    gp25:   require('../../assets/ui/icons/Pistol_HUD.png'),
+    rpo:    require('../../assets/ui/icons/MG_HUD.png'),
+  },
   skillIcons: {
     ammo_545bt:               require('../../assets/ui/icons/AP_Rounds.png'),
     ammo_subsonic:            require('../../assets/ui/icons/Subsonic.png'),

@@ -56,6 +56,11 @@
  *   - GameState gains crates[], nextCrateId, nextCrateSpawnAtMs
  *   - tickCrateSpawn (crateEngine) runs after tickPickups — timer-based world spawn
  *   - tickPickups extended to detect crate proximity pickup (no magnet)
+ *
+ * Phase 4c G2 additions:
+ *   - GameState gains pendingCrateReveal + crateRevealWeaponId + crateRevealTier
+ *   - updateGameState freezes when pendingCrateReveal (same pattern as isDead/pendingLevelUp)
+ *   - tickPickups extended to roll tier + weapon on crate pickup, set pendingCrateReveal
  */
 
 import type { HeroWeaponPose } from './sprites';
@@ -70,6 +75,7 @@ import {
   CRATE_SLOT_COUNT,
   CRATE_SPAWN_INTERVAL_MS,
 } from '../data/gameConstants';
+import type { CrateTier } from '../data/gameConstants';
 import type { SkillId } from '../data/skills';
 import { getEffectiveStats } from '../data/skills';
 import { tickEnemies } from './enemyEngine';
@@ -402,6 +408,15 @@ export type GameState = {
   nextCrateId: number;
   /** elapsedMs when the next crate spawn should fire. */
   nextCrateSpawnAtMs: number;
+  /**
+   * True while the crate reveal modal is open. updateGameState freezes all ticks
+   * until the player selects EQUIP or SCRAP (same pattern as isDead/pendingLevelUp).
+   */
+  pendingCrateReveal: boolean;
+  /** Weapon ID rolled when the crate was picked up. Null when not revealing. */
+  crateRevealWeaponId: string | null;
+  /** Tier of the rolled weapon — drives tier color display in the modal. */
+  crateRevealTier: CrateTier | null;
   /** Canvas dimensions stored once at init — spawner uses them to place enemies at edges. */
   canvasWidth: number;
   canvasHeight: number;
@@ -480,6 +495,9 @@ export function createInitialGameState(canvasWidth: number, canvasHeight: number
     }()),
     nextCrateId: 0,
     nextCrateSpawnAtMs: CRATE_SPAWN_INTERVAL_MS,
+    pendingCrateReveal: false,
+    crateRevealWeaponId: null,
+    crateRevealTier: null,
     canvasWidth,
     canvasHeight,
     elapsedMs: 0,
@@ -518,6 +536,10 @@ export function updateGameState(state: GameState, dtMs: number): GameState {
   // Freeze all simulation while a level-up selection is pending.
   // G3 will clear pendingLevelUp after the player picks a skill.
   if (state.pendingLevelUp) return state;
+
+  // Freeze while the crate reveal modal is open.
+  // Cleared by handleEquip / handleScrap on the JS thread.
+  if (state.pendingCrateReveal) return state;
 
   const { player } = state;
   const { inputVector } = player;
