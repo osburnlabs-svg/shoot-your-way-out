@@ -100,8 +100,6 @@ import {
   THROWABLE_ARC_HEIGHT_PX,
   FRAG_EXPLODE_FRAME_COUNT,
   FRAG_EXPLODE_FRAME_DURATION_MS,
-  MOLOTOV_FIRE_FRAME_COUNT,
-  MOLOTOV_FIRE_FRAME_DURATION_MS,
   EFFECT_SPRITE_SCALE,
   SMOKE_RADIUS_PX,
 } from '../data/gameConstants';
@@ -332,8 +330,9 @@ export default function GameCanvas({ width, height }: Props) {
   const moneySmallImage = useImage(PickupSprites.money.small);
 
   // ─── Effect sprite images (loaded once at mount, all unconditional) ───────
-  // Explode: 4 frames (Explode/1–4.png) — frag detonation, non-looping.
-  // Flame: 7 frames (Flamethrower/1–7.png) — molotov zone, looping.
+  // Explode: 4 frames (Explode/1–4.png) — frag detonation (non-looping) AND
+  //   molotov zone static visual (frame 3, index 2: peak-bloom, reads as fire patch).
+  // Flame: 7 frames (Flamethrower/1–7.png) — staged for future use (Phase 6 polish).
   const explode0 = useImage(EffectSprites.explode[0]);
   const explode1 = useImage(EffectSprites.explode[1]);
   const explode2 = useImage(EffectSprites.explode[2]);
@@ -538,13 +537,8 @@ export default function GameCanvas({ width, height }: Props) {
       for (let i = 0; i < state.effectZones.length; i++) {
         const z = state.effectZones[i];
         if (!z) continue;
-        let zFrame = 0;
-        if (z.type === 'molotov') {
-          zFrame = getCurrentFrame(
-            { frameCount: MOLOTOV_FIRE_FRAME_COUNT, frameDurationMs: MOLOTOV_FIRE_FRAME_DURATION_MS, loop: true },
-            state.elapsedMs - z.spawnedAtMs,
-          );
-        }
+        // Molotov zone uses a static explode frame — no frame cycling needed.
+        const zFrame = 0;
         zSlots[i] = { type: z.type, x: z.x, y: z.y, frame: zFrame };
       }
       setZoneSlotData(zSlots);
@@ -1050,7 +1044,8 @@ export default function GameCanvas({ width, height }: Props) {
           {/* ── Effect zones (below pickups) ──────────────────────────────── */}
           {/* Z-order: zones < pickups < projectiles < throwables < enemies.  */}
           {/* Smoke: grey Skia Circle (Phase 6: no kit smoke sprite).         */}
-          {/* Molotov: looping Flamethrower sprite (7 frames × 120ms).        */}
+          {/* Molotov: static Explode frame 3 (index 2) — peak-bloom reads as */}
+          {/*   "fire patch on ground" vs flamethrower stream. Phase 6: tune.  */}
           {zoneSlotData.map((z, i) => {
             if (!z.type) return null;
             if (z.type === 'smoke') {
@@ -1064,19 +1059,20 @@ export default function GameCanvas({ width, height }: Props) {
                 />
               );
             }
-            // Molotov — flame sprite
-            const flameImg = flameImages[z.frame] ?? null;
-            if (!flameImg) return null;
-            const fw = flameImg.width() * EFFECT_SPRITE_SCALE;
-            const fh = flameImg.height() * EFFECT_SPRITE_SCALE;
+            // Molotov — static Explode frame 3 (index 2): peak-bloom, reads as
+            // fire patch rather than directional stream. No frame cycling.
+            const molotovImg = explodeImages[2] ?? null;
+            if (!molotovImg) return null;
+            const mw = molotovImg.width() * EFFECT_SPRITE_SCALE;
+            const mh = molotovImg.height() * EFFECT_SPRITE_SCALE;
             return (
               <Image
                 key={`zone-${i}`}
-                image={flameImg}
-                x={z.x - fw / 2}
-                y={z.y - fh / 2}
-                width={fw}
-                height={fh}
+                image={molotovImg}
+                x={z.x - mw / 2}
+                y={z.y - mh / 2}
+                width={mw}
+                height={mh}
                 sampling={{ filter: FilterMode.Nearest, mipmap: MipmapMode.None }}
               />
             );
