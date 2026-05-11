@@ -5,9 +5,11 @@
  * Engine code (combatEngine.ts) reads these; never hardcodes weapon stats.
  *
  * G2: Pistol only — auto-fire, projectile travel, collision.
- * Phase 4a adds: AKS-74U (pistol pose), AK-74 (rifle), PKM (machinegun), SVD (rifle).
+ * Phase 4a adds: AKS-74U (pistol pose), AK-74 (rifle), SVD (rifle). PKM defined but
+ *   dormant — removed from level progression and crate pool (Phase 4c G2 decision).
+ *   Guaranteed progression: Pistol → SMG (L4) → Assault Rifle (L8) → Sniper Rifle (L16).
  * Phase 4b adds crate-only weapons: M870 Shotgun (machinegun pose),
- *   GP-25 (grenade_launcher pose), RPO Flamethrower (flamethrower pose).
+ *   RPO Rocket Launcher (grenade_launcher pose), RPO Flamethrower (flamethrower pose).
  */
 
 import type { HeroWeaponPose } from '../lib/sprites';
@@ -109,7 +111,7 @@ export const WEAPON_PROFILES: Record<string, WeaponProfile> = {
 
   gp25: {
     id: 'gp25',
-    displayName: 'Grenade Launcher',
+    displayName: 'Rocket Launcher',
     animationPose: 'grenade_launcher',
     // AOE damage radius handled by Phase 4b combatEngine extension.
     damage: 35,

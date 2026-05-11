@@ -139,8 +139,9 @@ const WEAPON_LABELS: Record<HeroWeaponPose, string> = {
 const WEAPON_UNLOCK_MAP: Record<number, { weaponId: string; weaponPose: HeroWeaponPose }> = {
   4:  { weaponId: 'aks74u', weaponPose: 'pistol' },
   8:  { weaponId: 'ak74',   weaponPose: 'rifle' },
-  12: { weaponId: 'pkm',    weaponPose: 'machinegun' },
   16: { weaponId: 'svd',    weaponPose: 'rifle' },
+  // pkm (machinegun) removed — dormant in weapons.ts, not surfaced to player.
+  // Progression: Pistol → SMG (L4) → Assault Rifle (L8) → Sniper Rifle (L16).
 };
 
 // Rotation offset: TDS kit sprites face DOWN by default.
