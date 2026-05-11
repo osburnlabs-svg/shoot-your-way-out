@@ -98,9 +98,6 @@ import {
   THROWABLE_SLOT_COUNT,
   EFFECT_ZONE_SLOT_COUNT,
   THROWABLE_TRAVEL_TIME_MS,
-  CRATE_SLOT_COUNT,
-  CRATE_MAX_ACTIVE,
-  CRATE_SPAWN_MARGIN_PX,
   THROWABLE_ARC_HEIGHT_PX,
   FRAG_EXPLODE_FRAME_COUNT,
   FRAG_EXPLODE_FRAME_DURATION_MS,
@@ -935,32 +932,6 @@ export default function GameCanvas({ width, height }: Props) {
     };
   }, [gameState]);
 
-  // ─── Debug spawn crate button ──────────────────────────────────────────────
-  // Directly injects a crate into the first free slot, bypassing the 30s timer.
-  // Respects CRATE_MAX_ACTIVE cap. Phase 5 removes this button.
-  const handleSpawnCrate = useCallback(() => {
-    const state = gameState.value;
-    let slot = -1;
-    for (let i = 0; i < CRATE_SLOT_COUNT; i++) {
-      if (state.crates[i] === null) { slot = i; break; }
-    }
-    if (slot === -1) return;
-    let activeCount = 0;
-    for (let i = 0; i < state.crates.length; i++) {
-      if (state.crates[i] !== null) activeCount += 1;
-    }
-    if (activeCount >= CRATE_MAX_ACTIVE) return;
-    const minX = CRATE_SPAWN_MARGIN_PX;
-    const maxX = state.canvasWidth - CRATE_SPAWN_MARGIN_PX;
-    const minY = CRATE_SPAWN_MARGIN_PX;
-    const maxY = state.canvasHeight - CRATE_SPAWN_MARGIN_PX;
-    const x = minX + Math.random() * (maxX - minX);
-    const y = minY + Math.random() * (maxY - minY);
-    const newCrates = state.crates.slice();
-    newCrates[slot] = { id: state.nextCrateId, x, y, spawnedAtMs: state.elapsedMs };
-    gameState.value = { ...state, crates: newCrates, nextCrateId: state.nextCrateId + 1 };
-  }, [gameState]);
-
   // ─── Crate reveal handlers ─────────────────────────────────────────────────
   // Both mutate gameState.value on the JS thread during the pendingCrateReveal
   // freeze window — same pattern as handleSkillSelect / handleFreeRevive.
@@ -1480,16 +1451,6 @@ export default function GameCanvas({ width, height }: Props) {
             Weapon: {WEAPON_LABELS[spriteState.weaponPose]}
           </Text>
           <Text style={[styles.debugText, styles.tapHint]}>tap to cycle</Text>
-        </Pressable>
-
-        {/* Debug spawn crate button — top-left, below weapon cycle button.
-            Phase 5 removes this once auto-spawn timer is verified on device. */}
-        <Pressable
-          style={[styles.debugOverlay, styles.weaponButton, { top: 110, left: 10 }]}
-          onPress={handleSpawnCrate}
-        >
-          <Text style={styles.debugText}>Spawn Crate</Text>
-          <Text style={[styles.debugText, styles.tapHint]}>tap to place</Text>
         </Pressable>
 
         {/* Debug overlay — top-right. */}
