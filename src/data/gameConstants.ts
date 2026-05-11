@@ -214,3 +214,82 @@ export const PICKUP_SPRITE_SCALE = 2;
  * splash rather than enveloping the whole sprite. Tune on device.
  */
 export const HIT_FLASH_RADIUS_PX = 7;
+
+// ─── Throwables ───────────────────────────────────────────────────────────────
+
+/**
+ * Fixed pre-allocated slot count for throwable entities.
+ * Same sparse-array pattern as ENEMY_SOFT_CAP: slots are never compacted,
+ * null = empty. 10 slots is generous — the player can only carry 3 of each
+ * type in G5, and travel time is 400ms so overlap is rare.
+ */
+export const THROWABLE_SLOT_COUNT = 10;
+
+/**
+ * Fixed pre-allocated slot count for effect zone entities (smoke, molotov fire).
+ * 6 = 2× of each type maximum in flight simultaneously.
+ */
+export const EFFECT_ZONE_SLOT_COUNT = 6;
+
+/** Time (ms) for a throwable to travel from the player to its target. */
+export const THROWABLE_TRAVEL_TIME_MS = 400;
+
+/**
+ * Peak height (px) of the parabolic arc above the direct line.
+ * Gives a lofted grenade feel. Applied as a vertical screen-space offset
+ * using a sin(0→π) curve over the travel fraction.
+ */
+export const THROWABLE_ARC_HEIGHT_PX = 40;
+
+// ─── Frag grenade ─────────────────────────────────────────────────────────────
+
+/** Damage dealt to each enemy within FRAG_RADIUS_PX on detonation. */
+export const FRAG_DAMAGE = 25;
+
+/** Blast radius (px) for frag detonation — circle-overlap with ENEMY_COLLISION_RADIUS_PX. */
+export const FRAG_RADIUS_PX = 40;
+
+/** Number of frames in the Explode sprite sheet (Effects/Explode/1–4.png). */
+export const FRAG_EXPLODE_FRAME_COUNT = 4;
+
+/** Duration per explode frame (ms). 4 × 100ms = 400ms total explosion visual. */
+export const FRAG_EXPLODE_FRAME_DURATION_MS = 100;
+
+// ─── Smoke grenade ────────────────────────────────────────────────────────────
+
+/** Radius (px) of the smoke slow zone. */
+export const SMOKE_RADIUS_PX = 50;
+
+/** How long (ms) the smoke zone persists before despawning. */
+export const SMOKE_DURATION_MS = 4000;
+
+/** Speed multiplier applied to enemies inside a smoke zone. 0.5 = half speed. */
+export const SMOKE_SLOW_MULT = 0.5;
+
+// ─── Molotov ──────────────────────────────────────────────────────────────────
+
+/** Radius (px) of the fire damage zone. */
+export const MOLOTOV_RADIUS_PX = 50;
+
+/** How long (ms) the fire zone persists before despawning. */
+export const MOLOTOV_DURATION_MS = 3000;
+
+/** DoT damage per second to enemies inside the fire zone. */
+export const MOLOTOV_DAMAGE_PER_SEC = 5;
+
+/** Interval (ms) between DoT damage ticks per zone. */
+export const MOLOTOV_TICK_INTERVAL_MS = 250;
+
+/** Number of frames in the Flamethrower sprite sheet (Effects/Flamethrower/1–7.png). */
+export const MOLOTOV_FIRE_FRAME_COUNT = 7;
+
+/** Duration per fire frame (ms). 7 × 120ms ≈ 840ms per loop cycle. */
+export const MOLOTOV_FIRE_FRAME_DURATION_MS = 120;
+
+// ─── Effect sprite scale ──────────────────────────────────────────────────────
+
+/**
+ * Pixel-art upscale for effect sprites (explode, flame).
+ * 2× matches hero/enemy/pickup scale.
+ */
+export const EFFECT_SPRITE_SCALE = 2;

@@ -31,6 +31,8 @@ import {
   RAIDER_RATIO_MAX,
   RAIDER_RATIO_RAMP_DURATION_MS,
   ENEMY_BASE_SPEED_PX_PER_SEC,
+  SMOKE_RADIUS_PX,
+  SMOKE_SLOW_MULT,
 } from '../data/gameConstants';
 
 /** Linear interpolation — inlined here to avoid importing a non-worklet util. */
@@ -186,7 +188,20 @@ export function tickEnemies(state: GameState, dtMs: number): GameState {
     }
 
     const profile = ENEMY_PROFILES[enemy.type];
-    const speed = profile.moveSpeed * ENEMY_BASE_SPEED_PX_PER_SEC;
+    let speed = profile.moveSpeed * ENEMY_BASE_SPEED_PX_PER_SEC;
+
+    // Smoke slow — check all active smoke zones inline (one-tick lag, imperceptible).
+    // No new EnemyState field needed; reads state.effectZones directly each tick.
+    for (let zi = 0; zi < state.effectZones.length; zi++) {
+      const zone = state.effectZones[zi];
+      if (zone === null || zone.type !== 'smoke') continue;
+      const szDx = enemy.x - zone.x;
+      const szDy = enemy.y - zone.y;
+      if (Math.sqrt(szDx * szDx + szDy * szDy) < SMOKE_RADIUS_PX) {
+        speed *= SMOKE_SLOW_MULT;
+        break; // Multiple overlapping smoke zones don't stack — first match wins.
+      }
+    }
 
     const dx = px - enemy.x;
     const dy = py - enemy.y;

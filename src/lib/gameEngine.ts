@@ -59,6 +59,8 @@ import {
   PLAYER_MAX_ANGULAR_SPEED_RAD_PER_SEC,
   PLAYER_STARTING_HP,
   ENEMY_SOFT_CAP,
+  THROWABLE_SLOT_COUNT,
+  EFFECT_ZONE_SLOT_COUNT,
 } from '../data/gameConstants';
 import type { SkillId } from '../data/skills';
 import { getEffectiveStats } from '../data/skills';
@@ -66,6 +68,7 @@ import { tickEnemies } from './enemyEngine';
 import { tickCombat } from './combatEngine';
 import { tickPickups } from './pickupEngine';
 import { tickProgression, tickRegen } from './progressionEngine';
+import { tickThrowables, tickEffectZones } from './throwableEngine';
 
 export type PlayerState = {
   x: number;
@@ -225,6 +228,61 @@ export type PickupState = {
   spawnedAtMs: number;
 };
 
+/**
+ * A throwable entity in flight or detonating.
+ *
+ * 'flying': arcing from spawnX/Y toward targetX/Y over THROWABLE_TRAVEL_TIME_MS.
+ *   Screen position is interpolated along the arc each render frame.
+ *   Visual: colored circle (per THROWABLE_PROJECTILE_COLORS in GameCanvas).
+ *
+ * 'detonating' (frag only): explosion animation plays for
+ *   FRAG_EXPLODE_FRAME_COUNT × FRAG_EXPLODE_FRAME_DURATION_MS ms at targetX/Y.
+ *   Smoke and molotov clear their throwable slot immediately on landing (the
+ *   EffectZone carries the visual); frag holds the slot until detonation ends.
+ *
+ * spawnX/Y: position at the moment of throw (player center at throw time).
+ * targetX/Y: absolute canvas coordinates of the target.
+ * thrownAtMs: elapsedMs when the throw occurred — used to compute arc fraction.
+ * detonationStartedAtMs: elapsedMs when status transitioned to 'detonating'. 0 otherwise.
+ */
+export type ThrowableState = {
+  id: number;
+  type: 'frag' | 'smoke' | 'molotov';
+  status: 'flying' | 'detonating';
+  spawnX: number;
+  spawnY: number;
+  targetX: number;
+  targetY: number;
+  /** elapsedMs when the throw was initiated. */
+  thrownAtMs: number;
+  /** elapsedMs when 'detonating' status began. 0 when 'flying'. */
+  detonationStartedAtMs: number;
+};
+
+/**
+ * A persistent on-ground effect zone left by a smoke or molotov throwable.
+ *
+ * type 'smoke': slows enemies inside by SMOKE_SLOW_MULT for SMOKE_DURATION_MS.
+ *   Slow is applied inline in tickEnemies — no EnemyState field needed.
+ *   Visual: grey Skia Circle (Phase 6 placeholder; no kit smoke sprite).
+ *
+ * type 'molotov': deals MOLOTOV_DAMAGE_PER_SEC DoT to enemies inside.
+ *   Damage ticks every MOLOTOV_TICK_INTERVAL_MS using lastTickAppliedMs.
+ *   Visual: looping Flamethrower sprite (7 frames × 120ms).
+ *
+ * spawnedAtMs: elapsedMs when the zone was created (throwable landed).
+ * lastTickAppliedMs: elapsedMs of the most recent DoT tick. 0 at spawn.
+ *   Updated by tickEffectZones each time damage is applied.
+ */
+export type EffectZoneState = {
+  id: number;
+  type: 'smoke' | 'molotov';
+  x: number;
+  y: number;
+  spawnedAtMs: number;
+  lastTickAppliedMs: number;
+};
+
 export type GameState = {
   player: PlayerState;
   /**
@@ -279,6 +337,21 @@ export type GameState = {
    * Incremented by the ad revive handler; reset to 0 on REDEPLOY.
    */
   adRevivesUsed: number;
+  /**
+   * Fixed-length sparse array of THROWABLE_SLOT_COUNT (10) slots.
+   * null = empty slot. Slot index stable for throwable lifetime (no compaction).
+   * Frag holds its slot through detonation; smoke/molotov clear immediately on land.
+   */
+  throwables: Array<ThrowableState | null>;
+  /** Monotonically increasing counter — ensures every throwable has a unique id. */
+  nextThrowableId: number;
+  /**
+   * Fixed-length sparse array of EFFECT_ZONE_SLOT_COUNT (6) slots.
+   * null = empty slot. Smoke and molotov zones live here after the throwable lands.
+   */
+  effectZones: Array<EffectZoneState | null>;
+  /** Monotonically increasing counter — ensures every effect zone has a unique id. */
+  nextEffectZoneId: number;
   /** Canvas dimensions stored once at init — spawner uses them to place enemies at edges. */
   canvasWidth: number;
   canvasHeight: number;
@@ -335,6 +408,18 @@ export function createInitialGameState(canvasWidth: number, canvasHeight: number
     pendingLevelUpCount: 0,
     currentLevelUpChoices: [],
     adRevivesUsed: 0,
+    throwables: (function () {
+      const arr: Array<ThrowableState | null> = [];
+      for (let i = 0; i < THROWABLE_SLOT_COUNT; i++) { arr.push(null); }
+      return arr;
+    }()),
+    nextThrowableId: 0,
+    effectZones: (function () {
+      const arr: Array<EffectZoneState | null> = [];
+      for (let i = 0; i < EFFECT_ZONE_SLOT_COUNT; i++) { arr.push(null); }
+      return arr;
+    }()),
+    nextEffectZoneId: 0,
     canvasWidth,
     canvasHeight,
     elapsedMs: 0,
@@ -426,6 +511,8 @@ export function updateGameState(state: GameState, dtMs: number): GameState {
   const stateAfterEnemies = tickEnemies(stateAfterPlayer, dtMs);
   const stateAfterCombat = tickCombat(stateAfterEnemies, dtMs);
   const stateAfterPickups = tickPickups(stateAfterCombat, dtMs);
-  const stateAfterRegen = tickRegen(stateAfterPickups, dtMs);
+  const stateAfterThrowables = tickThrowables(stateAfterPickups, dtMs);
+  const stateAfterZones = tickEffectZones(stateAfterThrowables, dtMs);
+  const stateAfterRegen = tickRegen(stateAfterZones, dtMs);
   return tickProgression(stateAfterRegen);
 }

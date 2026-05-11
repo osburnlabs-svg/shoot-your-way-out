@@ -181,6 +181,36 @@ export const PickupSprites = {
  *   BG.png has baked-in weapon placeholder icons; Phase 7 will evaluate kit UI fit.
  * skillIcons.*: 15 skills, 9 distinct icons.
  */
+/**
+ * Effect sprite registry — introduced in Phase 4b G4 for throwable detonations.
+ *
+ * explode: Effects/Explode/1–4.png (4 frames, 100ms each, linear non-looping).
+ *   Used for frag grenade detonation visual — plays once in-slot then clears.
+ *
+ * flame: Effects/Flamethrower/1–7.png (7 frames, 120ms each, looping).
+ *   Used for molotov fire zone visual — loops for MOLOTOV_DURATION_MS.
+ *
+ * Phase 6 tech debt: smoke zone has no kit sprite (no LightSmoke asset in kit).
+ *   Smoke zone is rendered as a Skia Circle (grey, ~0.45 opacity) as a placeholder.
+ */
+export const EffectSprites = {
+  explode: [
+    require('../../assets/effects/explode/1.png'),
+    require('../../assets/effects/explode/2.png'),
+    require('../../assets/effects/explode/3.png'),
+    require('../../assets/effects/explode/4.png'),
+  ],
+  flame: [
+    require('../../assets/effects/flame/1.png'),
+    require('../../assets/effects/flame/2.png'),
+    require('../../assets/effects/flame/3.png'),
+    require('../../assets/effects/flame/4.png'),
+    require('../../assets/effects/flame/5.png'),
+    require('../../assets/effects/flame/6.png'),
+    require('../../assets/effects/flame/7.png'),
+  ],
+} as const;
+
 export const GuiSprites = {
   upgrade: {
     bg: require('../../assets/ui/upgrade/BG.png'),

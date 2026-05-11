@@ -69,7 +69,7 @@ import {
 } from 'react-native-reanimated';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 
-import { HeroSprites, EnemySprites, PickupSprites } from '../lib/sprites';
+import { HeroSprites, EnemySprites, PickupSprites, EffectSprites } from '../lib/sprites';
 import type { HeroWeaponPose } from '../lib/sprites';
 import { SKILLS, SKILL_IDS, getEffectiveStats } from '../data/skills';
 import type { SkillId } from '../data/skills';
@@ -94,10 +94,21 @@ import {
   PICKUP_SPRITE_SCALE,
   HIT_FLASH_RADIUS_PX,
   INVULNERABLE_DURATION_MS,
+  THROWABLE_SLOT_COUNT,
+  EFFECT_ZONE_SLOT_COUNT,
+  THROWABLE_TRAVEL_TIME_MS,
+  THROWABLE_ARC_HEIGHT_PX,
+  FRAG_EXPLODE_FRAME_COUNT,
+  FRAG_EXPLODE_FRAME_DURATION_MS,
+  MOLOTOV_FIRE_FRAME_COUNT,
+  MOLOTOV_FIRE_FRAME_DURATION_MS,
+  EFFECT_SPRITE_SCALE,
+  SMOKE_RADIUS_PX,
 } from '../data/gameConstants';
 import type { EnemyType } from '../data/enemies';
 import { createInitialGameState, updateGameState } from '../lib/gameEngine';
 import type { GameState } from '../lib/gameEngine';
+import { spawnThrowable } from '../lib/throwableEngine';
 import { getCurrentFrame } from '../lib/animation';
 import { computeSteps, FIXED_STEP_MS } from '../lib/gameLoop';
 
@@ -189,6 +200,30 @@ function usePickupSlotTransform(gameState: SharedValue<GameState>, slotIndex: nu
 }
 
 /**
+ * Throwable arc position — one useDerivedValue per pre-allocated throwable slot.
+ * Computes the parabolic arc screen position for a flying throwable.
+ * Returns {x: -9999, y: -9999} when the slot is null or 'detonating'
+ * (detonating frags are rendered at their static targetX/Y via React state).
+ *
+ * Arc formula:
+ *   fraction = clamp((elapsedMs - thrownAtMs) / THROWABLE_TRAVEL_TIME_MS, 0, 1)
+ *   x = lerp(spawnX, targetX, fraction)
+ *   y = lerp(spawnY, targetY, fraction) - sin(fraction * PI) * THROWABLE_ARC_HEIGHT_PX
+ */
+function useThrowableSlotPos(gameState: SharedValue<GameState>, slotIndex: number) {
+  return useDerivedValue(() => {
+    const t = gameState.value.throwables[slotIndex];
+    if (!t || t.status !== 'flying') return { x: -9999, y: -9999 };
+    const elapsed = gameState.value.elapsedMs - t.thrownAtMs;
+    const frac = Math.min(elapsed / THROWABLE_TRAVEL_TIME_MS, 1);
+    const arcX = t.spawnX + (t.targetX - t.spawnX) * frac;
+    const arcY = (t.spawnY + (t.targetY - t.spawnY) * frac)
+               - Math.sin(frac * Math.PI) * THROWABLE_ARC_HEIGHT_PX;
+    return { x: arcX, y: arcY };
+  });
+}
+
+/**
  * Per-slot hit-flash opacity — one useDerivedValue per pre-allocated enemy slot.
  * Returns 0.75 while hitFlashUntilMs is in the future, 0 otherwise.
  * Drives a red <Circle> rendered on top of each enemy sprite in JSX.
@@ -212,6 +247,17 @@ function formatElapsed(totalSec: number): string {
   const s = totalSec % 60;
   return `${m}:${s < 10 ? '0' : ''}${s}`;
 }
+
+/**
+ * Throwable in-flight circle colors — defined locally (not in gameConstants) as
+ * they are purely visual/render concerns. Smoke/Molotov zone colors are also here.
+ * G5 TODO: remove debug spawn buttons that reference these; colors stay for flight circles.
+ */
+const THROWABLE_COLORS = {
+  frag:    '#e8c040', // yellow-gold
+  smoke:   '#a0c8a0', // pale green-grey
+  molotov: '#e06020', // orange-red
+};
 
 type Props = {
   width: number;
@@ -284,6 +330,24 @@ export default function GameCanvas({ width, height }: Props) {
 
   // ─── Pickup sprite image ──────────────────────────────────────────────────
   const moneySmallImage = useImage(PickupSprites.money.small);
+
+  // ─── Effect sprite images (loaded once at mount, all unconditional) ───────
+  // Explode: 4 frames (Explode/1–4.png) — frag detonation, non-looping.
+  // Flame: 7 frames (Flamethrower/1–7.png) — molotov zone, looping.
+  const explode0 = useImage(EffectSprites.explode[0]);
+  const explode1 = useImage(EffectSprites.explode[1]);
+  const explode2 = useImage(EffectSprites.explode[2]);
+  const explode3 = useImage(EffectSprites.explode[3]);
+  const explodeImages = [explode0, explode1, explode2, explode3];
+
+  const flame0 = useImage(EffectSprites.flame[0]);
+  const flame1 = useImage(EffectSprites.flame[1]);
+  const flame2 = useImage(EffectSprites.flame[2]);
+  const flame3 = useImage(EffectSprites.flame[3]);
+  const flame4 = useImage(EffectSprites.flame[4]);
+  const flame5 = useImage(EffectSprites.flame[5]);
+  const flame6 = useImage(EffectSprites.flame[6]);
+  const flameImages = [flame0, flame1, flame2, flame3, flame4, flame5, flame6];
 
   // ─── Game state ────────────────────────────────────────────────────────────
   const gameState = useSharedValue(createInitialGameState(width, height));
@@ -441,6 +505,49 @@ export default function GameCanvas({ width, height }: Props) {
       setEnemySlotTypes(types);
       setEnemySlotStatuses(statuses);
       setEnemySlotFrames(frames);
+
+      // Throwable slot state.
+      const tSlots = Array.from({ length: THROWABLE_SLOT_COUNT }, () => ({
+        type: null as 'frag' | 'smoke' | 'molotov' | null,
+        status: null as 'flying' | 'detonating' | null,
+        frame: 0,
+        targetX: 0,
+        targetY: 0,
+      }));
+      for (let i = 0; i < state.throwables.length; i++) {
+        const t = state.throwables[i];
+        if (!t) continue;
+        let frame = 0;
+        if (t.status === 'detonating') {
+          frame = getCurrentFrame(
+            { frameCount: FRAG_EXPLODE_FRAME_COUNT, frameDurationMs: FRAG_EXPLODE_FRAME_DURATION_MS, loop: false },
+            state.elapsedMs - t.detonationStartedAtMs,
+          );
+        }
+        tSlots[i] = { type: t.type, status: t.status, frame, targetX: t.targetX, targetY: t.targetY };
+      }
+      setThrowableSlotData(tSlots);
+
+      // Effect zone slot state.
+      const zSlots = Array.from({ length: EFFECT_ZONE_SLOT_COUNT }, () => ({
+        type: null as 'smoke' | 'molotov' | null,
+        x: 0,
+        y: 0,
+        frame: 0,
+      }));
+      for (let i = 0; i < state.effectZones.length; i++) {
+        const z = state.effectZones[i];
+        if (!z) continue;
+        let zFrame = 0;
+        if (z.type === 'molotov') {
+          zFrame = getCurrentFrame(
+            { frameCount: MOLOTOV_FIRE_FRAME_COUNT, frameDurationMs: MOLOTOV_FIRE_FRAME_DURATION_MS, loop: true },
+            state.elapsedMs - z.spawnedAtMs,
+          );
+        }
+        zSlots[i] = { type: z.type, x: z.x, y: z.y, frame: zFrame };
+      }
+      setZoneSlotData(zSlots);
     }, 100);
     return () => clearInterval(id);
   }, [gameState]);
@@ -687,6 +794,46 @@ export default function GameCanvas({ width, height }: Props) {
     pkTransform45, pkTransform46, pkTransform47, pkTransform48, pkTransform49,
   ];
 
+  // ─── Throwable slot arc positions (UI thread, no runOnJS) ────────────────
+  // 10 pre-allocated slots. Flying slots interpolate the arc each frame.
+  // Detonating/null slots return {x:-9999,y:-9999} — rendered off-screen.
+  const tPos0 = useThrowableSlotPos(gameState, 0);
+  const tPos1 = useThrowableSlotPos(gameState, 1);
+  const tPos2 = useThrowableSlotPos(gameState, 2);
+  const tPos3 = useThrowableSlotPos(gameState, 3);
+  const tPos4 = useThrowableSlotPos(gameState, 4);
+  const tPos5 = useThrowableSlotPos(gameState, 5);
+  const tPos6 = useThrowableSlotPos(gameState, 6);
+  const tPos7 = useThrowableSlotPos(gameState, 7);
+  const tPos8 = useThrowableSlotPos(gameState, 8);
+  const tPos9 = useThrowableSlotPos(gameState, 9);
+  const allThrowablePos = [tPos0, tPos1, tPos2, tPos3, tPos4, tPos5, tPos6, tPos7, tPos8, tPos9];
+
+  // ─── Throwable slot React state (100ms timer bridge) ─────────────────────
+  // type/status drive render mode (null = skip). frame drives explode sprite.
+  // targetX/Y used for detonating frags (position doesn't change post-landing).
+  const [throwableSlotData, setThrowableSlotData] = useState<Array<{
+    type: 'frag' | 'smoke' | 'molotov' | null;
+    status: 'flying' | 'detonating' | null;
+    frame: number;
+    targetX: number;
+    targetY: number;
+  }>>(() => Array.from({ length: THROWABLE_SLOT_COUNT }, () => ({
+    type: null, status: null, frame: 0, targetX: 0, targetY: 0,
+  })));
+
+  // ─── Effect zone slot React state (100ms timer bridge) ───────────────────
+  // type drives render mode (null = skip). x/y are static per zone lifetime.
+  // frame drives molotov flame animation.
+  const [zoneSlotData, setZoneSlotData] = useState<Array<{
+    type: 'smoke' | 'molotov' | null;
+    x: number;
+    y: number;
+    frame: number;
+  }>>(() => Array.from({ length: EFFECT_ZONE_SLOT_COUNT }, () => ({
+    type: null, x: 0, y: 0, frame: 0,
+  })));
+
   // ─── Debug weapon cycle button ─────────────────────────────────────────────
   // KNOWN BUG (tech debt): mutates weaponPose (animation) only — does NOT update
   // equippedWeaponId (combat stats). Cycling shows a different pose but fires with
@@ -699,6 +846,16 @@ export default function GameCanvas({ width, height }: Props) {
       ...gameState.value,
       player: { ...gameState.value.player, weaponPose: next },
     };
+  }, [gameState]);
+
+  // ─── Debug throwable spawn buttons ────────────────────────────────────────
+  // TEMPORARY — G5 TODO: remove these buttons when throwable skills are wired.
+  // Spawn target = 100px ahead of player in facing direction.
+  const spawnDebugThrowable = useCallback((type: 'frag' | 'smoke' | 'molotov') => {
+    const state = gameState.value;
+    const targetX = state.player.x + Math.cos(state.player.rotation) * 100;
+    const targetY = state.player.y + Math.sin(state.player.rotation) * 100;
+    gameState.value = spawnThrowable(state, type, targetX, targetY);
   }, [gameState]);
 
   // ─── Skill selection handler ───────────────────────────────────────────────
@@ -890,6 +1047,41 @@ export default function GameCanvas({ width, height }: Props) {
             tiles + enemies + HUD are all visible together. */}
         <Canvas style={StyleSheet.absoluteFill}>
 
+          {/* ── Effect zones (below pickups) ──────────────────────────────── */}
+          {/* Z-order: zones < pickups < projectiles < throwables < enemies.  */}
+          {/* Smoke: grey Skia Circle (Phase 6: no kit smoke sprite).         */}
+          {/* Molotov: looping Flamethrower sprite (7 frames × 120ms).        */}
+          {zoneSlotData.map((z, i) => {
+            if (!z.type) return null;
+            if (z.type === 'smoke') {
+              return (
+                <Circle
+                  key={`zone-${i}`}
+                  cx={z.x}
+                  cy={z.y}
+                  r={SMOKE_RADIUS_PX}
+                  color="rgba(160, 200, 160, 0.45)"
+                />
+              );
+            }
+            // Molotov — flame sprite
+            const flameImg = flameImages[z.frame] ?? null;
+            if (!flameImg) return null;
+            const fw = flameImg.width() * EFFECT_SPRITE_SCALE;
+            const fh = flameImg.height() * EFFECT_SPRITE_SCALE;
+            return (
+              <Image
+                key={`zone-${i}`}
+                image={flameImg}
+                x={z.x - fw / 2}
+                y={z.y - fh / 2}
+                width={fw}
+                height={fh}
+                sampling={{ filter: FilterMode.Nearest, mipmap: MipmapMode.None }}
+              />
+            );
+          })}
+
           {/* ── Pickups (below projectiles and enemies) ───────────────────── */}
           {/* Always render all 50 slots. Inactive slots sit at (-9999,-9999). */}
           {/* Z-order: pickups < projectiles < enemies < player < overlays.    */}
@@ -913,6 +1105,43 @@ export default function GameCanvas({ width, height }: Props) {
               <Circle cx={0} cy={0} r={4} color="#f5c842" />
             </Group>
           ))}
+
+          {/* ── Throwables (above projectiles, below enemies) ─────────────── */}
+          {/* Flying: colored circle following arc (useDerivedValue per slot). */}
+          {/* Detonating (frag): Explode sprite at static targetX/Y.           */}
+          {throwableSlotData.map((t, i) => {
+            if (!t.type) return null;
+
+            if (t.status === 'flying') {
+              const pos = allThrowablePos[i]!;
+              const color = THROWABLE_COLORS[t.type];
+              return (
+                <Group key={`throw-${i}`} transform={[{ translateX: pos.value.x }, { translateY: pos.value.y }]}>
+                  <Circle cx={0} cy={0} r={5} color={color} />
+                </Group>
+              );
+            }
+
+            if (t.status === 'detonating') {
+              const expImg = explodeImages[t.frame] ?? null;
+              if (!expImg) return null;
+              const ew = expImg.width() * EFFECT_SPRITE_SCALE;
+              const eh = expImg.height() * EFFECT_SPRITE_SCALE;
+              return (
+                <Image
+                  key={`throw-${i}`}
+                  image={expImg}
+                  x={t.targetX - ew / 2}
+                  y={t.targetY - eh / 2}
+                  width={ew}
+                  height={eh}
+                  sampling={{ filter: FilterMode.Nearest, mipmap: MipmapMode.None }}
+                />
+              );
+            }
+
+            return null;
+          })}
 
           {/* ── Enemies (below player) ────────────────────────────────────── */}
           {/* transform = per-slot useDerivedValue (UI thread, no runOnJS).   */}
@@ -1020,6 +1249,20 @@ export default function GameCanvas({ width, height }: Props) {
           </Text>
           <Text style={[styles.debugText, styles.tapHint]}>tap to cycle</Text>
         </Pressable>
+
+        {/* Debug throwable spawn buttons — TEMPORARY, G5 TODO: remove.
+            Spawn target = 100px in front of player facing direction.         */}
+        <View style={[styles.debugOverlay, { top: 110, left: 10 }]} pointerEvents="box-none">
+          <Pressable onPress={() => spawnDebugThrowable('frag')}>
+            <Text style={[styles.debugText, { color: THROWABLE_COLORS.frag }]}>▶ FRAG</Text>
+          </Pressable>
+          <Pressable onPress={() => spawnDebugThrowable('smoke')}>
+            <Text style={[styles.debugText, { color: THROWABLE_COLORS.smoke }]}>▶ SMOKE</Text>
+          </Pressable>
+          <Pressable onPress={() => spawnDebugThrowable('molotov')}>
+            <Text style={[styles.debugText, { color: THROWABLE_COLORS.molotov }]}>▶ MOLOTOV</Text>
+          </Pressable>
+        </View>
 
         {/* Debug overlay — top-right. */}
         {/* TODO Phase 7: replace hardcoded insets with real safe-area values. */}
