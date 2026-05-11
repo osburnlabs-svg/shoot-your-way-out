@@ -29,7 +29,7 @@ Status legend:
 | 3 — Enemies + auto-fire | 🟢 Complete | 2026-05-10 | G1: c47e000 G2: 083d28d G3: 5715c19 G4b: 738ab95 G4c: a095517 | G1 ✅ G2 ✅ G3 ✅ G4b ✅ G4c ✅ | |
 | 4a — Stat skills + level-up | 🟢 Complete | 2026-05-10 | G1: c4daad8 G2: a095517 G3: f297b4b G3-polish: 461b25b→d90aedf→ba505fc G4: ee7f7d5 G4-cleanup: 5690324 | G1 ✅ G2 ✅ G3 ✅ G4 ✅ | Full progression loop closed. G4: weapon unlocks L4/8/12/16 + all 8 weapon renames |
 | 4b — Ability skills + crates | 🟢 Complete | 2026-05-10 | G1: 5411988 Slot-fix: 8ff2533 G2: 18b44e3 G3: e2a1deb G4: 8c31b42 G4-polish: 9cb7762 G5: b4091c6 Smoke: 2438bb4 | G1 ✅ G2 ✅ G3 ✅ G4 ✅ G5 ✅ | All 20 v1 skills shipped; throwable system; revive; bloom-hold-dissipate smoke animation |
-| 4c — Crate weapons | 🟡 In Progress | 2026-05-11 | G1: 75dc967 Fix1: 68f5ef3 Fix2: 266fbd6 G2: d6f1c1c G3: 8c390b3 | G1 ✅ G2 ✅ G3 (untested) | Crate entity + world spawn; weapon roll table + reveal modal; 3 crate weapons active (shotgun, rocket launcher, flamethrower) |
+| 4c — Crate weapons | 🟢 Complete | 2026-05-11 | G1: 75dc967 Fix: 68f5ef3 266fbd6 G2: d6f1c1c G3: 8c390b3 Polish: cd2d2d8 5a29a3e 2daeffd a0b7e61 4eca404 Close: cb8bddb | G1 ✅ G2 ✅ G3 ✅ | World-spawn crates; weapon roll + reveal modal; Shotgun/Rocket Launcher/Flamethrower active; custom weapon icons; debug scaffold cleaned up |
 | 5 — Maps + obstacles + vehicle enemies | ⚪ | | | | |
 | 6 — Audio + atmospheric effects | ⚪ | | | | |
 | 7 — UI + persistence + analytics | ⚪ | | | | |
@@ -52,7 +52,10 @@ Status legend:
 | **Kit UI fit vs. custom UI — reinforced by Phase 4b evidence** — ReviveModal (Phase 4b G3) was built as a custom `<View>` layout because the kit's Mission Failed screen is not composable for a mid-run decision prompt. This is the second case after Phase 4a G3 (BG.png baked-in icons) where kit UI did not fit. | Phase 4a G3 polish (updated Phase 4b G3) | Custom layouts with kit color palette | Phase 7 — with full UI visible as a system, make the strategic call: continue kit-first UI or switch to custom pixel UI throughout. Growing evidence favors custom. |
 | **Projectiles and pickups predate the fixed-slot nullable-array pattern** — they use an always-render slot approach for Skia transforms but their underlying data management predates the formal `Array<T \| null>` pattern established in Phase 3 G3 (enemies) and Phase 4b G4 (throwables/zones). May have subtle inconsistencies in slot lifecycle. | Phase 4b G4 (identified during pattern audit) | No user-visible impact; entity counts are bounded and FPS is stable | Post-launch template pass — Phase 5 vehicle enemies don't require this fix; schedule for the template cleanup pass after v1 ships |
 | **Rocket exhaust trail frames not wired** — TDS kit ships 3 exhaust-trail frames (`rocket-f1/f2/f3.png`) alongside the 2 body frames. Only the body animation (1–2 frame loop at 100ms) is wired in Phase 4c G3. Exhaust trail compositing skipped for v1. | Phase 4c G3 | 2-frame body loop is readable at game scale; exhaust trail is visual polish | Phase 6 — atmospheric effects pass is the natural home for exhaust trail; schedule with muzzle flash and smoke compositing |
-| **CrateRevealModal weapon icons are kit placeholder silhouettes** — three shared silhouette PNGs (`SMG_HUD.png`, `MG_HUD.png`, `Pistol_HUD.png`) cover all 6 crate weapons with no 1-to-1 correspondence. aks74u and ak74 share SMG icon; svd and rpo share MG icon; m870 and gp25 share Pistol icon. | Phase 4c G2 | Accepted for v1; icons are recognizable shapes even if not weapon-accurate | Phase 7 — custom weapon silhouette sprites sourced and wired per weapon |
+| **Weapon selector / inventory not yet implemented** — player currently has one active weapon at a time; EQUIP simply swaps it. Must-have for v1. Design: `weaponInventory: WeaponId[]` on `PlayerState` (starts `['pistol']`), EQUIP appends if not already present and sets active, HUD shows inventory as tappable icon strip. Duplicate EQUIP: switch active only, no second copy added, no score/XP given. SCRAP unchanged (+50 score +25 XP). No carry cap, no drop modal, no quick-select wheel — just tap-to-swap. | Phase 4c close | Active weapon swap works; inventory strip not built | Phase 7 — implement alongside HUD rewrite |
+| **Auto-weapon-upgrade alternative design** — current design leaves Pistol as the starter with crates as the sole weapon source. If unlucky-crate-run feels punishing on player testing, a future option is a player-choice modal at L4/L8/L16 ("new weapon available — equip or keep current?"). No fix planned; logged for design awareness. | Phase 4c (dropped 2daeffd) | Crates are sole source — player starts on Pistol | Design review after Phase 5 playtesting |
+| **Muzzle flashes + bullet origin correction** — kit ships muzzle flash frames for every weapon archetype in `Effects/` (Pistol Shot/, Rifle Shot/, MachineGun Shot/, Grenade Launcher Shot/). Not wired. Adding them also requires fixing bullet spawn origin: currently player center, not gun barrel tip. Bundle both fixes into a single Phase 6 polish commit. | Phase 4c (identified during G3 review) | Bullets emanate from player center; no muzzle flash | Phase 6 — atmospheric effects + polish pass |
+| **Pistol and SMG weapon icons at 64×64 vs others at 80×80** — the custom weapon sprite batch shipped with Pistol.png and SMG.png at 64×64, the other five at 80×80. Causes slight size mismatch in the crate modal icon. Low priority. | Phase 4c weapon sprite swap (a0b7e61) | `resizeMode="contain"` handles it acceptably | Future sprite work — re-source at 80×80 or accept variance |
 
 ---
 
@@ -768,9 +771,9 @@ All 20 skill icons replaced with custom AI-generated 64×64 PNGs sourced via Cha
 
 **Goal:** Crate entities spawn in the world, player can walk into them for a weapon roll, and all three crate-only weapons (Shotgun, Rocket Launcher, Flamethrower) fire and feel distinct.
 
-**Status:** In Progress 🟡 — G3 committed, device test pending
+**Status:** 🟢 Complete
 
-**Commits:** G1: 75dc967 | Fix1: 68f5ef3 | Fix2: 266fbd6 | G2: d6f1c1c | G3: 8c390b3
+**Commits:** G1: 75dc967 | Fix: 68f5ef3 266fbd6 | G2: d6f1c1c | G3: 8c390b3 | Polish: cd2d2d8 5a29a3e 2daeffd a0b7e61 4eca404 | Close: cb8bddb
 
 ---
 
@@ -852,8 +855,65 @@ Three weapons that previously existed only as stubs in `weapons.ts` are now full
 - **`spawnEffectZoneAt` extracted vs. inline zone mutation.** The flamethrower fires 3 zones in a single tick (all from the fire block, not the collision loop). Extracting the worklet allowed chaining: each call returns a new state slice that the next call reads — no raw array mutation inside a worklet.
 - **Flamethrower renders kit flame art.** The molotov fire zone and the flamethrower cone zone use the same `'flame'` type and the same 7-frame animation. This is intentional — same fire, different delivery mechanic. Phase 6 can differentiate if needed.
 - **rpo cooldownMs 50 → 250ms.** At 50ms (same as the machine gun), the flamethrower was firing 20 zone-triples per second, saturating the zone slot pool in one trigger hold. 250ms gives 4 fires/sec — still responsive, zone pool stays healthy.
+- **World-spawned crates (time-based, not enemy-tied).** Tarkov-flavored loot identity: weapons are found in the world, not dropped by enemies. Vampiric-drop systems reward kill streaks; world-spawn crates reward map awareness and positioning.
+- **3-slot crate array exactly matches the active cap.** Unlike other entity types (projectiles, throwables, zones, pickups) which over-allocate slots beyond the realistic active count, the crate array is sized exactly to `CRATE_MAX_ACTIVE = 3`. Crates are long-lived (12s spawn interval, no expiry), so the realistic maximum equals the cap.
+- **Auto-weapon-upgrade at L4/L8/L16 scrapped mid-phase.** The mechanic was implemented in Phase 4a G4 and removed in Phase 4c (2daeffd). It was a Base44 holdover — guaranteed progression unlocks fit a linear action game, not a Tarkov-style loot-driven game. Removing it while Phase 4c was still in progress kept the design coherent: crates are now the sole weapon source, and every weapon found is a player choice.
+- **Custom AI-sourced sprites for all 7 weapons.** Closes the kit silhouette duplicate-icon tech debt from Phase 4c G2. Pistol added to `weaponHudIcons` for completeness (was missing from the original 6-weapon registration).
+- **Crate visual uses kit Army_Box.png.** Already imported as `PickupSprites.crate` (no new sourcing required). The military crate aesthetic matches the Tarkov-flavored identity.
 
 ---
+
+## Phase 4c — Post-G3 polish + tuning
+
+**Status:** 🟢 Complete
+**Commits:** cd2d2d8 | 5a29a3e | 2daeffd | a0b7e61 | 4eca404 | cb8bddb
+**Verification:** On device. All six commits shipped and tested together as a polish pass after G3 verification.
+
+### Flamethrower: directional jet sprite + cone direction fix (cd2d2d8)
+
+Device testing found two bugs: zones rendered at a fixed downward angle regardless of aim direction, and the visual read as a static fire blob rather than a jet.
+
+**Root cause:** `EffectZoneState` had no `rotation` field. Zone positions were correct (spawning in the right cone direction), but the sprite had no per-zone rotation — it always faced kit-default (downward). The `Effects/Flamethrower/1-7.png` frames are directional jet sprites (thin elongated blue ignition spark → orange teardrop flame), confirmed by direct image inspection. The Molotov zone uses `explodeImages[2]` (static Explode frame 3 peak-bloom) — not the flame frames — so no Molotov regression.
+
+**Fix:** Added `rotation: number` to `EffectZoneState` (required, `0` for all non-directional types). `spawnEffectZoneAt` accepts an optional `rotation` param (default 0). The `rpo` fire block in `combatEngine` passes each zone's exact cone angle as its rotation. The `'flame'` zone renderer wraps sprites in a `<Group transform={[translateX, translateY, rotate: rotation + SPRITE_ROTATION_OFFSET]}>`. DoT tick update objects in `throwableEngine` propagate `rotation: zone.rotation`.
+
+### Flamethrower damage tuning (5a29a3e)
+
+`FLAMETHROWER_ZONE_DAMAGE_PER_SEC`: 3 → 35. Three zones simultaneously at point-blank delivers ~105 effective DPS — enough to melt a Raider (40 HP) in under half a second. Justified by the Legendary tier and very short range.
+
+### Drop auto-weapon-upgrade at L4/L8/L16 (2daeffd)
+
+`WEAPON_UNLOCK_MAP` constant and its call-site lines removed from `GameCanvas.tsx`. The guaranteed upgrade mechanic was a Base44 holdover inconsistent with the Tarkov identity. Player starts on Pistol and stays there until they choose to equip from a crate. All weapon profiles remain intact in `weapons.ts`.
+
+### Weapon sprite swap: 7 custom AI-sourced weapon HUD icons (a0b7e61)
+
+All 7 weapon HUD icons replaced with custom AI-sourced PNGs (64×64 for Pistol and SMG; 80×80 for the remaining five). `pistol` entry added to `GuiSprites.weaponHudIcons` (was missing). Kit silhouette placeholders (`SMG_HUD.png`, `MG_HUD.png`, `Pistol_HUD.png`) removed from `weaponHudIcons`. **Closes CrateRevealModal weapon icon tech debt from Phase 4c G2.**
+
+### Flamethrower range tuning + crate modal icon (4eca404)
+
+- `FLAMETHROWER_SPAWN_DISTANCE_PX`: 50 → 75 px
+- `FLAMETHROWER_ZONE_RADIUS_PX`: 25 → 35 px
+- `CrateRevealModal` weapon icon: 80×80 → 120×120 with `marginBottom: 4`
+
+### Debug scaffold cleanup (cb8bddb)
+
+Removed `handleSpawnCrate` callback, its JSX button, and three now-unused imports (`CRATE_SLOT_COUNT`, `CRATE_MAX_ACTIVE`, `CRATE_SPAWN_MARGIN_PX`). Remaining debug scaffolding (weapon cycle button, overlay TODO comments) stays until Phase 7 HUD pass.
+
+---
+
+## Phase 4c — Final summary
+
+The world-spawn crate system enables the player to find weapons throughout a run, with a tier-weighted roll and EQUIP/SCRAP choice on each reveal. Three crate-only weapons bring distinct combat archetypes: Shotgun (5-pellet spread — best clearing tightly packed groups), Rocket Launcher (AOE detonation with kit rocket sprite — clears clusters at medium range), and Flamethrower (directional DoT cone with rotation-correct jet sprite — close-range king at 105 DPS). Combined with the removal of auto-upgrade at L4/L8/L16, the weapon progression is now entirely player-driven through loot — you use what you find. Phase 4 is closed; Phase 5 (maps + vehicle enemies + ranged enemy fire + sniper turrets) is next.
+
+---
+
+## Phase 4 — Close
+
+Phase 4 transformed the engine from a static survival loop (Phase 3) into a fully realized roguelite-progression-with-Tarkov-loot hybrid. The complete feature set shipped across 4a/4b/4c: 20 skills across 5 categories with random level-up draws; a revive system with free-charge and ad-backed paths; a multi-phase throwable system with arc flight, detonation, and directional zone effects; a world-spawn crate drop system with tier rolls, EQUIP/SCRAP choice, and 7 weapons each with distinct combat archetypes; and custom AI-sourced art across the entire skill and weapon icon set. The engine is now the intended game — progression, risk/reward, and loot-driven identity are all in place. Phase 5 adds the world.
+
+---
+
+## Phase 5 — Maps + obstacles + vehicle enemies
 
 **Goal:** Three hand-authored maps (Compound, Outskirts, Treeline) with tile rendering, map select screen, obstacle placement and collision, all 8 enemy types working including Humvee/BTR/Panzer/ACS vehicle enemies.
 
