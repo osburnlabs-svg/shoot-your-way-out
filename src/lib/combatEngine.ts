@@ -33,6 +33,7 @@ import { WEAPON_PROFILES } from '../data/weapons';
 import { ENEMY_PROFILES } from '../data/enemies';
 import { getEffectiveStats } from '../data/skills';
 import { audioEngine } from './audioEngine';
+import { applyAOEDamage, spawnEffectZoneAt } from './throwableEngine';
 import {
   ENEMY_COLLISION_RADIUS_PX,
   PROJECTILE_COLLISION_RADIUS_PX,
@@ -41,6 +42,12 @@ import {
   PLAYER_COLLISION_RADIUS_PX,
   CONTACT_DAMAGE_INTERVAL_MS,
   HIT_FLASH_DURATION_MS,
+  SHOTGUN_PELLET_COUNT,
+  SHOTGUN_SPREAD_DEG,
+  FLAMETHROWER_CONE_DEG,
+  FLAMETHROWER_ZONE_COUNT,
+  FLAMETHROWER_SPAWN_DISTANCE_PX,
+  ROCKET_AOE_RADIUS_PX,
 } from '../data/gameConstants';
 
 /** Combined projectile-enemy collision radius squared — computed once, used in hot loop. */
@@ -86,6 +93,8 @@ export function tickCombat(state: GameState, dtMs: number): GameState {
   let nextProjectileId = state.nextProjectileId;
   let nextPickupId = state.nextPickupId;
   let killCount = state.killCount;
+  let effectZones = state.effectZones;
+  let nextEffectZoneId = state.nextEffectZoneId;
 
   // Pickup array — carry existing pickups forward; deaths add to it below.
   const newPickups: PickupState[] = [];
@@ -125,20 +134,79 @@ export function tickCombat(state: GameState, dtMs: number): GameState {
     const ny = dy / dist;
     const spd = weapon.projectileSpeedPxPerSec;
 
-    newProjectiles.push({
-      id: nextProjectileId,
-      x: player.x,
-      y: player.y,
-      vxPxPerSec: nx * spd,
-      vyPxPerSec: ny * spd,
-      speedPxPerSec: spd,
-      distanceTraveledPx: 0,
-      maxRangePx: effective.rangePx,
-      damage: effective.damage,
-      pierceRemaining: effective.pierce,
-      hitEnemyIds: [],
-    });
-    nextProjectileId += 1;
+    if (weapon.id === 'm870') {
+      // Shotgun: SHOTGUN_PELLET_COUNT pellets spread over SHOTGUN_SPREAD_DEG arc.
+      const spreadRad = (SHOTGUN_SPREAD_DEG * Math.PI) / 180;
+      const baseAngle = Math.atan2(ny, nx);
+      for (let pi = 0; pi < SHOTGUN_PELLET_COUNT; pi++) {
+        const offset = (pi / (SHOTGUN_PELLET_COUNT - 1) - 0.5) * spreadRad;
+        const angle = baseAngle + offset;
+        newProjectiles.push({
+          id: nextProjectileId,
+          x: player.x,
+          y: player.y,
+          vxPxPerSec: Math.cos(angle) * spd,
+          vyPxPerSec: Math.sin(angle) * spd,
+          speedPxPerSec: spd,
+          distanceTraveledPx: 0,
+          maxRangePx: effective.rangePx,
+          damage: effective.damage,
+          pierceRemaining: effective.pierce,
+          hitEnemyIds: [],
+          isRocket: false,
+        });
+        nextProjectileId += 1;
+      }
+    } else if (weapon.id === 'gp25') {
+      // Rocket Launcher: single rocket projectile — AOE applied on impact in collision loop.
+      newProjectiles.push({
+        id: nextProjectileId,
+        x: player.x,
+        y: player.y,
+        vxPxPerSec: nx * spd,
+        vyPxPerSec: ny * spd,
+        speedPxPerSec: spd,
+        distanceTraveledPx: 0,
+        maxRangePx: effective.rangePx,
+        damage: effective.damage,
+        pierceRemaining: effective.pierce,
+        hitEnemyIds: [],
+        isRocket: true,
+      });
+      nextProjectileId += 1;
+    } else if (weapon.id === 'rpo') {
+      // Flamethrower: FLAMETHROWER_ZONE_COUNT flame zones in a cone, no projectile.
+      const coneRad = (FLAMETHROWER_CONE_DEG * Math.PI) / 180;
+      const baseAngle = Math.atan2(ny, nx);
+      let tmpState = { ...state, effectZones, nextEffectZoneId };
+      for (let zi = 0; zi < FLAMETHROWER_ZONE_COUNT; zi++) {
+        const offset = (zi / (FLAMETHROWER_ZONE_COUNT - 1) - 0.5) * coneRad;
+        const angle = baseAngle + offset;
+        const zx = player.x + Math.cos(angle) * FLAMETHROWER_SPAWN_DISTANCE_PX;
+        const zy = player.y + Math.sin(angle) * FLAMETHROWER_SPAWN_DISTANCE_PX;
+        tmpState = spawnEffectZoneAt(tmpState, 'flame', zx, zy);
+      }
+      effectZones = tmpState.effectZones;
+      nextEffectZoneId = tmpState.nextEffectZoneId;
+    } else {
+      // Default: single projectile (pistol, SMG, assault rifle, sniper).
+      newProjectiles.push({
+        id: nextProjectileId,
+        x: player.x,
+        y: player.y,
+        vxPxPerSec: nx * spd,
+        vyPxPerSec: ny * spd,
+        speedPxPerSec: spd,
+        distanceTraveledPx: 0,
+        maxRangePx: effective.rangePx,
+        damage: effective.damage,
+        pierceRemaining: effective.pierce,
+        hitEnemyIds: [],
+        isRocket: false,
+      });
+      nextProjectileId += 1;
+    }
+
     weaponCooldownMs = effective.cooldownMs;
     audioEngine.playSFX('shoot_pistol');
   }
@@ -161,6 +229,7 @@ export function tickCombat(state: GameState, dtMs: number): GameState {
       damage: p.damage,
       pierceRemaining: p.pierceRemaining,
       hitEnemyIds: p.hitEnemyIds,
+      isRocket: p.isRocket,
     });
   }
 
@@ -177,7 +246,10 @@ export function tickCombat(state: GameState, dtMs: number): GameState {
   // Each projectile tracks its own pierceRemaining and hitEnemyIds.
   // A projectile is consumed when pierceRemaining drops below 0.
   // hitEnemyIds prevents re-hitting the same enemy across multiple ticks of travel.
+  // Rockets bypass damageAccum — their position is recorded in rocketImpacts and
+  // AOE is applied in a post-loop pass after the die-animation cleanup.
   const finalProjectiles: ProjectileState[] = [];
+  const rocketImpacts: { x: number; y: number; damage: number }[] = [];
 
   for (let pi = 0; pi < movedProjectiles.length; pi++) {
     const proj = movedProjectiles[pi];
@@ -187,6 +259,8 @@ export function tickCombat(state: GameState, dtMs: number): GameState {
     for (let k = 0; k < proj.hitEnemyIds.length; k++) {
       hitEnemyIds.push(proj.hitEnemyIds[k]);
     }
+
+    let rocketDetonated = false;
 
     for (let ei = 0; ei < enemies.length; ei++) {
       const enemy = enemies[ei];
@@ -202,6 +276,13 @@ export function tickCombat(state: GameState, dtMs: number): GameState {
       const dx = proj.x - enemy.x;
       const dy = proj.y - enemy.y;
       if (dx * dx + dy * dy < PROJ_ENEMY_COLLISION_R_SQ) {
+        if (proj.isRocket) {
+          // Rocket: record impact position for AOE pass — skip damageAccum.
+          rocketImpacts.push({ x: proj.x, y: proj.y, damage: proj.damage });
+          rocketDetonated = true;
+          break; // rocket always consumed on first contact
+        }
+
         // Base damage for this hit — apply conditional skill multipliers before accumulating.
         let hitDamage = proj.damage;
 
@@ -227,6 +308,8 @@ export function tickCombat(state: GameState, dtMs: number): GameState {
       }
     }
 
+    if (rocketDetonated) continue; // detonated rockets are consumed — do not keep
+
     // Keep projectile if it still has pierce capacity (pierceRemaining >= 0).
     if (pierceRemaining >= 0) {
       finalProjectiles.push({
@@ -241,6 +324,7 @@ export function tickCombat(state: GameState, dtMs: number): GameState {
         damage: proj.damage,
         pierceRemaining,
         hitEnemyIds,
+        isRocket: proj.isRocket,
       });
     }
   }
@@ -311,6 +395,32 @@ export function tickCombat(state: GameState, dtMs: number): GameState {
     survivingEnemies.push(enemy);
   }
 
+  // ─── 7b. Rocket AOE ───────────────────────────────────────────────────────
+  // Process rocket impacts recorded in the collision loop.
+  // AOE damage is applied after regular die-animation cleanup so we don't re-kill
+  // enemies that were already transitioned to dying by direct bullet hits this tick.
+  let postRocketEnemies: Array<EnemyState | null> = survivingEnemies;
+  let finalPickups: PickupState[] = newPickups;
+
+  for (let ri = 0; ri < rocketImpacts.length; ri++) {
+    const impact = rocketImpacts[ri];
+    const aoeResult = applyAOEDamage(
+      postRocketEnemies, finalPickups, nextPickupId, killCount,
+      impact.x, impact.y, ROCKET_AOE_RADIUS_PX, impact.damage, elapsedMs,
+    );
+    postRocketEnemies = aoeResult.enemies;
+    finalPickups = aoeResult.pickups;
+    nextPickupId = aoeResult.nextPickupId;
+    killCount = aoeResult.killCount;
+    const tmpState = spawnEffectZoneAt(
+      { ...state, effectZones, nextEffectZoneId },
+      'explosion', impact.x, impact.y,
+    );
+    effectZones = tmpState.effectZones;
+    nextEffectZoneId = tmpState.nextEffectZoneId;
+    audioEngine.playSFX('impact_flesh');
+  }
+
   // ─── 8. Contact damage ────────────────────────────────────────────────────
   // For each alive enemy overlapping the player, apply contactDamage once per
   // CONTACT_DAMAGE_INTERVAL_MS. Each enemy has its own independent cooldown
@@ -324,8 +434,8 @@ export function tickCombat(state: GameState, dtMs: number): GameState {
   const contactCheckedEnemies: Array<EnemyState | null> = [];
   const isInvulnerable = elapsedMs < player.invulnerableUntilMs;
 
-  for (let i = 0; i < survivingEnemies.length; i++) {
-    const enemy = survivingEnemies[i];
+  for (let i = 0; i < postRocketEnemies.length; i++) {
+    const enemy = postRocketEnemies[i];
 
     if (!enemy) {
       contactCheckedEnemies.push(null);
@@ -397,7 +507,9 @@ export function tickCombat(state: GameState, dtMs: number): GameState {
     projectiles: finalProjectiles,
     nextProjectileId,
     killCount,
-    pickups: newPickups,
+    pickups: finalPickups,
     nextPickupId,
+    effectZones,
+    nextEffectZoneId,
   };
 }

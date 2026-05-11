@@ -50,6 +50,9 @@ import {
   MOLOTOV_RADIUS_PX,
   MOLOTOV_DAMAGE_PER_SEC,
   MOLOTOV_TICK_INTERVAL_MS,
+  FLAMETHROWER_ZONE_DURATION_MS,
+  FLAMETHROWER_ZONE_RADIUS_PX,
+  FLAMETHROWER_ZONE_DAMAGE_PER_SEC,
   ENEMY_COLLISION_RADIUS_PX,
   THROWABLE_TARGET_RANGE_PX,
 } from '../data/gameConstants';
@@ -61,8 +64,9 @@ import type { PickupState } from './gameEngine';
  * Apply AOE damage to all alive enemies within radiusPx of (centerX, centerY).
  * Killed enemies transition to 'dying' and spawn a pickup at their position.
  * Returns updated [enemies, pickups, nextPickupId, killCount].
+ * Exported so combatEngine can call it for rocket detonations.
  */
-function applyAOEDamage(
+export function applyAOEDamage(
   enemies: GameState['enemies'],
   pickups: PickupState[],
   nextPickupId: number,
@@ -151,6 +155,43 @@ function applyAOEDamage(
 }
 
 // ─── Exports ──────────────────────────────────────────────────────────────────
+
+/**
+ * Spawn an effect zone of the given type at an absolute canvas position.
+ * Finds the first free slot in effectZones. Silently drops if all slots are full.
+ * Callable from both combatEngine (rocket impact / flamethrower fire) and throwableEngine.
+ */
+export function spawnEffectZoneAt(
+  state: GameState,
+  type: 'flame' | 'explosion',
+  x: number,
+  y: number,
+): GameState {
+  'worklet';
+
+  let freeSlot = -1;
+  const newZones: Array<EffectZoneState | null> = [];
+  for (let zi = 0; zi < state.effectZones.length; zi++) { newZones.push(state.effectZones[zi]); }
+  for (let zi = 0; zi < newZones.length; zi++) {
+    if (newZones[zi] === null) { freeSlot = zi; break; }
+  }
+  if (freeSlot === -1) return state; // no free slot — drop silently
+
+  newZones[freeSlot] = {
+    id: state.nextEffectZoneId,
+    type,
+    x,
+    y,
+    spawnedAtMs: state.elapsedMs,
+    lastTickAppliedMs: 0,
+  };
+
+  return {
+    ...state,
+    effectZones: newZones,
+    nextEffectZoneId: state.nextEffectZoneId + 1,
+  };
+}
 
 /**
  * Spawn a throwable in the first free slot.
@@ -333,7 +374,17 @@ export function tickEffectZones(state: GameState, _dtMs: number): GameState {
     const zone = newZones[i];
     if (zone === null) continue;
 
-    const duration = zone.type === 'smoke' ? SMOKE_DURATION_MS : MOLOTOV_DURATION_MS;
+    let duration: number;
+    if (zone.type === 'smoke') {
+      duration = SMOKE_DURATION_MS;
+    } else if (zone.type === 'flame') {
+      duration = FLAMETHROWER_ZONE_DURATION_MS;
+    } else if (zone.type === 'explosion') {
+      duration = FRAG_EXPLODE_FRAME_COUNT * FRAG_EXPLODE_FRAME_DURATION_MS;
+    } else {
+      duration = MOLOTOV_DURATION_MS;
+    }
+
     if (elapsedMs - zone.spawnedAtMs >= duration) {
       newZones[i] = null;
       anyChange = true;
@@ -363,7 +414,31 @@ export function tickEffectZones(state: GameState, _dtMs: number): GameState {
         };
         anyChange = true;
       }
+    } else if (zone.type === 'flame') {
+      const timeSinceLastTick = elapsedMs - zone.lastTickAppliedMs;
+      if (timeSinceLastTick >= MOLOTOV_TICK_INTERVAL_MS) {
+        const tickDamage = FLAMETHROWER_ZONE_DAMAGE_PER_SEC * (MOLOTOV_TICK_INTERVAL_MS / 1000);
+        const result = applyAOEDamage(
+          enemies, pickups, nextPickupId, killCount,
+          zone.x, zone.y, FLAMETHROWER_ZONE_RADIUS_PX, tickDamage, elapsedMs,
+        );
+        enemies = result.enemies;
+        pickups = result.pickups;
+        nextPickupId = result.nextPickupId;
+        killCount = result.killCount;
+
+        newZones[i] = {
+          id: zone.id,
+          type: zone.type,
+          x: zone.x,
+          y: zone.y,
+          spawnedAtMs: zone.spawnedAtMs,
+          lastTickAppliedMs: elapsedMs,
+        };
+        anyChange = true;
+      }
     }
+    // 'smoke' and 'explosion' are passive — no per-tick action needed.
   }
 
   if (!anyChange) return state;

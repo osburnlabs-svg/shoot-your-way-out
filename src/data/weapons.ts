@@ -126,7 +126,7 @@ export const WEAPON_PROFILES: Record<string, WeaponProfile> = {
     animationPose: 'flamethrower',
     // Per-tick damage; continuous stream handled by Phase 4b combatEngine extension.
     damage: 6,
-    cooldownMs: 50,
+    cooldownMs: 250,
     rangePx: 110,
     projectileSpeedPxPerSec: 200,
   },

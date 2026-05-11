@@ -234,10 +234,10 @@ export const THROWABLE_TARGET_RANGE_PX = 250;
 export const THROWABLE_SLOT_COUNT = 10;
 
 /**
- * Fixed pre-allocated slot count for effect zone entities (smoke, molotov fire).
- * 6 = 2× of each type maximum in flight simultaneously.
+ * Fixed pre-allocated slot count for effect zone entities.
+ * 20 = headroom for flamethrower (3 zones/fire × rapid fire) + molotov + smoke + rocket explosions.
  */
-export const EFFECT_ZONE_SLOT_COUNT = 6;
+export const EFFECT_ZONE_SLOT_COUNT = 20;
 
 /** Time (ms) for a throwable to travel from the player to its target. */
 export const THROWABLE_TRAVEL_TIME_MS = 400;
@@ -311,6 +311,45 @@ export const MOLOTOV_FIRE_FRAME_DURATION_MS = 120;
  * 2× matches hero/enemy/pickup scale.
  */
 export const EFFECT_SPRITE_SCALE = 2;
+
+// ─── Shotgun ──────────────────────────────────────────────────────────────────
+
+/** Number of pellets per shotgun shot. */
+export const SHOTGUN_PELLET_COUNT = 5;
+
+/** Total spread arc of the pellet fan in degrees. */
+export const SHOTGUN_SPREAD_DEG = 30;
+
+// ─── Flamethrower weapon zones ────────────────────────────────────────────────
+
+/** Spread arc of the flamethrower cone in degrees. */
+export const FLAMETHROWER_CONE_DEG = 45;
+
+/** Number of flame zones spawned per trigger pull. */
+export const FLAMETHROWER_ZONE_COUNT = 3;
+
+/** Radius (px) of each individual flame zone. */
+export const FLAMETHROWER_ZONE_RADIUS_PX = 25;
+
+/** Duration (ms) each flame zone persists before despawning. */
+export const FLAMETHROWER_ZONE_DURATION_MS = 500;
+
+/** DoT damage per second to enemies inside a flame zone. */
+export const FLAMETHROWER_ZONE_DAMAGE_PER_SEC = 3;
+
+/** Distance (px) from player center at which flame zones spawn along the cone. */
+export const FLAMETHROWER_SPAWN_DISTANCE_PX = 50;
+
+// ─── Rocket launcher ──────────────────────────────────────────────────────────
+
+/** Blast radius (px) for rocket AOE detonation. Larger than FRAG_RADIUS_PX (40px). */
+export const ROCKET_AOE_RADIUS_PX = 60;
+
+/** Number of frames in the rocket body sprite animation (effects/rocket/1–2.png). */
+export const ROCKET_FRAME_COUNT = 2;
+
+/** Duration per rocket frame (ms). 2 × 100ms = 200ms cycle. */
+export const ROCKET_FRAME_DURATION_MS = 100;
 
 // ─── Crates ──────────────────────────────────────────────────────────────────
 

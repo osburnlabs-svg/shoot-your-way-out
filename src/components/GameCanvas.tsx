@@ -110,6 +110,11 @@ import {
   SMOKE_ANIM_FRAME_COUNT,
   SMOKE_BLOOM_DURATION_MS,
   SMOKE_DISSIPATE_DURATION_MS,
+  MOLOTOV_FIRE_FRAME_COUNT,
+  MOLOTOV_FIRE_FRAME_DURATION_MS,
+  PROJECTILE_SLOT_COUNT,
+  ROCKET_FRAME_COUNT,
+  ROCKET_FRAME_DURATION_MS,
 } from '../data/gameConstants';
 import type { CrateTier } from '../data/gameConstants';
 import type { EnemyType } from '../data/enemies';
@@ -187,8 +192,12 @@ function useEnemySlotTransform(gameState: SharedValue<GameState>, slotIndex: num
 function useProjectileSlotTransform(gameState: SharedValue<GameState>, slotIndex: number) {
   return useDerivedValue(() => {
     const proj = gameState.value.projectiles[slotIndex];
-    if (!proj) return [{ translateX: -9999 }, { translateY: -9999 }];
-    return [{ translateX: proj.x }, { translateY: proj.y }];
+    if (!proj) return [{ translateX: -9999 }, { translateY: -9999 }, { rotate: 0 }];
+    return [
+      { translateX: proj.x },
+      { translateY: proj.y },
+      { rotate: Math.atan2(proj.vyPxPerSec, proj.vxPxPerSec) + SPRITE_ROTATION_OFFSET },
+    ];
   });
 }
 
@@ -382,6 +391,11 @@ export default function GameCanvas({ width, height }: Props) {
   const smoke6 = useImage(EffectSprites.smoke[6]);
   const smokeImages = [smoke0, smoke1, smoke2, smoke3, smoke4, smoke5, smoke6];
 
+  // Rocket: 2-frame body animation (effects/rocket/1–2.png).
+  const rocket0 = useImage(EffectSprites.rocket[0]);
+  const rocket1 = useImage(EffectSprites.rocket[1]);
+  const rocketImages = [rocket0, rocket1];
+
   // ─── Game state ────────────────────────────────────────────────────────────
   const gameState = useSharedValue(createInitialGameState(width, height));
   const accumulator = useSharedValue(0);
@@ -568,7 +582,7 @@ export default function GameCanvas({ width, height }: Props) {
 
       // Effect zone slot state.
       const zSlots = Array.from({ length: EFFECT_ZONE_SLOT_COUNT }, () => ({
-        type: null as 'smoke' | 'molotov' | null,
+        type: null as 'smoke' | 'molotov' | 'flame' | 'explosion' | null,
         x: 0,
         y: 0,
         frame: 0,
@@ -592,11 +606,29 @@ export default function GameCanvas({ width, height }: Props) {
             zFrame = Math.floor((dissElapsed / SMOKE_DISSIPATE_DURATION_MS) * SMOKE_ANIM_FRAME_COUNT);
           }
           zFrame = Math.max(0, Math.min(LAST, zFrame));
+        } else if (z.type === 'flame') {
+          zFrame = getCurrentFrame(
+            { frameCount: MOLOTOV_FIRE_FRAME_COUNT, frameDurationMs: MOLOTOV_FIRE_FRAME_DURATION_MS, loop: true },
+            state.elapsedMs - z.spawnedAtMs,
+          );
+        } else if (z.type === 'explosion') {
+          zFrame = getCurrentFrame(
+            { frameCount: FRAG_EXPLODE_FRAME_COUNT, frameDurationMs: FRAG_EXPLODE_FRAME_DURATION_MS, loop: false },
+            state.elapsedMs - z.spawnedAtMs,
+          );
         }
         // Molotov zone uses a static explode frame — no frame cycling needed (zFrame stays 0).
         zSlots[i] = { type: z.type, x: z.x, y: z.y, frame: zFrame };
       }
       setZoneSlotData(zSlots);
+
+      // Projectile rocket flags + animation frame.
+      const rockets = Array.from({ length: PROJECTILE_SLOT_COUNT }, (_, i) => {
+        const p = state.projectiles[i];
+        return !!(p && p.isRocket);
+      });
+      setProjIsRocket(rockets);
+      setRocketFrame(Math.floor(state.elapsedMs / ROCKET_FRAME_DURATION_MS) % ROCKET_FRAME_COUNT);
 
       // Crate reveal modal bridge.
       setDisplayCrateReveal(state.pendingCrateReveal);
@@ -885,15 +917,23 @@ export default function GameCanvas({ width, height }: Props) {
 
   // ─── Effect zone slot React state (100ms timer bridge) ───────────────────
   // type drives render mode (null = skip). x/y are static per zone lifetime.
-  // frame drives molotov flame animation.
+  // frame drives flame/explosion animation cycling.
   const [zoneSlotData, setZoneSlotData] = useState<Array<{
-    type: 'smoke' | 'molotov' | null;
+    type: 'smoke' | 'molotov' | 'flame' | 'explosion' | null;
     x: number;
     y: number;
     frame: number;
   }>>(() => Array.from({ length: EFFECT_ZONE_SLOT_COUNT }, () => ({
     type: null, x: 0, y: 0, frame: 0,
   })));
+
+  // ─── Projectile rocket flags + animation frame (100ms timer bridge) ───────
+  // projIsRocket[i] = true when projectiles[i] is a rocket — drives Image vs Circle JSX.
+  // rocketFrame is shared across all rocket slots (rockets are short-lived; sync is fine).
+  const [projIsRocket, setProjIsRocket] = useState<boolean[]>(
+    () => Array.from({ length: PROJECTILE_SLOT_COUNT }, () => false),
+  );
+  const [rocketFrame, setRocketFrame] = useState(0);
 
   // ─── Debug weapon cycle button ─────────────────────────────────────────────
   // KNOWN BUG (tech debt): mutates weaponPose (animation) only — does NOT update
@@ -1192,6 +1232,42 @@ export default function GameCanvas({ width, height }: Props) {
                 />
               );
             }
+            if (z.type === 'flame') {
+              // Flamethrower zone: looping flame animation (7 frames × 120ms).
+              const flameImg = flameImages[z.frame] ?? flameImages[0] ?? null;
+              if (!flameImg) return null;
+              const fw = flameImg.width() * EFFECT_SPRITE_SCALE;
+              const fh = flameImg.height() * EFFECT_SPRITE_SCALE;
+              return (
+                <Image
+                  key={`zone-${i}`}
+                  image={flameImg}
+                  x={z.x - fw / 2}
+                  y={z.y - fh / 2}
+                  width={fw}
+                  height={fh}
+                  sampling={{ filter: FilterMode.Nearest, mipmap: MipmapMode.None }}
+                />
+              );
+            }
+            if (z.type === 'explosion') {
+              // Rocket detonation: non-looping Explode animation (4 frames × 100ms).
+              const expImg = explodeImages[z.frame] ?? null;
+              if (!expImg) return null;
+              const ew = expImg.width() * EFFECT_SPRITE_SCALE;
+              const eh = expImg.height() * EFFECT_SPRITE_SCALE;
+              return (
+                <Image
+                  key={`zone-${i}`}
+                  image={expImg}
+                  x={z.x - ew / 2}
+                  y={z.y - eh / 2}
+                  width={ew}
+                  height={eh}
+                  sampling={{ filter: FilterMode.Nearest, mipmap: MipmapMode.None }}
+                />
+              );
+            }
             // Molotov — static Explode frame 3 (index 2): peak-bloom, reads as
             // fire patch rather than directional stream. No frame cycling.
             const molotovImg = explodeImages[2] ?? null;
@@ -1243,12 +1319,39 @@ export default function GameCanvas({ width, height }: Props) {
           ))}
 
           {/* ── Projectiles (below enemies, above pickups) ─────────────────── */}
-          {/* Always render all 30 slots. Inactive slots sit at (-9999,-9999). */}
-          {allProjectileTransforms.map((transform, i) => (
-            <Group key={`proj-${i}`} transform={transform}>
-              <Circle cx={0} cy={0} r={4} color="#f5c842" />
-            </Group>
-          ))}
+          {/* Always render all 30 slots. Inactive slots sit at (-9999,-9999).  */}
+          {/* Rockets: Image sprite (transform includes rotation). Bullets: Circle. */}
+          {allProjectileTransforms.map((transform, i) => {
+            if (projIsRocket[i]) {
+              const rImg = rocketImages[rocketFrame] ?? rocketImages[0] ?? null;
+              if (!rImg) {
+                return (
+                  <Group key={`proj-${i}`} transform={transform}>
+                    <Circle cx={0} cy={0} r={4} color="#f5c842" />
+                  </Group>
+                );
+              }
+              const rw = rImg.width() * EFFECT_SPRITE_SCALE;
+              const rh = rImg.height() * EFFECT_SPRITE_SCALE;
+              return (
+                <Group key={`proj-${i}`} transform={transform}>
+                  <Image
+                    image={rImg}
+                    x={-rw / 2}
+                    y={-rh / 2}
+                    width={rw}
+                    height={rh}
+                    sampling={{ filter: FilterMode.Nearest, mipmap: MipmapMode.None }}
+                  />
+                </Group>
+              );
+            }
+            return (
+              <Group key={`proj-${i}`} transform={transform}>
+                <Circle cx={0} cy={0} r={4} color="#f5c842" />
+              </Group>
+            );
+          })}
 
           {/* ── Throwables (above projectiles, below enemies) ─────────────── */}
           {/* Flying circles: always-render (10 slots), inactive go to -9999.  */}

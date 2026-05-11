@@ -181,6 +181,12 @@ export const EffectSprites = {
     require('../../assets/effects/explode/3.png'),
     require('../../assets/effects/explode/4.png'),
   ],
+  // 2-frame rocket body animation (assets/effects/rocket/1–2.png).
+  // Exhaust trail frames (rocket-f1/f2/f3 from kit) skipped for v1 — Phase 6 polish.
+  rocket: [
+    require('../../assets/effects/rocket/1.png'),
+    require('../../assets/effects/rocket/2.png'),
+  ],
   flame: [
     require('../../assets/effects/flame/1.png'),
     require('../../assets/effects/flame/2.png'),

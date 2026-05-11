@@ -61,6 +61,13 @@
  *   - GameState gains pendingCrateReveal + crateRevealWeaponId + crateRevealTier
  *   - updateGameState freezes when pendingCrateReveal (same pattern as isDead/pendingLevelUp)
  *   - tickPickups extended to roll tier + weapon on crate pickup, set pendingCrateReveal
+ *
+ * Phase 4c G3 additions:
+ *   - ProjectileState gains isRocket: boolean — renderer switches Circle→Image for rockets;
+ *     combatEngine branches into AOE impact instead of single-target damageAccum.
+ *   - EffectZoneState.type expands to 'smoke' | 'molotov' | 'flame' | 'explosion':
+ *       'flame'     — flamethrower weapon cone zones (DoT, 500ms duration, short radius)
+ *       'explosion' — rocket detonation visual (no damage, 400ms, loops explode sprite)
  */
 
 import type { HeroWeaponPose } from './sprites';
@@ -237,6 +244,12 @@ export type ProjectileState = {
    * Plain number[] — avoids Set/Map which are not worklet-safe.
    */
   hitEnemyIds: number[];
+  /**
+   * True when this projectile is a rocket (gp25 weapon).
+   * Renderer switches from Circle to rocket sprite Image.
+   * combatEngine applies AOE damage on impact instead of single-target damageAccum.
+   */
+  isRocket: boolean;
 };
 
 /**
@@ -303,13 +316,21 @@ export type ThrowableState = {
  *   Damage ticks every MOLOTOV_TICK_INTERVAL_MS using lastTickAppliedMs.
  *   Visual: looping Flamethrower sprite (7 frames × 120ms).
  *
- * spawnedAtMs: elapsedMs when the zone was created (throwable landed).
+ * type 'flame': flamethrower weapon cone zone. DoT with FLAMETHROWER_ZONE constants.
+ *   Duration: FLAMETHROWER_ZONE_DURATION_MS (500ms). Radius: FLAMETHROWER_ZONE_RADIUS_PX.
+ *   Visual: looping Flamethrower sprite (same as molotov).
+ *
+ * type 'explosion': rocket detonation visual. No damage (AOE applied on impact).
+ *   Duration: FRAG_EXPLODE_FRAME_COUNT × FRAG_EXPLODE_FRAME_DURATION_MS (400ms).
+ *   Visual: Explode sprite (4 frames, non-looping) — same as frag detonation.
+ *
+ * spawnedAtMs: elapsedMs when the zone was created (throwable landed or rocket hit).
  * lastTickAppliedMs: elapsedMs of the most recent DoT tick. 0 at spawn.
- *   Updated by tickEffectZones each time damage is applied.
+ *   Updated by tickEffectZones each time damage is applied. Unused for explosion.
  */
 export type EffectZoneState = {
   id: number;
-  type: 'smoke' | 'molotov';
+  type: 'smoke' | 'molotov' | 'flame' | 'explosion';
   x: number;
   y: number;
   spawnedAtMs: number;
