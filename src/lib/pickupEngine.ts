@@ -20,23 +20,24 @@
  *   player position — no tail-chase, no drift.
  */
 
-import type { GameState, PickupState } from './gameEngine';
+import type { GameState, PickupState, CrateState } from './gameEngine';
 import { audioEngine } from './audioEngine';
 import {
   MAGNET_RANGE_PX,
   MAGNET_MAX_SPEED_PX_PER_SEC,
   COLLECT_RADIUS_PX,
+  CRATE_PICKUP_RADIUS_PX,
 } from '../data/gameConstants';
 
 /** Squared thresholds — avoid sqrt in the hot loop until needed for normalization. */
 const MAGNET_RANGE_SQ = MAGNET_RANGE_PX * MAGNET_RANGE_PX;
 const COLLECT_RADIUS_SQ = COLLECT_RADIUS_PX * COLLECT_RADIUS_PX;
+const CRATE_PICKUP_RADIUS_SQ = CRATE_PICKUP_RADIUS_PX * CRATE_PICKUP_RADIUS_PX;
 
 export function tickPickups(state: GameState, dtMs: number): GameState {
   'worklet';
 
   const { pickups, player } = state;
-  if (pickups.length === 0) return state;
 
   // Comms Headset: +30% magnet range per stack.
   // Computed per-tick here rather than via getEffectiveStats to avoid importing
@@ -90,6 +91,21 @@ export function tickPickups(state: GameState, dtMs: number): GameState {
     }
   }
 
+  // ─── Crate pickup ──────────────────────────────────────────────────────────
+  let cratesChanged = false;
+  const newCrates: Array<CrateState | null> = state.crates.slice();
+  for (let i = 0; i < newCrates.length; i++) {
+    const crate = newCrates[i];
+    if (!crate) continue;
+    const cdx = player.x - crate.x;
+    const cdy = player.y - crate.y;
+    if (cdx * cdx + cdy * cdy < CRATE_PICKUP_RADIUS_SQ) {
+      newCrates[i] = null;
+      cratesChanged = true;
+      // TODO Phase 4c G2: grant crate reward.
+    }
+  }
+
   return {
     ...state,
     pickups: survivingPickups,
@@ -98,5 +114,6 @@ export function tickPickups(state: GameState, dtMs: number): GameState {
       score: newScore,
       xp: newXp,
     },
+    crates: cratesChanged ? newCrates : state.crates,
   };
 }

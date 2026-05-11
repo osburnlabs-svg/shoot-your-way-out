@@ -50,6 +50,12 @@
  *   - GameState gains currentLevelUpChoices: SkillId[] (populated by JS thread during freeze)
  *   - LevelUpModal renders on React thread; skill selection mutates gameState.value directly
  *     (safe during pendingLevelUp freeze window — follows cycleWeapon precedent)
+ *
+ * Phase 4c G1 additions:
+ *   - CrateState type (id, position, spawnedAtMs)
+ *   - GameState gains crates[], nextCrateId, nextCrateSpawnAtMs
+ *   - tickCrateSpawn (crateEngine) runs after tickPickups — timer-based world spawn
+ *   - tickPickups extended to detect crate proximity pickup (no magnet)
  */
 
 import type { HeroWeaponPose } from './sprites';
@@ -61,6 +67,8 @@ import {
   ENEMY_SOFT_CAP,
   THROWABLE_SLOT_COUNT,
   EFFECT_ZONE_SLOT_COUNT,
+  CRATE_SLOT_COUNT,
+  CRATE_SPAWN_INTERVAL_MS,
 } from '../data/gameConstants';
 import type { SkillId } from '../data/skills';
 import { getEffectiveStats } from '../data/skills';
@@ -69,6 +77,7 @@ import { tickCombat } from './combatEngine';
 import { tickPickups } from './pickupEngine';
 import { tickProgression, tickRegen } from './progressionEngine';
 import { tickThrowables, tickEffectZones, tickThrowableSkills } from './throwableEngine';
+import { tickCrateSpawn } from './crateEngine';
 
 export type PlayerState = {
   x: number;
@@ -301,6 +310,20 @@ export type EffectZoneState = {
   lastTickAppliedMs: number;
 };
 
+/**
+ * A crate spawned on the map. Player must walk to it to collect.
+ *
+ * Spawns every CRATE_SPAWN_INTERVAL_MS at a random canvas position
+ * (margins from edges). Max CRATE_MAX_ACTIVE active at once.
+ * No magnet pull — proximity pickup only.
+ */
+export type CrateState = {
+  id: number;
+  x: number;
+  y: number;
+  spawnedAtMs: number;
+};
+
 export type GameState = {
   player: PlayerState;
   /**
@@ -370,6 +393,15 @@ export type GameState = {
   effectZones: Array<EffectZoneState | null>;
   /** Monotonically increasing counter — ensures every effect zone has a unique id. */
   nextEffectZoneId: number;
+  /**
+   * Fixed-length sparse array of CRATE_SLOT_COUNT (10) slots.
+   * null = empty slot. No compaction — slot index stable for crate lifetime.
+   */
+  crates: Array<CrateState | null>;
+  /** Monotonically increasing counter — ensures every crate has a unique id. */
+  nextCrateId: number;
+  /** elapsedMs when the next crate spawn should fire. */
+  nextCrateSpawnAtMs: number;
   /** Canvas dimensions stored once at init — spawner uses them to place enemies at edges. */
   canvasWidth: number;
   canvasHeight: number;
@@ -441,6 +473,13 @@ export function createInitialGameState(canvasWidth: number, canvasHeight: number
       return arr;
     }()),
     nextEffectZoneId: 0,
+    crates: (function () {
+      const arr: Array<CrateState | null> = [];
+      for (let i = 0; i < CRATE_SLOT_COUNT; i++) { arr.push(null); }
+      return arr;
+    }()),
+    nextCrateId: 0,
+    nextCrateSpawnAtMs: CRATE_SPAWN_INTERVAL_MS,
     canvasWidth,
     canvasHeight,
     elapsedMs: 0,
@@ -456,14 +495,18 @@ export function createInitialGameState(canvasWidth: number, canvasHeight: number
  * restart wiring; pendingLevelUp: G3 skill selection).
  *
  * Tick ordering within one step:
- *   1. Player movement + rotation
- *   2. Enemy spawning + AI movement (tickEnemies)
- *   3. Combat: weapon cooldown, auto-fire, projectile motion,
- *      collision, damage, death transitions, die-animation cleanup,
- *      pickup spawning on death, contact damage (tickCombat)
- *   4. Pickup magnet pull + collection (tickPickups)
- *   5. HP regen from provisions_painkillers / provisions_stims (tickRegen)
- *   6. XP threshold check — sets pendingLevelUp if a level was earned (tickProgression)
+ *   1.  Player movement + rotation
+ *   2.  Enemy spawning + AI movement (tickEnemies)
+ *   3.  Combat: weapon cooldown, auto-fire, projectile motion,
+ *       collision, damage, death transitions, die-animation cleanup,
+ *       pickup spawning on death, contact damage (tickCombat)
+ *   4.  Pickup magnet pull + collection; crate proximity pickup (tickPickups)
+ *   5.  Crate world spawning — timer-based random placement (tickCrateSpawn)
+ *   6.  Throwable flight + detonation (tickThrowables)
+ *   7.  Effect zone ticks — smoke slow, molotov DoT (tickEffectZones)
+ *   8.  Throwable skill cooldowns + auto-throw targeting (tickThrowableSkills)
+ *   9.  HP regen from provisions_painkillers / provisions_stims (tickRegen)
+ *   10. XP threshold check — sets pendingLevelUp if a level was earned (tickProgression)
  */
 export function updateGameState(state: GameState, dtMs: number): GameState {
   'worklet';
@@ -532,7 +575,8 @@ export function updateGameState(state: GameState, dtMs: number): GameState {
   const stateAfterEnemies = tickEnemies(stateAfterPlayer, dtMs);
   const stateAfterCombat = tickCombat(stateAfterEnemies, dtMs);
   const stateAfterPickups = tickPickups(stateAfterCombat, dtMs);
-  const stateAfterThrowables = tickThrowables(stateAfterPickups, dtMs);
+  const stateAfterCrates = tickCrateSpawn(stateAfterPickups, dtMs);
+  const stateAfterThrowables = tickThrowables(stateAfterCrates, dtMs);
   const stateAfterZones = tickEffectZones(stateAfterThrowables, dtMs);
   const stateAfterThrowableSkills = tickThrowableSkills(stateAfterZones, dtMs);
   const stateAfterRegen = tickRegen(stateAfterThrowableSkills, dtMs);

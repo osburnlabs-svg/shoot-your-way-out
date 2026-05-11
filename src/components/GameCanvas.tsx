@@ -97,6 +97,9 @@ import {
   THROWABLE_SLOT_COUNT,
   EFFECT_ZONE_SLOT_COUNT,
   THROWABLE_TRAVEL_TIME_MS,
+  CRATE_SLOT_COUNT,
+  CRATE_MAX_ACTIVE,
+  CRATE_SPAWN_MARGIN_PX,
   THROWABLE_ARC_HEIGHT_PX,
   FRAG_EXPLODE_FRAME_COUNT,
   FRAG_EXPLODE_FRAME_DURATION_MS,
@@ -197,6 +200,18 @@ function usePickupSlotTransform(gameState: SharedValue<GameState>, slotIndex: nu
     const pickup = gameState.value.pickups[slotIndex];
     if (!pickup) return [{ translateX: -9999 }, { translateY: -9999 }];
     return [{ translateX: pickup.x }, { translateY: pickup.y }];
+  });
+}
+
+/**
+ * Per-slot crate transform — one useDerivedValue per pre-allocated slot.
+ * Same always-render pattern as pickups: inactive slots go to (-9999, -9999).
+ */
+function useCrateSlotTransform(gameState: SharedValue<GameState>, slotIndex: number) {
+  return useDerivedValue(() => {
+    const crate = gameState.value.crates[slotIndex];
+    if (!crate) return [{ translateX: -9999 }, { translateY: -9999 }];
+    return [{ translateX: crate.x }, { translateY: crate.y }];
   });
 }
 
@@ -333,6 +348,7 @@ export default function GameCanvas({ width, height }: Props) {
 
   // ─── Pickup sprite image ──────────────────────────────────────────────────
   const moneySmallImage = useImage(PickupSprites.money.small);
+  const crateImage = useImage(PickupSprites.crate);
 
   // ─── Effect sprite images (loaded once at mount, all unconditional) ───────
   // Explode: 4 frames (Explode/1–4.png) — frag detonation (non-looping) AND
@@ -819,6 +835,20 @@ export default function GameCanvas({ width, height }: Props) {
     pkTransform45, pkTransform46, pkTransform47, pkTransform48, pkTransform49,
   ];
 
+  // ─── Per-slot crate transforms (UI thread, no runOnJS) ───────────────────
+  // 10 pre-allocated slots. Always rendered — inactive slots go to (-9999, -9999).
+  const crTransform0 = useCrateSlotTransform(gameState, 0);
+  const crTransform1 = useCrateSlotTransform(gameState, 1);
+  const crTransform2 = useCrateSlotTransform(gameState, 2);
+  const crTransform3 = useCrateSlotTransform(gameState, 3);
+  const crTransform4 = useCrateSlotTransform(gameState, 4);
+  const crTransform5 = useCrateSlotTransform(gameState, 5);
+  const crTransform6 = useCrateSlotTransform(gameState, 6);
+  const crTransform7 = useCrateSlotTransform(gameState, 7);
+  const crTransform8 = useCrateSlotTransform(gameState, 8);
+  const crTransform9 = useCrateSlotTransform(gameState, 9);
+  const allCrateTransforms = [crTransform0, crTransform1, crTransform2, crTransform3, crTransform4, crTransform5, crTransform6, crTransform7, crTransform8, crTransform9];
+
   // ─── Throwable slot arc positions (UI thread, no runOnJS) ────────────────
   // 10 pre-allocated slots. Flying slots interpolate the arc each frame.
   // Detonating/null slots return {x:-9999,y:-9999} — rendered off-screen.
@@ -871,6 +901,32 @@ export default function GameCanvas({ width, height }: Props) {
       ...gameState.value,
       player: { ...gameState.value.player, weaponPose: next },
     };
+  }, [gameState]);
+
+  // ─── Debug spawn crate button ──────────────────────────────────────────────
+  // Directly injects a crate into the first free slot, bypassing the 30s timer.
+  // Respects CRATE_MAX_ACTIVE cap. Phase 5 removes this button.
+  const handleSpawnCrate = useCallback(() => {
+    const state = gameState.value;
+    let slot = -1;
+    for (let i = 0; i < CRATE_SLOT_COUNT; i++) {
+      if (state.crates[i] === null) { slot = i; break; }
+    }
+    if (slot === -1) return;
+    let activeCount = 0;
+    for (let i = 0; i < state.crates.length; i++) {
+      if (state.crates[i] !== null) activeCount += 1;
+    }
+    if (activeCount >= CRATE_MAX_ACTIVE) return;
+    const minX = CRATE_SPAWN_MARGIN_PX;
+    const maxX = state.canvasWidth - CRATE_SPAWN_MARGIN_PX;
+    const minY = CRATE_SPAWN_MARGIN_PX;
+    const maxY = state.canvasHeight - CRATE_SPAWN_MARGIN_PX;
+    const x = minX + Math.random() * (maxX - minX);
+    const y = minY + Math.random() * (maxY - minY);
+    const newCrates = state.crates.slice();
+    newCrates[slot] = { id: state.nextCrateId, x, y, spawnedAtMs: state.elapsedMs };
+    gameState.value = { ...state, crates: newCrates, nextCrateId: state.nextCrateId + 1 };
   }, [gameState]);
 
   // ─── Skill selection handler ───────────────────────────────────────────────
@@ -1056,6 +1112,8 @@ export default function GameCanvas({ width, height }: Props) {
   // ─── Pickup render sizes ──────────────────────────────────────────────────
   const moneyW = moneySmallImage ? moneySmallImage.width() * PICKUP_SPRITE_SCALE : 0;
   const moneyH = moneySmallImage ? moneySmallImage.height() * PICKUP_SPRITE_SCALE : 0;
+  const crateW = crateImage ? crateImage.width() * PICKUP_SPRITE_SCALE : 0;
+  const crateH = crateImage ? crateImage.height() * PICKUP_SPRITE_SCALE : 0;
 
   return (
     <GestureDetector gesture={panGesture}>
@@ -1066,8 +1124,8 @@ export default function GameCanvas({ width, height }: Props) {
             tiles + enemies + HUD are all visible together. */}
         <Canvas style={StyleSheet.absoluteFill}>
 
-          {/* ── Effect zones (below pickups) ──────────────────────────────── */}
-          {/* Z-order: zones < pickups < projectiles < throwables < enemies.  */}
+          {/* ── Effect zones (below crates) ──────────────────────────────── */}
+          {/* Z-order: zones < crates < pickups < projectiles < throwables < enemies. */}
           {/* Smoke: 7-frame LightSmoke animation (dissipation loop, 150ms/frame). */}
           {/* Molotov: static Explode frame 3 (index 2) — peak-bloom reads as   */}
           {/*   "fire patch on ground" vs flamethrower stream. Phase 6: tune.    */}
@@ -1108,6 +1166,21 @@ export default function GameCanvas({ width, height }: Props) {
               />
             );
           })}
+
+          {/* ── Crates (above effect zones, below pickups) ───────────────── */}
+          {/* Always render all 10 slots. Inactive slots sit at (-9999,-9999). */}
+          {crateImage && allCrateTransforms.map((transform, i) => (
+            <Group key={`crate-${i}`} transform={transform}>
+              <Image
+                image={crateImage}
+                x={-crateW / 2}
+                y={-crateH / 2}
+                width={crateW}
+                height={crateH}
+                sampling={{ filter: FilterMode.Nearest, mipmap: MipmapMode.None }}
+              />
+            </Group>
+          ))}
 
           {/* ── Pickups (below projectiles and enemies) ───────────────────── */}
           {/* Always render all 50 slots. Inactive slots sit at (-9999,-9999). */}
@@ -1272,6 +1345,16 @@ export default function GameCanvas({ width, height }: Props) {
             Weapon: {WEAPON_LABELS[spriteState.weaponPose]}
           </Text>
           <Text style={[styles.debugText, styles.tapHint]}>tap to cycle</Text>
+        </Pressable>
+
+        {/* Debug spawn crate button — top-left, below weapon cycle button.
+            Phase 5 removes this once auto-spawn timer is verified on device. */}
+        <Pressable
+          style={[styles.debugOverlay, styles.weaponButton, { top: 110, left: 10 }]}
+          onPress={handleSpawnCrate}
+        >
+          <Text style={styles.debugText}>Spawn Crate</Text>
+          <Text style={[styles.debugText, styles.tapHint]}>tap to place</Text>
         </Pressable>
 
         {/* Debug overlay — top-right. */}

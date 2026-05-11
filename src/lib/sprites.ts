@@ -144,6 +144,7 @@ export const PickupSprites = {
   money: {
     small: require('../../assets/sprites/pickups/money/Money_Small.png'),
   },
+  crate: require('../../assets/ui/icons/Army_Box.png'),
 } as const;
 
 /**

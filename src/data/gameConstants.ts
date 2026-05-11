@@ -311,3 +311,23 @@ export const MOLOTOV_FIRE_FRAME_DURATION_MS = 120;
  * 2× matches hero/enemy/pickup scale.
  */
 export const EFFECT_SPRITE_SCALE = 2;
+
+// ─── Crates ──────────────────────────────────────────────────────────────────
+
+/** Fixed pre-allocated slot count for crate entities. */
+export const CRATE_SLOT_COUNT = 10;
+
+/** Time (ms) between crate spawn events. */
+export const CRATE_SPAWN_INTERVAL_MS = 30000;
+
+/** Maximum number of simultaneously active crates on the map. */
+export const CRATE_MAX_ACTIVE = 3;
+
+/**
+ * Distance (px) within which the player picks up a crate on overlap.
+ * No magnet — player must physically walk to the crate.
+ */
+export const CRATE_PICKUP_RADIUS_PX = 30;
+
+/** Margin (px) from each canvas edge within which crates will not spawn. */
+export const CRATE_SPAWN_MARGIN_PX = 50;
