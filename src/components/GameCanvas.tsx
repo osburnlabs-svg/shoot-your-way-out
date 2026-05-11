@@ -198,26 +198,28 @@ function usePickupSlotTransform(gameState: SharedValue<GameState>, slotIndex: nu
 }
 
 /**
- * Throwable arc position — one useDerivedValue per pre-allocated throwable slot.
- * Computes the parabolic arc screen position for a flying throwable.
- * Returns {x: -9999, y: -9999} when the slot is null or 'detonating'
- * (detonating frags are rendered at their static targetX/Y via React state).
+ * Throwable arc transform — one useDerivedValue per pre-allocated throwable slot.
+ * Returns a Skia-compatible transform array for a flying throwable arc position.
+ * Inactive/detonating slots return off-screen (-9999, -9999) so their circles
+ * are invisible — same always-render pattern as projectile/pickup slots.
+ * The transform is passed directly to <Group transform={...}>; no .value read
+ * in JSX. Detonating frags are rendered separately via React state (targetX/Y).
  *
  * Arc formula:
  *   fraction = clamp((elapsedMs - thrownAtMs) / THROWABLE_TRAVEL_TIME_MS, 0, 1)
  *   x = lerp(spawnX, targetX, fraction)
  *   y = lerp(spawnY, targetY, fraction) - sin(fraction * PI) * THROWABLE_ARC_HEIGHT_PX
  */
-function useThrowableSlotPos(gameState: SharedValue<GameState>, slotIndex: number) {
+function useThrowableSlotTransform(gameState: SharedValue<GameState>, slotIndex: number) {
   return useDerivedValue(() => {
     const t = gameState.value.throwables[slotIndex];
-    if (!t || t.status !== 'flying') return { x: -9999, y: -9999 };
+    if (!t || t.status !== 'flying') return [{ translateX: -9999 }, { translateY: -9999 }];
     const elapsed = gameState.value.elapsedMs - t.thrownAtMs;
     const frac = Math.min(elapsed / THROWABLE_TRAVEL_TIME_MS, 1);
     const arcX = t.spawnX + (t.targetX - t.spawnX) * frac;
     const arcY = (t.spawnY + (t.targetY - t.spawnY) * frac)
                - Math.sin(frac * Math.PI) * THROWABLE_ARC_HEIGHT_PX;
-    return { x: arcX, y: arcY };
+    return [{ translateX: arcX }, { translateY: arcY }];
   });
 }
 
@@ -791,17 +793,17 @@ export default function GameCanvas({ width, height }: Props) {
   // ─── Throwable slot arc positions (UI thread, no runOnJS) ────────────────
   // 10 pre-allocated slots. Flying slots interpolate the arc each frame.
   // Detonating/null slots return {x:-9999,y:-9999} — rendered off-screen.
-  const tPos0 = useThrowableSlotPos(gameState, 0);
-  const tPos1 = useThrowableSlotPos(gameState, 1);
-  const tPos2 = useThrowableSlotPos(gameState, 2);
-  const tPos3 = useThrowableSlotPos(gameState, 3);
-  const tPos4 = useThrowableSlotPos(gameState, 4);
-  const tPos5 = useThrowableSlotPos(gameState, 5);
-  const tPos6 = useThrowableSlotPos(gameState, 6);
-  const tPos7 = useThrowableSlotPos(gameState, 7);
-  const tPos8 = useThrowableSlotPos(gameState, 8);
-  const tPos9 = useThrowableSlotPos(gameState, 9);
-  const allThrowablePos = [tPos0, tPos1, tPos2, tPos3, tPos4, tPos5, tPos6, tPos7, tPos8, tPos9];
+  const tTransform0 = useThrowableSlotTransform(gameState, 0);
+  const tTransform1 = useThrowableSlotTransform(gameState, 1);
+  const tTransform2 = useThrowableSlotTransform(gameState, 2);
+  const tTransform3 = useThrowableSlotTransform(gameState, 3);
+  const tTransform4 = useThrowableSlotTransform(gameState, 4);
+  const tTransform5 = useThrowableSlotTransform(gameState, 5);
+  const tTransform6 = useThrowableSlotTransform(gameState, 6);
+  const tTransform7 = useThrowableSlotTransform(gameState, 7);
+  const tTransform8 = useThrowableSlotTransform(gameState, 8);
+  const tTransform9 = useThrowableSlotTransform(gameState, 9);
+  const allThrowableTransforms = [tTransform0, tTransform1, tTransform2, tTransform3, tTransform4, tTransform5, tTransform6, tTransform7, tTransform8, tTransform9];
 
   // ─── Throwable slot React state (100ms timer bridge) ─────────────────────
   // type/status drive render mode (null = skip). frame drives explode sprite.
@@ -1103,40 +1105,37 @@ export default function GameCanvas({ width, height }: Props) {
           ))}
 
           {/* ── Throwables (above projectiles, below enemies) ─────────────── */}
-          {/* Flying: colored circle following arc (useDerivedValue per slot). */}
-          {/* Detonating (frag): Explode sprite at static targetX/Y.           */}
+          {/* Flying circles: always-render (10 slots), inactive go to -9999.  */}
+          {/*   transform from useDerivedValue — no .value read during render.  */}
+          {/* Detonating frag: Explode sprite at React-state targetX/Y.         */}
+          {allThrowableTransforms.map((transform, i) => {
+            const t = throwableSlotData[i]!;
+            // Always render the flying circle for this slot.
+            // Inactive/detonating slots sit at (-9999,-9999) — circle invisible.
+            const color = t.type ? THROWABLE_COLORS[t.type] : '#000000';
+            return (
+              <Group key={`throw-fly-${i}`} transform={transform}>
+                <Circle cx={0} cy={0} r={5} color={color} />
+              </Group>
+            );
+          })}
           {throwableSlotData.map((t, i) => {
-            if (!t.type) return null;
-
-            if (t.status === 'flying') {
-              const pos = allThrowablePos[i]!;
-              const color = THROWABLE_COLORS[t.type];
-              return (
-                <Group key={`throw-${i}`} transform={[{ translateX: pos.value.x }, { translateY: pos.value.y }]}>
-                  <Circle cx={0} cy={0} r={5} color={color} />
-                </Group>
-              );
-            }
-
-            if (t.status === 'detonating') {
-              const expImg = explodeImages[t.frame] ?? null;
-              if (!expImg) return null;
-              const ew = expImg.width() * EFFECT_SPRITE_SCALE;
-              const eh = expImg.height() * EFFECT_SPRITE_SCALE;
-              return (
-                <Image
-                  key={`throw-${i}`}
-                  image={expImg}
-                  x={t.targetX - ew / 2}
-                  y={t.targetY - eh / 2}
-                  width={ew}
-                  height={eh}
-                  sampling={{ filter: FilterMode.Nearest, mipmap: MipmapMode.None }}
-                />
-              );
-            }
-
-            return null;
+            if (t.status !== 'detonating') return null;
+            const expImg = explodeImages[t.frame] ?? null;
+            if (!expImg) return null;
+            const ew = expImg.width() * EFFECT_SPRITE_SCALE;
+            const eh = expImg.height() * EFFECT_SPRITE_SCALE;
+            return (
+              <Image
+                key={`throw-det-${i}`}
+                image={expImg}
+                x={t.targetX - ew / 2}
+                y={t.targetY - eh / 2}
+                width={ew}
+                height={eh}
+                sampling={{ filter: FilterMode.Nearest, mipmap: MipmapMode.None }}
+              />
+            );
           })}
 
           {/* ── Enemies (below player) ────────────────────────────────────── */}
