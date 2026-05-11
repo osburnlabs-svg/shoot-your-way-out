@@ -212,18 +212,19 @@ export const GuiSprites = {
     bg: require('../../assets/ui/upgrade/BG.png'),
   },
   /**
-   * Weapon HUD silhouettes for the CrateRevealModal.
-   * Only weapons reachable by the player (crate pool) are listed — pkm excluded.
-   * Tech debt: these are kit placeholder silhouettes (3 icons shared across 6 weapons).
-   *   Replace with custom weapon sprites when sourced.
+   * Weapon HUD icons for the CrateRevealModal (and future weapon HUD in Phase 7).
+   * All 7 icons are custom AI-sourced 64×64 or 80×80 RGBA PNGs (batch: weapon sprite swap).
+   * Kit silhouette placeholders (Pistol_HUD, SMG_HUD, MG_HUD) no longer used here.
+   * pkm excluded — dormant weapon, not surfaced to the player.
    */
   weaponHudIcons: {
-    aks74u: require('../../assets/ui/icons/SMG_HUD.png'),
-    ak74:   require('../../assets/ui/icons/SMG_HUD.png'),
-    svd:    require('../../assets/ui/icons/MG_HUD.png'),
-    m870:   require('../../assets/ui/icons/Pistol_HUD.png'),
-    gp25:   require('../../assets/ui/icons/Pistol_HUD.png'),
-    rpo:    require('../../assets/ui/icons/MG_HUD.png'),
+    pistol: require('../../assets/ui/icons/Pistol.png'),
+    aks74u: require('../../assets/ui/icons/SMG.png'),
+    ak74:   require('../../assets/ui/icons/Assault_Rifle.png'),
+    svd:    require('../../assets/ui/icons/Sniper_Rifle.png'),
+    m870:   require('../../assets/ui/icons/Shotgun.png'),
+    gp25:   require('../../assets/ui/icons/Rocket_Launcher.png'),
+    rpo:    require('../../assets/ui/icons/Flame_Thrower.png'),
   },
   skillIcons: {
     ammo_545bt:               require('../../assets/ui/icons/AP_Rounds.png'),
