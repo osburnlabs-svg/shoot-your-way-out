@@ -750,6 +750,17 @@ All 20 v1 skills shipped: 10 stat-modifier skills from Phase 4a, plus 5 inline-e
 
 ---
 
+## Phase 4b — Post-commit: batch skill icon swap
+
+**Status:** Complete 🟢
+**Commits:** c5dbf34 (pilot: Comms Headset), batch commit (19 remaining skills)
+
+All 20 skill icons replaced with custom AI-generated 64×64 PNGs sourced via ChatGPT image gen and Adobe Express transparency processing. Comms Headset was the pilot to validate the workflow; the remaining 19 followed in a single batch swap. Every skill now has a unique, purpose-made icon — no shared kit-asset placeholders remain. The mixed kit-asset approach (ammo.png shared across 4 skills, armor icons shared across 2 skills, etc.) is fully retired. Icons verified pre-commit: all RGBA with real alpha channels. Two icons (Stims, Painkillers) have near-zero fully opaque pixels — verify these read clearly at modal display size during device testing.
+
+**Closes:** All skill icon sourcing tech debt entries previously noted in `sprites.ts` (throwables Phase 7 sourcing audit, helmet/plate-carrier collision, backpack/Army_Box mismatch, comms headset Money_Small placeholder).
+
+---
+
 ## Phase 5 — Maps + obstacles + vehicle enemies
 
 **Goal:** Three hand-authored maps (Compound, Outskirts, Treeline) with tile rendering, map select screen, obstacle placement and collision, all 8 enemy types working including Humvee/BTR/Panzer/ACS vehicle enemies.

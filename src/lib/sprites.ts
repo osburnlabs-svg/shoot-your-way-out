@@ -152,46 +152,21 @@ export const PickupSprites = {
  *   ammo_subsonic + ammo_tracer → reverted back to Ammo.png (category coherence;
  *     all three ammo skills sharing one icon communicates "ammo skill" more clearly
  *     than box-vs-bullet visual differentiation without semantic value)
- *   provisions_painkillers → HP_pickup.png (medkit pickup, distinct from abstract HP glyph)
- *   provisions_stims → Speed_02.png (speed/energy icon matches stims' mechanical identity)
- *   Ammo_Box.png kept registered — parked for Phase 4b crate/weapon icons or future skills.
+ *   provisions_painkillers → HP_pickup.png (kit placeholder — replaced in batch swap below)
+ *   provisions_stims → Speed_02.png (kit placeholder — replaced in batch swap below)
  *
- * Phase 4b G3 icon additions:
- *   gear_backpack → Army_Box.png (kit Props/Ammo — military supply crate; no backpack/bag
- *     art exists in kit. Placeholder: "field gear you carry" adjacency. Flag for Phase 7
- *     if distinct backpack art is sourced.)
- *     Tech debt: Army_Box is an ammo crate, not a backpack. First use of this asset.
- *
- * Phase 4b G2 icon additions:
- *   provisions_field_medic_kit → HP_Box.png (kit Props/HP — medkit box, direct match for
- *     on-selection heal; first use of this asset)
- *
- * Phase 4b G1 icon additions:
- *   ammo_hollow_points → Ammo.png (AMMO category coherence — shares bullet icon)
- *   gear_ceramic_insert → Armor_Small.png (small armor pickup = ceramic plate insert)
- *   optics_suppressor → MG_HUD.png (third weapon silhouette for OPTICS category)
- *   provisions_comms_headset → Comms_Headset.png (50×50 AI-generated pixel art, sourced
- *     via ChatGPT image gen + Adobe Express transparency pass; pilot for batch sprite
- *     replacement workflow. Replaces Money_Small.png placeholder.)
- *   gear_helmet → Armor_Icon.png (accepted duplicate with Plate Carrier within GEAR
- *     category; no helmet-specific art in kit)
- *     Tech debt: shares icon with gear_plate_carrier; flag for Phase 7 if distinct art sourced.
+ * Post-Phase-4b batch sprite swap:
+ *   All 20 skill icons replaced with custom AI-generated 64×64 PNGs (ChatGPT image gen +
+ *   Adobe Express transparency pass). Comms_Headset.png was the pilot (commit c5dbf34);
+ *   the remaining 19 replaced in the batch commit. Every skill now has a unique icon —
+ *   no shared icons remain across the 20-skill pool. Kit-asset placeholders retired.
+ *   Files: AP_Rounds, Subsonic, Tracer, Hollow_Points, Red_Dot, Holographic, Suppressor,
+ *   Plate_Carrier, Ceramic_Insert, Tactical_Boots, Helmet, Backpack, MRE, Painkillers,
+ *   Stims, Field_Medic_Kit, Frag, Smoke, Molotov (all in assets/ui/icons/).
  *
  * upgrade.bg: kit Upgrade/BG.png (cropped to 308×105). Registered but unreferenced —
  *   BG.png has baked-in weapon placeholder icons; Phase 7 will evaluate kit UI fit.
- * skillIcons.*: 20 skills (after G5), 10 distinct icons.
- *
- * Phase 4b G5 icon additions (all three are kit-first placeholders — no grenade/smoke/
- *   molotov art exists in the kit; flagged for post-Phase-4b sprite sourcing audit):
- *   throwables_frag    → Ammo_Box.png (military ordnance container; first actual use
- *     of this asset — was parked since Phase 4a. "Packaged explosive" adjacency.)
- *     Tech debt: no grenade-shaped art in kit; Phase 7 sourcing audit.
- *   throwables_smoke   → Ammo.png (shared with all ammo-category skills; no smoke art
- *     anywhere in kit). Weakest match.
- *     Tech debt: shares icon with ammo skills; no smoke art in kit; Phase 7 sourcing audit.
- *   throwables_molotov → Speed_02.png (orange/energy visual; "heat" adjacency; already
- *     used by provisions_stims so this is a duplicate icon).
- *     Tech debt: shares icon with provisions_stims; no bottle/flame art in kit; Phase 7.
+ * skillIcons.*: 20 skills, 20 distinct icons.
  */
 /**
  * Effect sprite registry — introduced in Phase 4b G4 for throwable detonations.
@@ -240,29 +215,25 @@ export const GuiSprites = {
     bg: require('../../assets/ui/upgrade/BG.png'),
   },
   skillIcons: {
-    ammo_545bt:          require('../../assets/ui/icons/Ammo.png'),
-    ammo_subsonic:       require('../../assets/ui/icons/Ammo.png'),
-    ammo_tracer:         require('../../assets/ui/icons/Ammo.png'),
-    optics_red_dot:      require('../../assets/ui/icons/Pistol_HUD.png'),
-    optics_pso_scope:    require('../../assets/ui/icons/SMG_HUD.png'),
-    gear_plate_carrier:  require('../../assets/ui/icons/Armor_Icon.png'),
-    gear_tactical_boots: require('../../assets/ui/icons/Speed_01.png'),
-    gear_mre:            require('../../assets/ui/icons/HP_Icon.png'),
-    provisions_painkillers: require('../../assets/ui/icons/HP_pickup.png'),
-    provisions_stims:    require('../../assets/ui/icons/Speed_02.png'),
-    // Phase 4b G1
-    ammo_hollow_points:      require('../../assets/ui/icons/Ammo.png'),
-    gear_ceramic_insert:     require('../../assets/ui/icons/Armor_Small.png'),
-    optics_suppressor:       require('../../assets/ui/icons/MG_HUD.png'),
+    ammo_545bt:               require('../../assets/ui/icons/AP_Rounds.png'),
+    ammo_subsonic:            require('../../assets/ui/icons/Subsonic.png'),
+    ammo_tracer:              require('../../assets/ui/icons/Tracer.png'),
+    optics_red_dot:           require('../../assets/ui/icons/Red_Dot.png'),
+    optics_pso_scope:         require('../../assets/ui/icons/Holographic.png'),
+    gear_plate_carrier:       require('../../assets/ui/icons/Plate_Carrier.png'),
+    gear_tactical_boots:      require('../../assets/ui/icons/Tactical_Boots.png'),
+    gear_mre:                 require('../../assets/ui/icons/MRE.png'),
+    provisions_painkillers:   require('../../assets/ui/icons/Painkillers.png'),
+    provisions_stims:         require('../../assets/ui/icons/Stims.png'),
+    ammo_hollow_points:       require('../../assets/ui/icons/Hollow_Points.png'),
+    gear_ceramic_insert:      require('../../assets/ui/icons/Ceramic_Insert.png'),
+    optics_suppressor:        require('../../assets/ui/icons/Suppressor.png'),
     provisions_comms_headset: require('../../assets/ui/icons/Comms_Headset.png'),
-    gear_helmet:             require('../../assets/ui/icons/Armor_Icon.png'),
-    // Phase 4b G2
-    provisions_field_medic_kit: require('../../assets/ui/icons/HP_Box.png'),
-    // Phase 4b G3
-    gear_backpack:               require('../../assets/ui/icons/Army_Box.png'),
-    // Phase 4b G5 (all placeholders — see registry comment above)
-    throwables_frag:    require('../../assets/ui/icons/Ammo_Box.png'),
-    throwables_smoke:   require('../../assets/ui/icons/Ammo.png'),
-    throwables_molotov: require('../../assets/ui/icons/Speed_02.png'),
+    gear_helmet:              require('../../assets/ui/icons/Helmet.png'),
+    provisions_field_medic_kit: require('../../assets/ui/icons/Field_Medic_Kit.png'),
+    gear_backpack:            require('../../assets/ui/icons/Backpack.png'),
+    throwables_frag:          require('../../assets/ui/icons/Frag.png'),
+    throwables_smoke:         require('../../assets/ui/icons/Smoke.png'),
+    throwables_molotov:       require('../../assets/ui/icons/Molotov.png'),
   },
 } as const;
