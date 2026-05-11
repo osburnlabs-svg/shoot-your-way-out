@@ -957,25 +957,6 @@ export default function GameCanvas({ width, height }: Props) {
           <Text style={[styles.debugText, styles.tapHint]}>tap to cycle</Text>
         </Pressable>
 
-        {/* TEMPORARY G4 VERIFICATION DEBUG BUTTON — remove before phase close.
-            Grants 500 XP per tap to drive level-ups for testing weapon unlocks.
-            Verify unlocks by observing combat behavior (fire rate, range, damage),
-            NOT by reading the cycle button face (it does not reflect equippedWeaponId). */}
-        <Pressable
-          style={[styles.debugOverlay, { top: 105, left: 10 }]}
-          onPress={() => {
-            gameState.value = {
-              ...gameState.value,
-              player: {
-                ...gameState.value.player,
-                xp: gameState.value.player.xp + 500,
-              },
-            };
-          }}
-        >
-          <Text style={styles.debugText}>+500 XP</Text>
-        </Pressable>
-
         {/* Debug overlay — top-right. */}
         {/* TODO Phase 7: replace hardcoded insets with real safe-area values. */}
         <View

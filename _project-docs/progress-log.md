@@ -27,7 +27,7 @@ Status legend:
 | 1 — Project scaffold | 🟢 Complete | 2026-05-08 | a85087b | Yes | Placeholder screen confirmed on device via Expo Go |
 | 2 — Player + drag-to-move | 🟢 Complete | 2026-05-08 | G1: fe57417 G2: 9116c45 G3: 3f618d0 G4: 78fa367 | Yes — all 4 groups | All groups complete |
 | 3 — Enemies + auto-fire | 🟢 Complete | 2026-05-10 | G1: c47e000 G2: 083d28d G3: 5715c19 G4b: 738ab95 G4c: a095517 | G1 ✅ G2 ✅ G3 ✅ G4b ✅ G4c ✅ | |
-| 4a — Stat skills + level-up | 🟡 In Progress | 2026-05-10 | G1: c4daad8 G2: a095517 G3: f297b4b G3-polish: 461b25b→d90aedf→ba505fc G4: (pending) | G1 ✅ G2 ✅ G3 pending device test | G1: XP curve. G2: 10 skills + pierce + regen. G3: level-up modal + 3 polish rounds. G4: weapon unlock floor L4/8/12/16 + rename |
+| 4a — Stat skills + level-up | 🟢 Complete | 2026-05-10 | G1: c4daad8 G2: a095517 G3: f297b4b G3-polish: 461b25b→d90aedf→ba505fc G4: ee7f7d5 G4-cleanup: (this commit) | G1 ✅ G2 ✅ G3 ✅ G4 ✅ | Full progression loop closed. G4: weapon unlocks L4/8/12/16 + all 8 weapon renames |
 | 4b — Ability skills + crates | ⚪ | | | | |
 | 5 — Maps + obstacles + vehicle enemies | ⚪ | | | | |
 | 6 — Audio + atmospheric effects | ⚪ | | | | |
@@ -494,15 +494,15 @@ Single-line gate in `lib/combatEngine.ts`: added `&& !player.isMoving` to the au
 
 ## Phase 4a — Stat skills + level-up
 
-**Goal:** XP gems collected, level-up modal opens (using kit Upgrade Preset), 10 stat-modifier skills selectable, weapon progression unlocks at levels 4/8/12/16.
+**Goal:** XP gems collected, level-up modal opens, 10 stat-modifier skills selectable, weapon progression unlocks at levels 4/8/12/16.
 
-**Status:** 🟡 In Progress
+**Status:** 🟢 Complete
 
 **Groups:**
 - G1 🟢 — XP curve, level field, level-up engine freeze (commit c4daad8, device-tested)
 - G2 🟢 — 10 stat-modifier skills + skill state on PlayerState (commit a095517, device-tested)
-- G3 🟡 — Level-up modal (kit Upgrade/BG.png), skill selection, game resume (in progress)
-- G4 ⚪ — Weapon progression unlocks at levels 4/8/12/16
+- G3 🟢 — Level-up modal, skill selection, game resume — 3 polish rounds (commits f297b4b, 461b25b, d90aedf, ba505fc, device-tested)
+- G4 🟢 — Weapon progression unlocks at levels 4/8/12/16 (commits ee7f7d5 + cleanup, device-tested)
 
 ---
 
@@ -531,7 +531,7 @@ Single-line gate in `lib/combatEngine.ts`: added `&& !player.isMoving` to the au
 
 ## Phase 4a — Group 3: Level-up modal, skill selection, game resume
 
-**Status:** 🟡 In Progress (pending device test)
+**Status:** Complete 🟢
 
 ### What was built
 
@@ -563,6 +563,31 @@ Single-line gate in `lib/combatEngine.ts`: added `&& !player.isMoving` to the au
 5. Reach max stacks on a skill → it no longer appears as a choice
 6. If pendingLevelUpCount > 1 (rare), modal re-appears after first selection
 7. YOU DIED overlay still works (isDead still fires correctly)
+
+---
+
+## Phase 4a — Group 4: Weapon unlock floor at levels 4/8/12/16
+
+**Status:** Complete 🟢
+**Commits:** ee7f7d5 (content) + G4 cleanup (this commit — removes verification button)
+**Verification:** On device — XP button drove level-ups through all four unlock thresholds. L4 (SMG): fire rate change was immediately unmistakable — bullets visibly stream at ~7× the pre-unlock cadence. L8 (Assault Rifle): hero sprite pose switches from pistol stance to rifle stance, confirming both `weaponPose` and `equippedWeaponId` set correctly. L12 (Machine Gun): pose switches to machinegun stance, fire rate increases again. L16 (Sniper Rifle): pose returns to rifle stance, fire rate drops dramatically and projectile range visibly extends — enemies at the edge of the arena are targetable. Skill modal opened and skill picks applied correctly at every unlock level. Non-unlock levels (2, 3, 5–7, 9–11, 13–15) showed no weapon change as expected.
+
+### What was built
+
+- `src/data/weapons.ts`: four previously commented stubs (`aks74u`, `ak74`, `pkm`, `svd`) fully defined with final stats from the context doc table. Three crate-only weapons (`m870`, `gp25`, `rpo`) added as complete stubs for Phase 4b — correct stats but combat engine extensions (pellet spread, AOE, DoT stream) not wired until 4b. All 8 `displayName` fields renamed from Tarkov caliber names to generic player-facing names: Pistol, SMG, Assault Rifle, Machine Gun, Sniper Rifle, Shotgun, Grenade Launcher, Flamethrower.
+- `src/components/GameCanvas.tsx`: `WEAPON_UNLOCK_MAP` constant at module level mapping unlock levels to `{ weaponId, weaponPose }` pairs. `handleSkillSelect` extended: computes `newLevel` first, checks the map, spreads both `equippedWeaponId` and `weaponPose` into the player state mutation when a match is found (non-unlock levels skip the spread entirely — zero additional cost). `+500 XP` debug button added for verification, removed in the cleanup commit.
+
+### Architectural decisions made during G4
+
+- **Both `equippedWeaponId` AND `weaponPose` must be set on unlock.** The two fields are independent: `equippedWeaponId` drives combat stats (damage, cooldown, range) via `WEAPON_PROFILES`; `weaponPose` drives hero animation. Pre-review catch — the `cycleWeapon` button in Phase 2 G4 only mutated `weaponPose`, creating a precedent where the two fields appeared coupled. They are not. Any weapon equip operation must set both.
+- **Unlock check lives inline in `handleSkillSelect`, not as a separate callback.** The unlock fires only when the modal-driven level increment crosses a threshold — it is not a general "level changed" observer. Inlining it keeps the mutation atomic: level, weapon unlock (if any), and skill stack all commit in one `gameState.value = { ...state }` write. Separate handlers would require two writes or complex coordination.
+- **Cycle button weaponPose-only bug discovered during pre-review.** The button's Phase 2 implementation only sets `weaponPose`. Logged as tech debt. Does not affect gameplay — the button is a dev tool, not a player-facing control. Resolves when Phase 7 removes the button entirely and the real HUD weapon icon takes over.
+- **Generic weapon names ship now, not at Phase 7.** Names are invisible in current shipping UI (no HUD until Phase 7), but doing the rename while the design judgment was fresh (the Tarkov names were always wrong for a non-Tarkov game) costs nothing and frees Phase 7 from the conversation. Same reasoning applied to the 3 crate weapon stubs — defining them here while the file is open prevents a context-switch into weapons.ts during Phase 4b.
+- **SMG and Shotgun reuse `pistol` pose; Sniper Rifle reuses `rifle` pose.** The kit ships 5 hero animations for 8 weapon profiles. Three weapon unlocks (L4 SMG, L8 Assault Rifle, L12 Machine Gun) produce visible pose changes; L4 (SMG) does not because SMG uses `pistol` pose like the starting Pistol. The fire rate change at L4 is the observable signal. Phase 7's HUD weapon icon will visually distinguish SMG from Pistol regardless of shared pose.
+
+### Phase 4a — Final summary
+
+The full progression loop is closed. Run shape: kill → XP → freeze → modal → pick skill → resume → repeat, with auto-weapon-unlock at L4/8/12/16 layered on top of every level-up. Phase 3's static combat loop (shoot, kill, die) is now Phase 4a's dynamic-progression loop: skills compound across a run, weapon tiers change the engagement range and tempo, and runs now have an arc from Pistol scrapping through SMG into Rifle and beyond. Phase 4b adds the remaining 10 ability skills (grenades, molotovs, smoke), the crate drop system with reveal animation, and activates the three crate-only weapon profiles (Shotgun, Grenade Launcher, Flamethrower) already stubbed in `weapons.ts`.
 
 ---
 
