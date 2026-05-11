@@ -148,21 +148,11 @@ export const PickupSprites = {
 
 /**
  * GUI sprite registry — introduced in Phase 4a G3 for the level-up modal.
- * Icon swaps applied in Phase 4a G3 polish (reverted in polish r2 where noted):
- *   ammo_subsonic + ammo_tracer → reverted back to Ammo.png (category coherence;
- *     all three ammo skills sharing one icon communicates "ammo skill" more clearly
- *     than box-vs-bullet visual differentiation without semantic value)
- *   provisions_painkillers → HP_pickup.png (kit placeholder — replaced in batch swap below)
- *   provisions_stims → Speed_02.png (kit placeholder — replaced in batch swap below)
  *
- * Post-Phase-4b batch sprite swap:
- *   All 20 skill icons replaced with custom AI-generated 64×64 PNGs (ChatGPT image gen +
- *   Adobe Express transparency pass). Comms_Headset.png was the pilot (commit c5dbf34);
- *   the remaining 19 replaced in the batch commit. Every skill now has a unique icon —
- *   no shared icons remain across the 20-skill pool. Kit-asset placeholders retired.
- *   Files: AP_Rounds, Subsonic, Tracer, Hollow_Points, Red_Dot, Holographic, Suppressor,
- *   Plate_Carrier, Ceramic_Insert, Tactical_Boots, Helmet, Backpack, MRE, Painkillers,
- *   Stims, Field_Medic_Kit, Frag, Smoke, Molotov (all in assets/ui/icons/).
+ * All skill icons are custom AI-sourced 64×64 PNGs (pilot c5dbf34, batch 678d834).
+ * To swap a sprite: drop the new file at assets/ui/icons/<Name>.png and update the
+ * require() path in the matching GuiSprites.skillIcons entry below. No other changes
+ * needed — Metro picks up the new file on next reload.
  *
  * upgrade.bg: kit Upgrade/BG.png (cropped to 308×105). Registered but unreferenced —
  *   BG.png has baked-in weapon placeholder icons; Phase 7 will evaluate kit UI fit.
