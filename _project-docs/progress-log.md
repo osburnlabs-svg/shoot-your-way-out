@@ -29,6 +29,7 @@ Status legend:
 | 3 — Enemies + auto-fire | 🟢 Complete | 2026-05-10 | G1: c47e000 G2: 083d28d G3: 5715c19 G4b: 738ab95 G4c: a095517 | G1 ✅ G2 ✅ G3 ✅ G4b ✅ G4c ✅ | |
 | 4a — Stat skills + level-up | 🟢 Complete | 2026-05-10 | G1: c4daad8 G2: a095517 G3: f297b4b G3-polish: 461b25b→d90aedf→ba505fc G4: ee7f7d5 G4-cleanup: 5690324 | G1 ✅ G2 ✅ G3 ✅ G4 ✅ | Full progression loop closed. G4: weapon unlocks L4/8/12/16 + all 8 weapon renames |
 | 4b — Ability skills + crates | 🟢 Complete | 2026-05-10 | G1: 5411988 Slot-fix: 8ff2533 G2: 18b44e3 G3: e2a1deb G4: 8c31b42 G4-polish: 9cb7762 G5: b4091c6 Smoke: 2438bb4 | G1 ✅ G2 ✅ G3 ✅ G4 ✅ G5 ✅ | All 20 v1 skills shipped; throwable system; revive; bloom-hold-dissipate smoke animation |
+| 4c — Crate weapons | 🟡 In Progress | 2026-05-11 | G1: 75dc967 Fix1: 68f5ef3 Fix2: 266fbd6 G2: d6f1c1c G3: 8c390b3 | G1 ✅ G2 ✅ G3 (untested) | Crate entity + world spawn; weapon roll table + reveal modal; 3 crate weapons active (shotgun, rocket launcher, flamethrower) |
 | 5 — Maps + obstacles + vehicle enemies | ⚪ | | | | |
 | 6 — Audio + atmospheric effects | ⚪ | | | | |
 | 7 — UI + persistence + analytics | ⚪ | | | | |
@@ -50,6 +51,8 @@ Status legend:
 | **Debug cycle button mutates `weaponPose` only — not `equippedWeaponId`** — cycling the button changes the hero animation pose but combat stats (damage, cooldown, range) remain from the previously equipped weapon. The button face is therefore an unreliable indicator of which weapon is actually equipped. | Phase 4a G4 | Button is for visual debugging only; weapon floor unlocks (G4) correctly set both fields | Phase 7 — cycle button is removed entirely when the real HUD weapon icon lands. Do not use the cycle button face to verify weapon equip state. |
 | **Kit UI fit vs. custom UI — reinforced by Phase 4b evidence** — ReviveModal (Phase 4b G3) was built as a custom `<View>` layout because the kit's Mission Failed screen is not composable for a mid-run decision prompt. This is the second case after Phase 4a G3 (BG.png baked-in icons) where kit UI did not fit. | Phase 4a G3 polish (updated Phase 4b G3) | Custom layouts with kit color palette | Phase 7 — with full UI visible as a system, make the strategic call: continue kit-first UI or switch to custom pixel UI throughout. Growing evidence favors custom. |
 | **Projectiles and pickups predate the fixed-slot nullable-array pattern** — they use an always-render slot approach for Skia transforms but their underlying data management predates the formal `Array<T \| null>` pattern established in Phase 3 G3 (enemies) and Phase 4b G4 (throwables/zones). May have subtle inconsistencies in slot lifecycle. | Phase 4b G4 (identified during pattern audit) | No user-visible impact; entity counts are bounded and FPS is stable | Post-launch template pass — Phase 5 vehicle enemies don't require this fix; schedule for the template cleanup pass after v1 ships |
+| **Rocket exhaust trail frames not wired** — TDS kit ships 3 exhaust-trail frames (`rocket-f1/f2/f3.png`) alongside the 2 body frames. Only the body animation (1–2 frame loop at 100ms) is wired in Phase 4c G3. Exhaust trail compositing skipped for v1. | Phase 4c G3 | 2-frame body loop is readable at game scale; exhaust trail is visual polish | Phase 6 — atmospheric effects pass is the natural home for exhaust trail; schedule with muzzle flash and smoke compositing |
+| **CrateRevealModal weapon icons are kit placeholder silhouettes** — three shared silhouette PNGs (`SMG_HUD.png`, `MG_HUD.png`, `Pistol_HUD.png`) cover all 6 crate weapons with no 1-to-1 correspondence. aks74u and ak74 share SMG icon; svd and rpo share MG icon; m870 and gp25 share Pistol icon. | Phase 4c G2 | Accepted for v1; icons are recognizable shapes even if not weapon-accurate | Phase 7 — custom weapon silhouette sprites sourced and wired per weapon |
 
 ---
 
@@ -761,7 +764,96 @@ All 20 skill icons replaced with custom AI-generated 64×64 PNGs sourced via Cha
 
 ---
 
-## Phase 5 — Maps + obstacles + vehicle enemies
+## Phase 4c — Crate weapons
+
+**Goal:** Crate entities spawn in the world, player can walk into them for a weapon roll, and all three crate-only weapons (Shotgun, Rocket Launcher, Flamethrower) fire and feel distinct.
+
+**Status:** In Progress 🟡 — G3 committed, device test pending
+
+**Commits:** G1: 75dc967 | Fix1: 68f5ef3 | Fix2: 266fbd6 | G2: d6f1c1c | G3: 8c390b3
+
+---
+
+### G1 — Crate entity + world spawn logic
+
+**Commit:** 75dc967
+
+New engine module `crateEngine.ts` introduced. Crates are fixed-slot nullable entities (`Array<CrateState | null>`, cap = 3) following the same pattern as enemies and throwables. A crate spawns at a random position on the map every `CRATE_SPAWN_INTERVAL_MS` (12 000 ms); up to `CRATE_SLOT_COUNT` (3) crates may exist simultaneously. On each tick, `pickupEngine` checks player proximity — if the player touches a crate, it is removed from its slot and a pending-open flag triggers the reveal modal. Army Box sprite (`assets/ui/icons/Army_Box.png`) used for the crate visual, registered in `PickupSprites.crate`. A temporary verification button ("Open Crate") was added to `GameCanvas` to confirm the modal fires on demand before device testing.
+
+**Post-G1 fixes:**
+- `68f5ef3` — `CRATE_SLOT_COUNT` shrunk from 10 → 3 to match the intended active cap (the 10-slot JSX pre-allocation was wrong)
+- `266fbd6` — PKM dropped from the weapon progression table (was unreachable as a crate weapon and had no stub in `weapons.ts`); `gp25` renamed to "Rocket Launcher" in `weapons.ts` for player-facing clarity
+
+---
+
+### G2 — Weapon roll table + crate reveal modal
+
+**Commit:** d6f1c1c
+
+New component `CrateRevealModal.tsx`. When a crate is opened, a weapon is rolled from the pool (`aks74u`, `ak74`, `svd`, `m870`, `gp25`, `rpo`) using uniform random selection — every crate weapon has equal probability. The modal displays:
+- Weapon silhouette icon (kit HUD placeholder — one of three shared silhouettes; tech debt logged)
+- Weapon name + fire-mode label
+- Two buttons: **Equip** (swaps `equippedWeaponId`, closes modal, weapon is now active) and **Scrap** (closes modal with no change)
+
+The Equip flow also resets ammo to the new weapon's `maxAmmo`. Scrap leaves the player's current weapon untouched. Modal dismissal is gated — no tap-outside-to-close; the player must pick a path. Weapon HUD icons registered in `GuiSprites.weaponHudIcons` (6 entries, 3 unique silhouette files from kit).
+
+New constants added to `gameConstants.ts`: `CRATE_WEAPON_POOL`, `CRATE_REVEAL_ANIMATION_MS`, plus the weapon pool array.
+
+---
+
+### G3 — Activate 3 crate weapons
+
+**Commit:** 8c390b3
+
+Three weapons that previously existed only as stubs in `weapons.ts` are now fully active with distinct fire behaviors:
+
+**Shotgun (m870 — 5-pellet spread)**
+- On fire: spawns 5 projectiles simultaneously in a 30° fan (`SHOTGUN_SPREAD_DEG`)
+- Each pellet is an independent `ProjectileState` with `isRocket: false`
+- Angles distributed symmetrically: `baseAngle + (i/(count-1) - 0.5) * spreadRad` for i in 0–4
+- Per-pellet damage is the same as the weapon's base damage; DPS is ×5 at point-blank, falls off with spread at range
+
+**Rocket Launcher (gp25)**
+- On fire: spawns one projectile with `isRocket: true`
+- Rocket flies at standard projectile speed toward the aim point
+- On collision with any enemy: AOE detonation at impact position (`ROCKET_AOE_RADIUS_PX = 60`) via `applyAOEDamage` (reused from throwable engine); enemies within radius take damage, money drops per kill
+- Explosion effect zone (`'explosion'` type) spawned at impact — renders the 4-frame explode sprite sequence
+- Projectile renderer: Skia `<Image>` instead of `<Circle>`, showing a 2-frame rocket body animation; rotated to direction of travel via `Math.atan2(vy, vx) + SPRITE_ROTATION_OFFSET`
+- `SPRITE_ROTATION_OFFSET = -Math.PI/2`: TDS kit sprites face down by default; offset aligns body with direction vector
+- Rocket assets: `assets/effects/rocket/1.png` and `2.png` (copied from `tds-modern-hero-weapons-and-props/rocket/`)
+- `rpo.cooldownMs` bumped from 50 → 250ms to prevent frame-rate-dependent burst fire
+
+**Flamethrower (rpo)**
+- On fire: spawns 3 flame zones in a 45° cone (`FLAMETHROWER_CONE_DEG`) at `FLAMETHROWER_SPAWN_DISTANCE_PX = 50px` ahead of the player
+- Each zone is a `'flame'` type `EffectZoneState` — DoT, 500ms duration, 3 HP/sec
+- Renders the 7-frame kit flame animation (looping, `MOLOTOV_FIRE_FRAME_DURATION_MS` per frame) — same art as molotov fire zone
+- No projectile spawned; the weapon fires instantaneously into zones with no bullet travel
+- Zone spawning happens entirely in the `combatEngine` fire block via `spawnEffectZoneAt` (new export from `throwableEngine`)
+
+**Infrastructure changes enabling G3:**
+- `ProjectileState.isRocket: boolean` — discriminator field; renderer switches Circle → Image; collision loop branches into AOE
+- `EffectZoneState.type` expanded: `'smoke' | 'molotov'` → `'smoke' | 'molotov' | 'flame' | 'explosion'`
+- `applyAOEDamage` exported from `throwableEngine.ts` (was private) — reused by rocket AOE
+- `spawnEffectZoneAt(state, type, x, y)` — new export from `throwableEngine.ts`; spawns a zone at an arbitrary position; used for flamethrower zones (fire block) and rocket explosion (post-collision pass)
+- `EFFECT_ZONE_SLOT_COUNT` raised from 6 → 20 to accommodate simultaneous flame zones
+- Rocket AOE processed in a post-collision pass (after `survivingEnemies` is finalized) to avoid double-killing enemies already transitioning to die animation
+- `GameCanvas` 100ms timer bridges `projIsRocket[]` and `rocketFrame` from SharedValue to React state for conditional render
+
+**Asset inventory (new this phase):**
+- `assets/effects/rocket/1.png` — rocket body frame 1 (from TDS kit `tds-modern-hero-weapons-and-props/rocket/rocket1.png`)
+- `assets/effects/rocket/2.png` — rocket body frame 2 (from TDS kit `tds-modern-hero-weapons-and-props/rocket/rocket2.png`)
+
+---
+
+### Architectural decisions
+
+- **`isRocket` as a projectile-level discriminator, not a weapon-level flag.** Weapon type is available on `GameState` but the per-projectile flag keeps the renderer stateless — it never has to cross-reference weapon data to decide Circle vs. Image. This also handles edge cases where the player switches weapons while a rocket is in flight.
+- **Rocket AOE after die-animation cleanup.** The collision loop marks enemies as dying first; then `survivingEnemies` is the correct input to the AOE pass. Processing AOE inline in the collision loop would double-kill enemies already set to `dying` in the same tick.
+- **`spawnEffectZoneAt` extracted vs. inline zone mutation.** The flamethrower fires 3 zones in a single tick (all from the fire block, not the collision loop). Extracting the worklet allowed chaining: each call returns a new state slice that the next call reads — no raw array mutation inside a worklet.
+- **Flamethrower renders kit flame art.** The molotov fire zone and the flamethrower cone zone use the same `'flame'` type and the same 7-frame animation. This is intentional — same fire, different delivery mechanic. Phase 6 can differentiate if needed.
+- **rpo cooldownMs 50 → 250ms.** At 50ms (same as the machine gun), the flamethrower was firing 20 zone-triples per second, saturating the zone slot pool in one trigger hold. 250ms gives 4 fires/sec — still responsive, zone pool stays healthy.
+
+---
 
 **Goal:** Three hand-authored maps (Compound, Outskirts, Treeline) with tile rendering, map select screen, obstacle placement and collision, all 8 enemy types working including Humvee/BTR/Panzer/ACS vehicle enemies.
 
