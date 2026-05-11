@@ -135,22 +135,6 @@ const WEAPON_LABELS: Record<HeroWeaponPose, string> = {
   flamethrower: 'Flamethrower',
 };
 
-/**
- * Guaranteed weapon floor unlocks — triggers inside handleSkillSelect when
- * player.level increments to one of these values.
- * Both equippedWeaponId (combat stats) and weaponPose (animation) are set together.
- * NOTE: the debug cycle button only mutates weaponPose — it is NOT a reliable
- * indicator of which weapon is equipped. Verify unlocks via combat behavior
- * (fire rate, range, damage), not by reading the cycle button face.
- */
-const WEAPON_UNLOCK_MAP: Record<number, { weaponId: string; weaponPose: HeroWeaponPose }> = {
-  4:  { weaponId: 'aks74u', weaponPose: 'pistol' },
-  8:  { weaponId: 'ak74',   weaponPose: 'rifle' },
-  16: { weaponId: 'svd',    weaponPose: 'rifle' },
-  // pkm (machinegun) removed — dormant in weapons.ts, not surfaced to player.
-  // Progression: Pistol → SMG (L4) → Assault Rifle (L8) → Sniper Rifle (L16).
-};
-
 // Rotation offset: TDS kit sprites face DOWN by default.
 // Subtract π/2 to align with atan2 convention (0 = right).
 // Applied to both hero and enemy transforms.
@@ -1041,10 +1025,6 @@ export default function GameCanvas({ width, height }: Props) {
     // rather than staying above the new cap until the next hit.
     newHp = Math.min(newHp, effective.maxHp);
 
-    // Weapon floor unlock: levels 4, 8, 12, 16 auto-equip the next weapon tier.
-    // Sets both equippedWeaponId (combat stats) and weaponPose (animation).
-    const unlock = WEAPON_UNLOCK_MAP[newLevel];
-
     gameState.value = {
       ...state,
       player: {
@@ -1052,9 +1032,6 @@ export default function GameCanvas({ width, height }: Props) {
         skillStacks: newStacks,
         level: newLevel,
         hp: newHp,
-        ...(unlock !== undefined
-          ? { equippedWeaponId: unlock.weaponId, weaponPose: unlock.weaponPose }
-          : {}),
       },
       pendingLevelUp: newCount > 0,
       pendingLevelUpCount: newCount,
