@@ -14,6 +14,15 @@
  *   expressed as flat modifiers. combatEngine.ts and pickupEngine.ts read skillStacks
  *   directly and apply the effect inline. The registry entry is still needed for modal
  *   display (displayName, description, maxStacks, icon).
+ *
+ * On-selection skills (Phase 4b G2): Field Medic Kit.
+ *   These skills have onSelectEffect set and fire once when the player taps the card.
+ *   Applied on the JS thread inside handleSkillSelect in GameCanvas.tsx, after the stack
+ *   increment, before the modal-close logic. effect: {} — no passive stat contribution.
+ *   Stack count still increments; maxStacks gates re-appearance in the draw pool.
+ *
+ * Description convention (Phase 4b G2): "per stack" dropped from all descriptions —
+ *   the "Lv X/Y" indicator already communicates stacking. Descriptions are effect-only.
  */
 
 import { PLAYER_MOVE_SPEED_PX_PER_SEC } from './gameConstants';
@@ -36,7 +45,21 @@ export type SkillId =
   | 'gear_helmet'
   | 'provisions_painkillers'
   | 'provisions_stims'
-  | 'provisions_comms_headset';
+  | 'provisions_comms_headset'
+  | 'provisions_field_medic_kit';
+
+// ─── On-selection effect descriptor ──────────────────────────────────────────
+
+/**
+ * Effect applied once at the moment the player taps the skill card.
+ * Fired on the JS thread in handleSkillSelect, after the stack increment.
+ * New on-selection effect types: add an optional field here.
+ *
+ * healHp: restore this many HP, capped at effective maxHp (no overheal).
+ */
+type OnSelectEffect = {
+  healHp?: number;
+};
 
 // ─── Effect descriptor ────────────────────────────────────────────────────────
 
@@ -72,6 +95,11 @@ export type SkillDefinition = {
   category: 'ammo' | 'optics' | 'gear' | 'provisions';
   maxStacks: number;
   effect: SkillEffect;
+  /**
+   * Optional effect fired once when the player selects this skill.
+   * Omit for purely passive skills. Handled in GameCanvas handleSkillSelect.
+   */
+  onSelectEffect?: OnSelectEffect;
 };
 
 // ─── Skill registry ───────────────────────────────────────────────────────────
@@ -80,7 +108,7 @@ export const SKILLS: Record<SkillId, SkillDefinition> = {
   ammo_545bt: {
     id: 'ammo_545bt',
     displayName: 'Armor-Piercing Rounds',
-    description: '+20% damage per stack.',
+    description: '+20% damage',
     category: 'ammo',
     maxStacks: 3,
     effect: { damageMultAdd: 0.2 },
@@ -88,7 +116,7 @@ export const SKILLS: Record<SkillId, SkillDefinition> = {
   ammo_subsonic: {
     id: 'ammo_subsonic',
     displayName: 'Subsonic Rounds',
-    description: '+10% fire rate per stack.',
+    description: '+10% fire rate',
     category: 'ammo',
     maxStacks: 3,
     effect: { fireRateMultAdd: 0.1 },
@@ -96,7 +124,7 @@ export const SKILLS: Record<SkillId, SkillDefinition> = {
   ammo_tracer: {
     id: 'ammo_tracer',
     displayName: 'Tracer Rounds',
-    description: 'Projectiles pierce +1 enemy per stack.',
+    description: '+1 pierce',
     category: 'ammo',
     maxStacks: 3,
     effect: { pierceAdd: 1 },
@@ -104,7 +132,7 @@ export const SKILLS: Record<SkillId, SkillDefinition> = {
   optics_red_dot: {
     id: 'optics_red_dot',
     displayName: 'Red Dot',
-    description: '+15% range per stack.',
+    description: '+15% range',
     category: 'optics',
     maxStacks: 3,
     effect: { rangeMultAdd: 0.15 },
@@ -112,7 +140,7 @@ export const SKILLS: Record<SkillId, SkillDefinition> = {
   optics_pso_scope: {
     id: 'optics_pso_scope',
     displayName: 'Holographic Sight',
-    description: '+30% range, -10% fire rate per stack.',
+    description: '+30% range, -10% fire rate',
     category: 'optics',
     maxStacks: 2,
     effect: { rangeMultAdd: 0.3, fireRateMultAdd: -0.1 },
@@ -120,7 +148,7 @@ export const SKILLS: Record<SkillId, SkillDefinition> = {
   gear_plate_carrier: {
     id: 'gear_plate_carrier',
     displayName: 'Plate Carrier',
-    description: '-10% damage taken per stack.',
+    description: '-10% damage taken',
     category: 'gear',
     maxStacks: 3,
     effect: { damageTakenMultAdd: -0.1 },
@@ -128,7 +156,7 @@ export const SKILLS: Record<SkillId, SkillDefinition> = {
   gear_tactical_boots: {
     id: 'gear_tactical_boots',
     displayName: 'Tactical Boots',
-    description: '+12% move speed per stack.',
+    description: '+12% movement',
     category: 'gear',
     maxStacks: 3,
     effect: { moveSpeedMultAdd: 0.12 },
@@ -136,7 +164,7 @@ export const SKILLS: Record<SkillId, SkillDefinition> = {
   gear_mre: {
     id: 'gear_mre',
     displayName: 'MRE',
-    description: '+15 max HP per stack.',
+    description: '+15 max HP',
     category: 'gear',
     maxStacks: 3,
     effect: { maxHpAdd: 15 },
@@ -144,7 +172,7 @@ export const SKILLS: Record<SkillId, SkillDefinition> = {
   provisions_painkillers: {
     id: 'provisions_painkillers',
     displayName: 'Painkillers',
-    description: '+2 HP/sec regen per stack.',
+    description: '+2 HP/sec regen',
     category: 'provisions',
     maxStacks: 3,
     effect: { hpRegenPerSecAdd: 2 },
@@ -152,7 +180,7 @@ export const SKILLS: Record<SkillId, SkillDefinition> = {
   provisions_stims: {
     id: 'provisions_stims',
     displayName: 'Stims',
-    description: '+5% damage, -2 HP/sec regen per stack.',
+    description: '+5% damage, -2 HP/sec',
     category: 'provisions',
     maxStacks: 3,
     effect: { damageMultAdd: 0.05, hpRegenPerSecAdd: -2 },
@@ -163,7 +191,7 @@ export const SKILLS: Record<SkillId, SkillDefinition> = {
   ammo_hollow_points: {
     id: 'ammo_hollow_points',
     displayName: 'Hollow Points',
-    description: '+50% damage to enemies below 50% HP per stack.',
+    description: '+50% damage on low HP',
     category: 'ammo',
     maxStacks: 5,
     // Inline effect: combatEngine reads skillStacks directly at hit time.
@@ -172,7 +200,7 @@ export const SKILLS: Record<SkillId, SkillDefinition> = {
   gear_ceramic_insert: {
     id: 'gear_ceramic_insert',
     displayName: 'Ceramic Insert',
-    description: '-8% damage taken per stack.',
+    description: '-8% damage taken',
     category: 'gear',
     maxStacks: 2,
     effect: { damageTakenMultAdd: -0.08 },
@@ -180,7 +208,7 @@ export const SKILLS: Record<SkillId, SkillDefinition> = {
   optics_suppressor: {
     id: 'optics_suppressor',
     displayName: 'Suppressor',
-    description: '+10% damage to first enemy hit per stack.',
+    description: '+10% damage to first hit',
     category: 'optics',
     maxStacks: 5,
     // Inline effect: combatEngine reads skillStacks directly at hit time.
@@ -189,7 +217,7 @@ export const SKILLS: Record<SkillId, SkillDefinition> = {
   provisions_comms_headset: {
     id: 'provisions_comms_headset',
     displayName: 'Comms Headset',
-    description: '+30% magnet range per stack.',
+    description: '+30% magnet range',
     category: 'provisions',
     maxStacks: 5,
     // Inline effect: pickupEngine reads skillStacks directly for magnet range.
@@ -198,11 +226,25 @@ export const SKILLS: Record<SkillId, SkillDefinition> = {
   gear_helmet: {
     id: 'gear_helmet',
     displayName: 'Helmet',
-    description: '15% chance per stack to negate a hit (max 60%).',
+    description: '15% negate chance (max 60%)',
     category: 'gear',
     maxStacks: 4,
     // Inline effect: combatEngine reads skillStacks directly at contact-damage time.
     effect: {},
+  },
+
+  // ── Phase 4b G2 ─────────────────────────────────────────────────────────────
+
+  provisions_field_medic_kit: {
+    id: 'provisions_field_medic_kit',
+    displayName: 'Field Medic Kit',
+    description: '+25 HP on selection',
+    category: 'provisions',
+    maxStacks: 3,
+    // On-selection effect: heals 25 HP the moment the player taps this card.
+    // No passive stat contribution — effect: {} is intentional.
+    effect: {},
+    onSelectEffect: { healHp: 25 },
   },
 };
 
@@ -228,6 +270,8 @@ export const SKILL_IDS: SkillId[] = [
   'optics_suppressor',
   'provisions_comms_headset',
   'gear_helmet',
+  // Phase 4b G2
+  'provisions_field_medic_kit',
 ];
 
 // ─── Effective stats ──────────────────────────────────────────────────────────

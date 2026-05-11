@@ -156,6 +156,10 @@ export const PickupSprites = {
  *   provisions_stims → Speed_02.png (speed/energy icon matches stims' mechanical identity)
  *   Ammo_Box.png kept registered — parked for Phase 4b crate/weapon icons or future skills.
  *
+ * Phase 4b G2 icon additions:
+ *   provisions_field_medic_kit → HP_Box.png (kit Props/HP — medkit box, direct match for
+ *     on-selection heal; first use of this asset)
+ *
  * Phase 4b G1 icon additions:
  *   ammo_hollow_points → Ammo.png (AMMO category coherence — shares bullet icon)
  *   gear_ceramic_insert → Armor_Small.png (small armor pickup = ceramic plate insert)
@@ -192,5 +196,7 @@ export const GuiSprites = {
     optics_suppressor:       require('../../assets/ui/icons/MG_HUD.png'),
     provisions_comms_headset: require('../../assets/sprites/pickups/money/Money_Small.png'),
     gear_helmet:             require('../../assets/ui/icons/Armor_Icon.png'),
+    // Phase 4b G2
+    provisions_field_medic_kit: require('../../assets/ui/icons/HP_Box.png'),
   },
 } as const;

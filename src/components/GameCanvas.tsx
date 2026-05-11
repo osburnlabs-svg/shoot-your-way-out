@@ -71,8 +71,9 @@ import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 
 import { HeroSprites, EnemySprites, PickupSprites } from '../lib/sprites';
 import type { HeroWeaponPose } from '../lib/sprites';
-import { SKILLS, SKILL_IDS } from '../data/skills';
+import { SKILLS, SKILL_IDS, getEffectiveStats } from '../data/skills';
 import type { SkillId } from '../data/skills';
+import { WEAPON_PROFILES } from '../data/weapons';
 import LevelUpModal from './LevelUpModal';
 import {
   ENEMY_COLLISION_RADIUS_PX,
@@ -706,6 +707,16 @@ export default function GameCanvas({ width, height }: Props) {
     const newStacks = { ...state.player.skillStacks, [id]: currentStacks + 1 };
     const newCount = state.pendingLevelUpCount - 1;
 
+    // On-selection effect: fires after stack increment, before modal close.
+    // Uses newStacks so any passive bonuses from this same selection apply to the cap.
+    const skillDef = SKILLS[id];
+    let newHp = state.player.hp;
+    if (skillDef.onSelectEffect?.healHp) {
+      const weapon = WEAPON_PROFILES[state.player.equippedWeaponId];
+      const effective = getEffectiveStats(newStacks, weapon, state.player.maxHp);
+      newHp = Math.min(state.player.hp + skillDef.onSelectEffect.healHp, effective.maxHp);
+    }
+
     // Weapon floor unlock: levels 4, 8, 12, 16 auto-equip the next weapon tier.
     // Sets both equippedWeaponId (combat stats) and weaponPose (animation).
     const unlock = WEAPON_UNLOCK_MAP[newLevel];
@@ -716,6 +727,7 @@ export default function GameCanvas({ width, height }: Props) {
         ...state.player,
         skillStacks: newStacks,
         level: newLevel,
+        hp: newHp,
         ...(unlock !== undefined
           ? { equippedWeaponId: unlock.weaponId, weaponPose: unlock.weaponPose }
           : {}),
