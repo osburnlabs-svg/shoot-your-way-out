@@ -28,7 +28,7 @@ Status legend:
 | 2 — Player + drag-to-move | 🟢 Complete | 2026-05-08 | G1: fe57417 G2: 9116c45 G3: 3f618d0 G4: 78fa367 | Yes — all 4 groups | All groups complete |
 | 3 — Enemies + auto-fire | 🟢 Complete | 2026-05-10 | G1: c47e000 G2: 083d28d G3: 5715c19 G4b: 738ab95 G4c: a095517 | G1 ✅ G2 ✅ G3 ✅ G4b ✅ G4c ✅ | |
 | 4a — Stat skills + level-up | 🟢 Complete | 2026-05-10 | G1: c4daad8 G2: a095517 G3: f297b4b G3-polish: 461b25b→d90aedf→ba505fc G4: ee7f7d5 G4-cleanup: 5690324 | G1 ✅ G2 ✅ G3 ✅ G4 ✅ | Full progression loop closed. G4: weapon unlocks L4/8/12/16 + all 8 weapon renames |
-| 4b — Ability skills + crates | ⚪ | | | | |
+| 4b — Ability skills + crates | 🟢 Complete | 2026-05-10 | G1: 5411988 Slot-fix: 8ff2533 G2: 18b44e3 G3: e2a1deb G4: 8c31b42 G4-polish: 9cb7762 G5: b4091c6 Smoke: 2438bb4 | G1 ✅ G2 ✅ G3 ✅ G4 ✅ G5 ✅ | All 20 v1 skills shipped; throwable system; revive; bloom-hold-dissipate smoke animation |
 | 5 — Maps + obstacles + vehicle enemies | ⚪ | | | | |
 | 6 — Audio + atmospheric effects | ⚪ | | | | |
 | 7 — UI + persistence + analytics | ⚪ | | | | |
@@ -43,12 +43,13 @@ Status legend:
 |---|---|---|---|
 | SafeAreaProvider native ViewManager not registering on Fabric — react-native-safe-area-context's `RNCSafeAreaProvider` is missing from the New Architecture build despite the package being installed | Phase 2 Group 2 | Hardcoded inset values in DebugOverlay (`top: 50, right: 10`) | Phase 7 — HUD requires real safe-area awareness for notch / dynamic island / home indicator |
 | No camera/zoom system — world renders at 1:1 with no `<Group>` wrapper, sprite scale hardcoded per element | Phase 2 G3 | `HERO_SPRITE_SCALE` constant in `gameConstants.ts` as a tunable | Phase 5 — tile rendering and obstacle placement need a camera that follows the player; multiple sprite scales need a unified zoom |
-| **YOU DIED overlay** — custom RN `<View>` with red "YOU DIED" text, opacity-gated in the JSX tree; not a kit asset | Phase 3 G3 | `displayIsDead` opacity toggle in `GameCanvas.tsx` (opacity 0/1, always in tree, pointerEvents none) | Phase 7 — replace with kit `Mission Failed/BG.png` + `BG Preset.png`, hero death animation (4-frame loop), stats panel (score / time / level / kills), `BTN Retry.png` (REDEPLOY) + `BTN MENU.png` (RETURN TO HQ), revive prompt per Game Over spec |
 | **Debug overlay** — plain RN `<Text>` lines for HP/Score/XP/Level + Enemies/Kills/Time/Frame; hardcoded safe-area offsets; not kit assets | Phase 2 G2 (extended through Phase 3 and 4a G1) | Hardcoded `top: 50, right: 10` in `GameCanvas.tsx`; extended in each phase as new fields arrive | Phase 7 — replace with kit HUD assets: `HUD/CHARACTER HUD/HP ARMOR AMMO HUD.png`, `HUD/MONEY PANEL/Money Panel HUD.png`, `HUD/WEAPON ICONS/` per equipped weapon, bottom-center XP bar with current level; safe-area insets via real `useSafeAreaInsets` once SafeAreaProvider is fixed |
 | **Level-up modal typography is RN default font** — all text in `LevelUpModal.tsx` (skill name, level, description) renders in the system default font | Phase 4a G3 polish | RN default font with kit color palette (`#ffffff` names, `#ffd700` level, `#d0d0d0` desc) | Phase 7 — UI typography pass picks a pixel font and applies consistently across modal, HUD, menus, and YOU DIED overlay (all default-font text is pending replacement in Phase 7, so current consistency is acceptable in the interim) |
 | **Open question: kit UI fit vs. custom UI** — kit-first principle is applied to all UI, but the full system hasn't been seen together yet | Phase 4a G3 polish | Kit-first applied throughout; BG.png crop in this commit is one example of forcing a kit asset to fit the game's needs | Phase 7 — with the full UI visible as a system (modal, HUD, menus, overlays), evaluate whether kit UI elements actually fit the intended look. If they don't, kit-first for UI may need to be relaxed in favor of custom pixel UI. This is a strategic judgment call for Phase 7, not a pre-committed rebuild. **First evidence in:** Phase 4a G3 polish followup discovered the kit's Upgrade BG.png has baked-in weapon placeholder icons in each slot that are part of the panel art itself — not separable layers. Even after cropping to one row, the bullet icons sit behind skill cards and bleed around the edges. The kit UI was designed for a weapon-loadout shooter specifically, not a generic skill modal. Phase 7 should evaluate seriously whether to continue building UI from kit assets or rebuild custom. |
 | **Hit flash visual tuning** — `HIT_FLASH_RADIUS_PX = 7` (~1/3 of `ENEMY_COLLISION_RADIUS_PX`) is a starting point, not a validated value | Phase 4a G3 polish | Constant in `gameConstants.ts`, one-line tune on device | When device testing confirms feel is right; remove from tech debt once Mo signs off on the radius |
 | **Debug cycle button mutates `weaponPose` only — not `equippedWeaponId`** — cycling the button changes the hero animation pose but combat stats (damage, cooldown, range) remain from the previously equipped weapon. The button face is therefore an unreliable indicator of which weapon is actually equipped. | Phase 4a G4 | Button is for visual debugging only; weapon floor unlocks (G4) correctly set both fields | Phase 7 — cycle button is removed entirely when the real HUD weapon icon lands. Do not use the cycle button face to verify weapon equip state. |
+| **Kit UI fit vs. custom UI — reinforced by Phase 4b evidence** — ReviveModal (Phase 4b G3) was built as a custom `<View>` layout because the kit's Mission Failed screen is not composable for a mid-run decision prompt. This is the second case after Phase 4a G3 (BG.png baked-in icons) where kit UI did not fit. | Phase 4a G3 polish (updated Phase 4b G3) | Custom layouts with kit color palette | Phase 7 — with full UI visible as a system, make the strategic call: continue kit-first UI or switch to custom pixel UI throughout. Growing evidence favors custom. |
+| **Projectiles and pickups predate the fixed-slot nullable-array pattern** — they use an always-render slot approach for Skia transforms but their underlying data management predates the formal `Array<T \| null>` pattern established in Phase 3 G3 (enemies) and Phase 4b G4 (throwables/zones). May have subtle inconsistencies in slot lifecycle. | Phase 4b G4 (identified during pattern audit) | No user-visible impact; entity counts are bounded and FPS is stable | Post-launch template pass — Phase 5 vehicle enemies don't require this fix; schedule for the template cleanup pass after v1 ships |
 
 ---
 
@@ -595,7 +596,157 @@ The full progression loop is closed. Run shape: kill → XP → freeze → modal
 
 **Goal:** 10 ability skills (grenades, molotovs, smoke grenades), throwable system with area effects, crate drop system from enemies, crate reveal animation, weapon swap logic.
 
-**Status:** Not started
+**Status:** 🟢 Complete
+
+**Groups:**
+- G1 🟢 — 5 inline-effect skills (commit 5411988, device-tested)
+- Slot-drift fix 🟢 — stable enemy slot indices (commit 8ff2533)
+- G2 🟢 — Field Medic Kit + description polish (commit 18b44e3, device-tested)
+- G3 🟢 — Revive system: Backpack skill + free/ad revive prompt (commit e2a1deb, device-tested)
+- G4 🟢 — Throwable system infrastructure (commits 8c31b42 + 835f8c2 + 9cb7762, device-tested)
+- G5 🟢 — Wire throwable skills + Stims rework (commits b4091c6 + 8304fbf, device-tested)
+- Smoke 🟢 — Smoke art wired + bloom-hold-dissipate animation (commits 27657d1 + b9ec3a6 + 2438bb4, device-tested)
+
+---
+
+## Phase 4b — Group 1: 5 inline-effect skills
+
+**Status:** Complete 🟢
+**Commit:** 5411988
+**Verification:** On device — all five skills appear in the level-up draw pool and function as designed. Hollow Points: kill pace noticeably higher at low HP than at full HP — +50% damage threshold confirmed. Suppressor: first-hit kills coming faster than subsequent hits on fresh enemies. Ceramic Insert: damage-reduction stacks with Plate Carrier — confirmed via longer survival in contact-heavy situations. Comms Headset: magnet range visibly expanded — pickups drew from further away without approaching. Helmet: individual negate rolls (15% chance) are hard to isolate, but contact-damage survival improved measurably at 3–4 stacks.
+
+### What was built
+
+- `src/data/skills.ts`: Five new `SkillId`s (`ammo_hollow_points`, `gear_ceramic_insert`, `optics_suppressor`, `provisions_comms_headset`, `gear_helmet`). All use `effect: {}` — inline-effect pattern formalized here. Icons assigned in `GuiSprites.skillIcons` with tech-debt notes for placeholder matches.
+- `src/lib/combatEngine.ts`: Hollow Points conditional (+50% damage when player HP < 25% of max, reads `skillStacks` directly at hit time). Suppressor first-hit bonus per enemy (+10% per stack, flag cleared on enemy death). Helmet negate roll at contact-damage time (worklet-safe hash of `elapsedMs ^ enemyId`; 15% × stacks, capped at 60%).
+- `src/lib/pickupEngine.ts`: Comms Headset magnet range multiplier (+30% per stack, applied to `MAGNET_RANGE_PX` before distance check).
+
+### Architectural decisions made during G1
+
+- **Inline-effect pattern formalized.** Skills whose effect is conditional (Hollow Points: low-HP trigger) or stateful (Suppressor: per-enemy first-hit flag) cannot be expressed as flat modifiers — the worklet Babel constraint prohibits function-valued fields on `SkillEffect`. These skills use `effect: {}` and the registry entry exists solely for modal display; logic lives in the engine that applies the effect. Pattern documented in skills.ts header.
+- **Helmet negate uses a worklet-safe hash, not `Math.random()`.** `Math.random()` is available in Reanimated worklets (confirmed by existing use in enemyEngine.ts), but a deterministic hash of `(elapsedMs ^ enemyId)` ensures each hit's negate roll is stable across any re-computation of the same tick without accumulating RNG state.
+
+---
+
+## Phase 4b — Slot-drift fix: stable enemy slot indices
+
+**Status:** Complete 🟢
+**Commit:** 8ff2533
+**Verification:** On device — no die-frame flicker or visual artifact observed across 10+ sequential enemy deaths. Enemy sprites transition from alive to death animation cleanly with no one-frame bleed onto adjacent slots.
+
+### What was built
+
+- `src/lib/enemyEngine.ts`: Enemy array converted from compacting (splice on death) to fixed-length nullable (`Array<EnemyState | null>`). Dead enemies' slots are set to `null`; new spawns fill the first-null slot; no slot indices shift after any death event. Matches the existing projectile and pickup slot patterns.
+
+### Architectural decisions
+
+- **Fixed-slot nullable-array is the canonical project pattern for all entity arrays.** Stable slot index = stable React key = no spurious animation state resets. Arrays that compact after removal break key stability: a surviving enemy can shift into a lower slot and inherit a different slot's Skia animation state, producing the die-frame flash this fix eliminates. The pattern now applies to projectiles, pickups, enemies, throwables, and effect zones.
+
+---
+
+## Phase 4b — Group 2: Field Medic Kit + description polish
+
+**Status:** Complete 🟢
+**Commit:** 18b44e3
+**Verification:** On device — Field Medic Kit appears in the draw pool. Tapping at partial HP restores exactly 25 HP (debug overlay confirmed). Tapping at full HP produces no overheal. Three picks available (maxStacks: 3); after third pick the card no longer appears. All existing skill descriptions visibly shorter — no truncation in cards.
+
+### What was built
+
+- `src/data/skills.ts`: `provisions_field_medic_kit` added with `onSelectEffect: { healHp: 25 }` and `effect: {}`. `OnSelectEffect` type introduced. Description convention updated: "per stack" dropped from all skill descriptions — the "Lv X/Y" indicator already communicates stacking.
+- `src/components/GameCanvas.tsx` `handleSkillSelect`: reads `skillDef.onSelectEffect?.healHp` after stack increment; applies `newHp = Math.min(currentHp + healHp, effective.maxHp)`.
+
+### Architectural decisions made during G2
+
+- **`onSelectEffect` optional field on `SkillDefinition`.** Fires once at selection time on the JS thread, inside `handleSkillSelect`, after the stack increment. Separate from passive `effect: {}` modifiers accumulated by `getEffectiveStats`. Enables burst skills (heal, and future XP or ammo grants) without polluting the worklet-safe stat accumulator. Stack count still increments; `maxStacks` gates re-appearance in the draw pool.
+
+---
+
+## Phase 4b — Group 3: Revive system
+
+**Status:** Complete 🟢
+**Commit:** e2a1deb
+**Verification:** On device — full revive path exercised. Reached L5, died. ReviveModal appeared: FREE REVIVE button (Backpack at 1 stack), WATCH AD, GIVE UP. FREE REVIVE: respawned at center with 50 HP and ~2s invulnerability, Backpack stack decremented to 0 — FREE REVIVE absent on second death. WATCH AD: ad stub ran, revive applied, adRevivesUsed incremented; second WATCH AD suppressed on next death (1/run max). GIVE UP: death state confirmed. No regressions on skill modal or existing combat.
+
+### What was built
+
+- `src/lib/gameEngine.ts`: `PlayerState.invulnerableUntilMs`, `PlayerState.adRevivesUsed` added.
+- `src/data/skills.ts`: `gear_backpack` (`effect: {}`, `maxStacks: 1`) — stack count acts as the revive charge counter; decrement on free revive use.
+- `src/components/GameCanvas.tsx`: `ReviveModal` (custom RN `<View>` layout — no kit asset fit for a mid-run decision prompt). `handleFreeRevive`: decrements backpack stack, respawns player at center, sets `invulnerableUntilMs = elapsedMs + 2000`. `handleAdRevive`: `adRevivesUsed` guard (1/run max), same respawn. `handleGiveUp`: confirms death state.
+
+### Architectural decisions made during G3
+
+- **ReviveModal is custom layout, not kit art.** The kit's Mission Failed screen is a full stats + retry panel designed for a game-over endpoint, not a mid-run yes/no prompt. Custom `<View>` with kit color palette is faster to ship and more legible for the player. Phase 7 evaluates whether to unify with the kit's Game Over screen. **Closes the YOU DIED overlay tech debt** — the death-state UX is now fully handled by ReviveModal + GIVE UP path.
+- **`gear_backpack` stack = revive charge.** Doubles as the charge counter without a separate field: 0 = no free revive, 1 = one charge. `maxStacks: 1` limits draw-pool appearances. Decrement in `handleFreeRevive` on the JS thread (safe — game is frozen during death state).
+
+---
+
+## Phase 4b — Group 4: Throwable system infrastructure
+
+**Status:** Complete 🟢
+**Commits:** 8c31b42 (infrastructure) + 835f8c2 (G4 polish: static molotov visual) + 9cb7762 (Reanimated strict-mode fix)
+**Verification:** On device via G4 debug spawn buttons (removed in G5). Frag: arc flight to target, 4-frame Explode sprite at landing (400ms), AOE damage hits enemy cluster within 40px. Smoke: zone appears, enemies inside slow to half speed, zone expires at 4s. Molotov: fire-patch zone appears (static Explode frame 3, peak-bloom), DoT deals 5 dmg/250ms in radius, zone expires at 3s. No Reanimated console warnings after strict-mode fix.
+
+### What was built
+
+- `src/data/gameConstants.ts`: All throwable and zone constants (`THROWABLE_SLOT_COUNT=10`, `EFFECT_ZONE_SLOT_COUNT=6`, travel/arc/damage/radius/duration constants for frag/smoke/molotov).
+- `src/lib/gameEngine.ts`: `ThrowableState` type (`id`, `type`, `status: 'flying'|'detonating'`, `spawnX/Y`, `targetX/Y`, `thrownAtMs`, `detonationStartedAtMs`). `EffectZoneState` type (`id`, `type: 'smoke'|'molotov'`, `x`, `y`, `spawnedAtMs`, `lastTickAppliedMs`). `GameState.throwables` (10 null-initialized slots), `GameState.effectZones` (6 null-initialized slots). `PlayerState.invulnerableUntilMs` (also used by G3 revive).
+- `src/lib/throwableEngine.ts` (new file): `spawnThrowable`, `tickThrowables`, `tickEffectZones`. Arc formula: `y = lerp(spawnY, targetY, frac) − sin(frac × π) × ARC_HEIGHT_PX`. Frag: AOE on landing, status transitions to `'detonating'` and holds slot for 400ms Explode animation. Smoke/molotov: clear throwable slot on landing, spawn EffectZone. `applyAOEDamage` private worklet helper.
+- `src/lib/enemyEngine.ts`: Smoke slow inline in movement tick — reads `state.effectZones` per enemy per tick, applies `SMOKE_SLOW_MULT` when enemy is inside a smoke zone radius. First zone match wins (no stacking).
+- `src/components/GameCanvas.tsx`: `useThrowableSlotTransform` (always-render, returns transform array with −9999 offset for inactive slots — no `.value` read during JSX render). 10-slot flying-circle render + 6-slot zone render. Molotov G4 polish: static Explode frame 3 (index 2, peak-bloom) replaced the looping flamethrower animation that read as a directional stream rather than a ground patch.
+
+### Architectural decisions made during G4
+
+- **Fixed-slot pattern extended to throwables (10) and zones (6).** Same rationale as enemies: stable slot index = stable render key. Throwable count is bounded by auto-throw cooldowns — 10 slots exceeds any realistic concurrent in-flight count at max skill stacks.
+- **Frag holds its slot during detonation; smoke/molotov don't.** Frag needs a fixed visual position for the 400ms Explode animation — the throwable slot provides it. Smoke and molotov clear their throwable slot on landing; the EffectZone carries the persistent visual and gameplay effect.
+- **Smoke slow inline in `tickEnemies`, no new EnemyState field.** Mo's recommendation, accepted. 50 enemies × 6 zones = 300 distance checks/tick — negligible vs 1500 projectile collision checks. One-tick lag (≤16ms) imperceptible. Avoids a `smokeSlowUntilMs` field on every enemy that would need to be threaded through all enemy-state copies.
+- **Reanimated strict-mode: no `.value` read in JSX render.** `useDerivedValue` callbacks are UI-thread safe. JSX `.map()` runs on the React thread — reading `.value` there triggers `"[Reanimated] Reading from value during component render."` Fixed by returning `SharedValue<Transform[]>` directly from `useThrowableSlotTransform` and passing it to `<Group transform={...}>`. Skia reads it on the UI thread. Matches the existing projectile and pickup slot transform pattern.
+
+---
+
+## Phase 4b — Group 5: Wire throwable skills + Stims rework
+
+**Status:** Complete 🟢
+**Commits:** b4091c6 (G5: wire skills + verification button) + 8304fbf (Stims rework + remove +500 XP button)
+**Verification:** On device — all three throwable skills appear in the draw pool and fire on cooldown. Frag Grenade: first throw fired immediately on first enemy in range (cooldown init 0), subsequent throws on interval. Smoke Grenade: zones deployed on cooldown, enemies visibly slowed inside. Molotov: fire patches on cooldown, HP draining on enemies in zone. Stims rework: +5% damage at full HP confirmed via kill-speed comparison; −10 max HP per stack confirmed (debug overlay HP ceiling dropped on selection). HP clamped correctly when new max < current HP.
+
+### What was built
+
+- `src/data/skills.ts`: `throwables_frag`, `throwables_smoke`, `throwables_molotov` (`effect: {}`, `maxStacks: 3`, category `'throwables'`). Stims reworked: `effect: { damageMultAdd: 0.05, maxHpAdd: -10 }` (was `hpRegenPerSecAdd: -2`), description `'+5% damage, -10 max HP'`.
+- `src/lib/gameEngine.ts`: `PlayerState.fragCooldownMs`, `smokeCooldownMs`, `molotovCooldownMs` (all initialized to 0 — fires on first in-range target after selection).
+- `src/lib/throwableEngine.ts`: `tickThrowableSkills` — advances cooldowns, picks a random eligible enemy within `THROWABLE_TARGET_RANGE_PX` (plain `number[]` indices, worklet-safe `Math.random()` selection), calls `spawnThrowable` on expiry. Cooldowns: `max(8000 − 2000×stacks, 4000)` frag, `max(15000 − 3000×stacks, 9000)` smoke, `max(12000 − 3000×stacks, 6000)` molotov.
+- `src/components/GameCanvas.tsx` `handleSkillSelect`: unconditionally recomputes `effective = getEffectiveStats(newStacks, weapon, player.maxHp)` after any skill pick, then `newHp = Math.min(newHp, effective.maxHp)` — single clamp covers max HP reductions (Stims), increases (MRE), and on-selection heals (Field Medic Kit).
+
+### Architectural decisions made during G5
+
+- **Cooldown initialized to 0.** First throw fires the moment an enemy enters range after skill selection — immediate payoff. Cooldown stays at 0 while no target is present (no phantom accumulation). Resets to effective cooldown after a successful throw.
+- **Stims reworked from drain to structural penalty.** `-2 HP/sec` created an ongoing HP race and partially cancelled Painkillers, muddying both skills' identities. `-10 max HP` is a permanent structural trade-off: higher damage ceiling, lower HP ceiling. Risk/reward is legible; interaction surface with other skills is clean.
+- **`handleSkillSelect` HP clamp is unconditional.** A single post-selection `Math.min(newHp, effective.maxHp)` handles all three scenarios (max HP reduction, max HP increase, on-selection heal) without per-skill branching. Applied after stack increment and after heal (if any), so effective.maxHp always reflects the new stack count.
+
+---
+
+## Phase 4b — Smoke art wiring + animation rework
+
+**Status:** Complete 🟢
+**Commits:** 27657d1 (smoke art wired: 7-frame LightSmoke replaces Skia Circle) + b9ec3a6 (bloom-hold-dissipate animation) + 2438bb4 (fix: missing SMOKE_DURATION_MS import)
+**Verification:** On device — smoke zone triggered. Animation: small wisp appears and grows to full dark-grey cloud over ~1s (bloom), holds as full cloud for ~2s, dissipates back to nothing over ~1s. Zone expires at 4s. Smoke slow applies throughout zone lifetime. No regressions on frag Explode animation or molotov fire patch.
+
+### What was built
+
+- `assets/effects/smoke/1-7.png`: 7-frame LightSmoke sequence sourced from `tds-pixel-art-modern-soldiers-and-vehicles-sprites.zip` (the soldiers kit, not the hero props pack — where the art had been all along). Frame 0 (`1.png`) = largest billow; frame 6 (`7.png`) = smallest wisp.
+- `src/lib/sprites.ts`: `EffectSprites.smoke[0–6]` registered. "Phase 6 tech debt: no kit smoke sprite" comment removed — **closes smoke art sourcing tech debt (27657d1).**
+- `src/data/gameConstants.ts`: `SMOKE_ANIM_FRAME_COUNT = 7`, `SMOKE_BLOOM_DURATION_MS = 1000`, `SMOKE_DISSIPATE_DURATION_MS = 1000`. `SMOKE_ANIM_FRAME_DURATION_MS` added then removed (phase-based logic doesn't use per-frame duration).
+- `src/components/GameCanvas.tsx`: 7 `useImage` calls + `smokeImages[]`. 100ms timer computes per-zone frame via three-phase selector: bloom plays 6→0 over `SMOKE_BLOOM_DURATION_MS`, hold clamps to frame 0 for the middle 2000ms, dissipate plays 0→6 over `SMOKE_DISSIPATE_DURATION_MS`. Replaces `getCurrentFrame` looping call and the grey Skia `<Circle>` placeholder.
+
+### Architectural decisions
+
+- **Frame direction inverted from the investigation report's initial labels.** Frame 0 is the largest puff; the initial report labelled playback order as "big→small (dispersion)" which was correct, but the report also described the existing loop as starting with the biggest frame — making bloom require reverse playback (6→0). Confirmed on device after the art wiring commit.
+- **Phase-based animation over looping `getCurrentFrame`.** A continuously looping smoke cloud reads as static magic smoke. Bloom-hold-dissipate reads as a real smoke grenade: puff appears, hangs, clears. The 100ms timer polling granularity (≤100ms jitter per frame transition) is acceptable — smoke transitions are slow enough that the jitter is imperceptible.
+
+---
+
+## Phase 4b — Final summary
+
+All 20 v1 skills shipped: 10 stat-modifier skills from Phase 4a, plus 5 inline-effect skills (G1), Field Medic Kit on-selection heal (G2), Backpack revive charge (G3), and 3 throwable auto-throw skills (G5). The revive system extends runs past first death: one free revive via the Backpack skill, plus one ad revive per run. The throwable system is the engine's first multi-phase entity — spawn → arc flight → landing → detonation or zone effect — with three throwable types and two zone types each with distinct render paths. Runs now have multiple layers of strategic depth: stat compounding, weapon unlocks, burst skills, throwable cooldowns, and a death safety net. The smoke zone graduated from a grey Skia Circle placeholder to sourced kit art with a three-phase animation. Phase 4c picks up crates, crate drop mechanics, and the three crate-only weapon profiles (Shotgun, Grenade Launcher, Flamethrower) already stubbed in `weapons.ts`.
 
 ---
 
