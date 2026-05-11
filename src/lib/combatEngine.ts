@@ -315,9 +315,14 @@ export function tickCombat(state: GameState, dtMs: number): GameState {
   // For each alive enemy overlapping the player, apply contactDamage once per
   // CONTACT_DAMAGE_INTERVAL_MS. Each enemy has its own independent cooldown
   // (lastHitPlayerAtMs), so multiple overlapping enemies each deal damage.
+  //
+  // Invulnerability: when elapsedMs < player.invulnerableUntilMs, the damage
+  // application is skipped but lastHitPlayerAtMs is NOT advanced — enemies
+  // deal damage immediately on their natural cooldown when the window expires.
   let newPlayerHp = player.hp;
   let newLastDamagedAtMs = player.lastDamagedAtMs;
   const contactCheckedEnemies: Array<EnemyState | null> = [];
+  const isInvulnerable = elapsedMs < player.invulnerableUntilMs;
 
   for (let i = 0; i < survivingEnemies.length; i++) {
     const enemy = survivingEnemies[i];
@@ -337,6 +342,7 @@ export function tickCombat(state: GameState, dtMs: number): GameState {
     const distSq = dx * dx + dy * dy;
 
     if (
+      !isInvulnerable &&
       distSq < PLAYER_ENEMY_COLLISION_R_SQ &&
       elapsedMs - enemy.lastHitPlayerAtMs >= CONTACT_DAMAGE_INTERVAL_MS
     ) {

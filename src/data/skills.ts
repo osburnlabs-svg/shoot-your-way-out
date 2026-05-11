@@ -46,7 +46,8 @@ export type SkillId =
   | 'provisions_painkillers'
   | 'provisions_stims'
   | 'provisions_comms_headset'
-  | 'provisions_field_medic_kit';
+  | 'provisions_field_medic_kit'
+  | 'gear_backpack';
 
 // ─── On-selection effect descriptor ──────────────────────────────────────────
 
@@ -235,6 +236,18 @@ export const SKILLS: Record<SkillId, SkillDefinition> = {
 
   // ── Phase 4b G2 ─────────────────────────────────────────────────────────────
 
+  gear_backpack: {
+    id: 'gear_backpack',
+    displayName: 'Backpack',
+    description: '+1 max revive',
+    category: 'gear',
+    maxStacks: 1,
+    // On-death usage: handled by handleFreeRevive in GameCanvas.tsx.
+    // Stack count gates the FREE REVIVE button (> 0 = active) and is
+    // decremented on use. No passive stat contribution.
+    effect: {},
+  },
+
   provisions_field_medic_kit: {
     id: 'provisions_field_medic_kit',
     displayName: 'Field Medic Kit',
@@ -272,6 +285,7 @@ export const SKILL_IDS: SkillId[] = [
   'gear_helmet',
   // Phase 4b G2
   'provisions_field_medic_kit',
+  'gear_backpack',
 ];
 
 // ─── Effective stats ──────────────────────────────────────────────────────────

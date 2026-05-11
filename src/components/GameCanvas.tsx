@@ -75,6 +75,7 @@ import { SKILLS, SKILL_IDS, getEffectiveStats } from '../data/skills';
 import type { SkillId } from '../data/skills';
 import { WEAPON_PROFILES } from '../data/weapons';
 import LevelUpModal from './LevelUpModal';
+import ReviveModal from './ReviveModal';
 import {
   ENEMY_COLLISION_RADIUS_PX,
   ENEMY_SOFT_CAP,
@@ -92,6 +93,7 @@ import {
   PICKUP_SLOT_COUNT,
   PICKUP_SPRITE_SCALE,
   HIT_FLASH_RADIUS_PX,
+  INVULNERABLE_DURATION_MS,
 } from '../data/gameConstants';
 import type { EnemyType } from '../data/enemies';
 import { createInitialGameState, updateGameState } from '../lib/gameEngine';
@@ -342,6 +344,8 @@ export default function GameCanvas({ width, height }: Props) {
   const [displayXp, setDisplayXp] = useState(0);
   const [displayLevel, setDisplayLevel] = useState(1);
   const [displayIsDead, setDisplayIsDead] = useState(false);
+  const [displayBackpackStacks, setDisplayBackpackStacks] = useState(0);
+  const [displayAdRevivesUsed, setDisplayAdRevivesUsed] = useState(0);
 
   // ─── Level-up modal display state (React, updated by 100ms timer) ─────────
   const [displayPendingLevelUp, setDisplayPendingLevelUp] = useState(false);
@@ -371,6 +375,8 @@ export default function GameCanvas({ width, height }: Props) {
       setDisplayXp(Math.floor(player.xp));
       setDisplayLevel(player.level);
       setDisplayIsDead(state.isDead);
+      setDisplayBackpackStacks(state.player.skillStacks['gear_backpack'] ?? 0);
+      setDisplayAdRevivesUsed(state.adRevivesUsed);
 
       // Level-up modal: draw choices on JS thread when pendingLevelUp is first
       // detected and currentLevelUpChoices is still empty (safe to mutate
@@ -738,6 +744,50 @@ export default function GameCanvas({ width, height }: Props) {
     };
   }, [gameState]);
 
+  // ─── Revive handlers ──────────────────────────────────────────────────────
+  // All mutate gameState.value on the JS thread during the isDead freeze.
+  // Same pattern as handleSkillSelect.
+
+  const handleFreeRevive = useCallback(() => {
+    const state = gameState.value;
+    const backpackStacks = state.player.skillStacks['gear_backpack'] ?? 0;
+    if (backpackStacks <= 0) return; // defensive — button should be disabled if 0
+
+    const weapon = WEAPON_PROFILES[state.player.equippedWeaponId];
+    const effective = getEffectiveStats(state.player.skillStacks, weapon, state.player.maxHp);
+
+    gameState.value = {
+      ...state,
+      isDead: false,
+      player: {
+        ...state.player,
+        hp: effective.maxHp,
+        x: state.canvasWidth / 2,
+        y: state.canvasHeight / 2,
+        invulnerableUntilMs: state.elapsedMs + INVULNERABLE_DURATION_MS,
+        skillStacks: {
+          ...state.player.skillStacks,
+          gear_backpack: backpackStacks - 1,
+        },
+      },
+    };
+  }, [gameState]);
+
+  // Phase 9 TODO: replace handler body with rewarded ad flow.
+  // On ad completion: apply revive effects (hp = effective.maxHp, center respawn,
+  // invulnerableUntilMs, isDead = false) and remove the early return.
+  // For now: stub sets adRevivesUsed = 1 so button greys immediately. No revive effect.
+  const handleAdRevive = useCallback(() => {
+    const state = gameState.value;
+    if (state.adRevivesUsed >= 1) return; // defensive
+    gameState.value = { ...state, adRevivesUsed: state.adRevivesUsed + 1 };
+  }, [gameState]);
+
+  const handleRedeploy = useCallback(() => {
+    gameState.value = createInitialGameState(width, height);
+    accumulator.value = 0;
+  }, [gameState, accumulator, width, height]);
+
   // ─── Virtual joystick gesture ──────────────────────────────────────────────
   const panGesture = Gesture.Pan()
     .runOnJS(true)
@@ -988,14 +1038,16 @@ export default function GameCanvas({ width, height }: Props) {
           <Text style={styles.debugText}>Frame: {displayFrameCount}</Text>
         </View>
 
-        {/* YOU DIED overlay — rendered unconditionally, opacity drives visibility.
-            Pointer events always none — no buttons in G3, wired in Phase 7. */}
-        <View
-          style={[styles.deathOverlay, { opacity: displayIsDead ? 1 : 0 }]}
-          pointerEvents="none"
-        >
-          <Text style={styles.deathText}>YOU DIED</Text>
-        </View>
+        {/* Revive prompt — replaces the old YOU DIED overlay.
+            ReviveModal renders null when !visible, so no layout cost when hidden. */}
+        <ReviveModal
+          visible={displayIsDead}
+          backpackStacks={displayBackpackStacks}
+          adRevivesUsed={displayAdRevivesUsed}
+          onFreeRevive={handleFreeRevive}
+          onAdRevive={handleAdRevive}
+          onRedeploy={handleRedeploy}
+        />
 
         {/* Level-up modal — unmounts when not pending (returns null internally too).
             Rendered above YOU DIED so both can't simultaneously be the focus. */}
@@ -1029,21 +1081,5 @@ const styles = StyleSheet.create({
   tapHint: {
     color: '#888',
     fontSize: 9,
-  },
-  deathOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0,0,0,0.7)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  deathText: {
-    color: '#cc3333',
-    fontSize: 48,
-    fontWeight: 'bold',
-    letterSpacing: 4,
   },
 });

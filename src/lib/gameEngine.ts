@@ -118,6 +118,13 @@ export type PlayerState = {
    * Read by getEffectiveStats every tick to compute live weapon/player stats.
    */
   skillStacks: Record<SkillId, number>;
+  /**
+   * elapsedMs until which contact damage is suppressed (post-revive grace window).
+   * 0 when not active. combatEngine §8 skips HP decrement while elapsedMs < this value.
+   * lastHitPlayerAtMs is NOT updated during this window so enemies deal damage
+   * immediately on their natural cooldown when the window expires.
+   */
+  invulnerableUntilMs: number;
 };
 
 /**
@@ -267,6 +274,11 @@ export type GameState = {
    * first detected and currentLevelUpChoices is still empty. Never read by worklets.
    */
   currentLevelUpChoices: SkillId[];
+  /**
+   * Number of ad revives used this run. Capped at 1 — only one ad revive per run.
+   * Incremented by the ad revive handler; reset to 0 on REDEPLOY.
+   */
+  adRevivesUsed: number;
   /** Canvas dimensions stored once at init — spawner uses them to place enemies at edges. */
   canvasWidth: number;
   canvasHeight: number;
@@ -308,6 +320,7 @@ export function createInitialGameState(canvasWidth: number, canvasHeight: number
         provisions_painkillers: 0,
         provisions_stims: 0,
       },
+      invulnerableUntilMs: 0,
     },
     enemies: emptyEnemies,
     nextEnemyId: 0,
@@ -321,6 +334,7 @@ export function createInitialGameState(canvasWidth: number, canvasHeight: number
     pendingLevelUp: false,
     pendingLevelUpCount: 0,
     currentLevelUpChoices: [],
+    adRevivesUsed: 0,
     canvasWidth,
     canvasHeight,
     elapsedMs: 0,

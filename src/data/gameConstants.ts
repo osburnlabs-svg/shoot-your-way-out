@@ -150,6 +150,14 @@ export const ENEMY_DIE_FRAME_DURATION_MS = 100;
 export const PLAYER_STARTING_HP = 100;
 
 /**
+ * Duration (ms) of post-revive invulnerability.
+ * Contact damage is suppressed while elapsedMs < player.invulnerableUntilMs.
+ * lastHitPlayerAtMs is NOT updated during this window so enemies can deal
+ * damage immediately when the window expires.
+ */
+export const INVULNERABLE_DURATION_MS = 3000;
+
+/**
  * Circle collision radius for the player (px). Used for enemy contact damage
  * checks and pickup collection. Hero sprites are ~64px display at 2× scale;
  * 16px is a fair center-body hitbox.

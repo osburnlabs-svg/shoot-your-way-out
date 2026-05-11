@@ -156,6 +156,12 @@ export const PickupSprites = {
  *   provisions_stims → Speed_02.png (speed/energy icon matches stims' mechanical identity)
  *   Ammo_Box.png kept registered — parked for Phase 4b crate/weapon icons or future skills.
  *
+ * Phase 4b G3 icon additions:
+ *   gear_backpack → Army_Box.png (kit Props/Ammo — military supply crate; no backpack/bag
+ *     art exists in kit. Placeholder: "field gear you carry" adjacency. Flag for Phase 7
+ *     if distinct backpack art is sourced.)
+ *     Tech debt: Army_Box is an ammo crate, not a backpack. First use of this asset.
+ *
  * Phase 4b G2 icon additions:
  *   provisions_field_medic_kit → HP_Box.png (kit Props/HP — medkit box, direct match for
  *     on-selection heal; first use of this asset)
@@ -198,5 +204,7 @@ export const GuiSprites = {
     gear_helmet:             require('../../assets/ui/icons/Armor_Icon.png'),
     // Phase 4b G2
     provisions_field_medic_kit: require('../../assets/ui/icons/HP_Box.png'),
+    // Phase 4b G3
+    gear_backpack:               require('../../assets/ui/icons/Army_Box.png'),
   },
 } as const;
