@@ -102,6 +102,8 @@ import {
   FRAG_EXPLODE_FRAME_DURATION_MS,
   EFFECT_SPRITE_SCALE,
   SMOKE_RADIUS_PX,
+  SMOKE_ANIM_FRAME_COUNT,
+  SMOKE_ANIM_FRAME_DURATION_MS,
 } from '../data/gameConstants';
 import type { EnemyType } from '../data/enemies';
 import { createInitialGameState, updateGameState } from '../lib/gameEngine';
@@ -349,6 +351,16 @@ export default function GameCanvas({ width, height }: Props) {
   const flame6 = useImage(EffectSprites.flame[6]);
   const flameImages = [flame0, flame1, flame2, flame3, flame4, flame5, flame6];
 
+  // Smoke: 7 frames (LightSmoke/1–7.png) — dissipation animation, looping over smoke zone lifetime.
+  const smoke0 = useImage(EffectSprites.smoke[0]);
+  const smoke1 = useImage(EffectSprites.smoke[1]);
+  const smoke2 = useImage(EffectSprites.smoke[2]);
+  const smoke3 = useImage(EffectSprites.smoke[3]);
+  const smoke4 = useImage(EffectSprites.smoke[4]);
+  const smoke5 = useImage(EffectSprites.smoke[5]);
+  const smoke6 = useImage(EffectSprites.smoke[6]);
+  const smokeImages = [smoke0, smoke1, smoke2, smoke3, smoke4, smoke5, smoke6];
+
   // ─── Game state ────────────────────────────────────────────────────────────
   const gameState = useSharedValue(createInitialGameState(width, height));
   const accumulator = useSharedValue(0);
@@ -538,8 +550,14 @@ export default function GameCanvas({ width, height }: Props) {
       for (let i = 0; i < state.effectZones.length; i++) {
         const z = state.effectZones[i];
         if (!z) continue;
-        // Molotov zone uses a static explode frame — no frame cycling needed.
-        const zFrame = 0;
+        let zFrame = 0;
+        if (z.type === 'smoke') {
+          zFrame = getCurrentFrame(
+            { frameCount: SMOKE_ANIM_FRAME_COUNT, frameDurationMs: SMOKE_ANIM_FRAME_DURATION_MS, loop: true },
+            state.elapsedMs - z.spawnedAtMs,
+          );
+        }
+        // Molotov zone uses a static explode frame — no frame cycling needed (zFrame stays 0).
         zSlots[i] = { type: z.type, x: z.x, y: z.y, frame: zFrame };
       }
       setZoneSlotData(zSlots);
@@ -1038,19 +1056,25 @@ export default function GameCanvas({ width, height }: Props) {
 
           {/* ── Effect zones (below pickups) ──────────────────────────────── */}
           {/* Z-order: zones < pickups < projectiles < throwables < enemies.  */}
-          {/* Smoke: grey Skia Circle (Phase 6: no kit smoke sprite).         */}
-          {/* Molotov: static Explode frame 3 (index 2) — peak-bloom reads as */}
-          {/*   "fire patch on ground" vs flamethrower stream. Phase 6: tune.  */}
+          {/* Smoke: 7-frame LightSmoke animation (dissipation loop, 150ms/frame). */}
+          {/* Molotov: static Explode frame 3 (index 2) — peak-bloom reads as   */}
+          {/*   "fire patch on ground" vs flamethrower stream. Phase 6: tune.    */}
           {zoneSlotData.map((z, i) => {
             if (!z.type) return null;
             if (z.type === 'smoke') {
+              const smokeImg = smokeImages[z.frame] ?? smokeImages[0] ?? null;
+              if (!smokeImg) return null;
+              const sw = smokeImg.width() * EFFECT_SPRITE_SCALE;
+              const sh = smokeImg.height() * EFFECT_SPRITE_SCALE;
               return (
-                <Circle
+                <Image
                   key={`zone-${i}`}
-                  cx={z.x}
-                  cy={z.y}
-                  r={SMOKE_RADIUS_PX}
-                  color="rgba(160, 200, 160, 0.45)"
+                  image={smokeImg}
+                  x={z.x - sw / 2}
+                  y={z.y - sh / 2}
+                  width={sw}
+                  height={sh}
+                  sampling={{ filter: FilterMode.Nearest, mipmap: MipmapMode.None }}
                 />
               );
             }

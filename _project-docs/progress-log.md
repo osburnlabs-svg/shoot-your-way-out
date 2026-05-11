@@ -745,7 +745,7 @@ Per-asset tracking of what's been imported and where it lives in the project.
 | Civilian vehicles (kit 2) | ⚪ Not imported | | Phase 5 |
 | Pickups | ⚪ Not imported | | Phase 4a |
 | Weapon crate | ⚪ Not imported | | Phase 4b |
-| Effects (explosions, smoke, flames) | ⚪ Not imported | | Phase 6 |
+| Effects (explosions, smoke, flames) | 🟡 Partial | explode (4f), flame (7f), smoke (7f) imported; full Phase 6 polish TBD | Phase 6 |
 | GUI assets | ⚪ Not imported | | Phase 7 |
 | App store icons | ⚪ Not imported | | Phase 9 |
 | Music tracks | ⚪ Not sourced yet | | Phase 6 |

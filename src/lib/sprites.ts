@@ -202,8 +202,11 @@ export const PickupSprites = {
  * flame: Effects/Flamethrower/1–7.png (7 frames, 120ms each, looping).
  *   Used for molotov fire zone visual — loops for MOLOTOV_DURATION_MS.
  *
- * Phase 6 tech debt: smoke zone has no kit sprite (no LightSmoke asset in kit).
- *   Smoke zone is rendered as a Skia Circle (grey, ~0.45 opacity) as a placeholder.
+ * smoke: Effects/LightSmoke/1–7.png (7 frames, 150ms each, looping).
+ *   Used for smoke zone visual — dissipation sequence (large puff → tiny wisp),
+ *   loops ~3.8× over SMOKE_DURATION_MS (4000ms). Sourced from
+ *   tds-pixel-art-modern-soldiers-and-vehicles-sprites.zip; replaces the
+ *   Skia Circle placeholder that shipped with Phase 4b G5.
  */
 export const EffectSprites = {
   explode: [
@@ -220,6 +223,15 @@ export const EffectSprites = {
     require('../../assets/effects/flame/5.png'),
     require('../../assets/effects/flame/6.png'),
     require('../../assets/effects/flame/7.png'),
+  ],
+  smoke: [
+    require('../../assets/effects/smoke/1.png'),
+    require('../../assets/effects/smoke/2.png'),
+    require('../../assets/effects/smoke/3.png'),
+    require('../../assets/effects/smoke/4.png'),
+    require('../../assets/effects/smoke/5.png'),
+    require('../../assets/effects/smoke/6.png'),
+    require('../../assets/effects/smoke/7.png'),
   ],
 } as const;
 

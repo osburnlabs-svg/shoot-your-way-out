@@ -274,6 +274,12 @@ export const SMOKE_DURATION_MS = 4000;
 /** Speed multiplier applied to enemies inside a smoke zone. 0.5 = half speed. */
 export const SMOKE_SLOW_MULT = 0.5;
 
+/** Frame count for the LightSmoke animation (7-frame dissipation sequence). */
+export const SMOKE_ANIM_FRAME_COUNT = 7;
+
+/** Duration per smoke frame in ms. 7 frames × 150ms ≈ 1050ms/cycle (~3.8 loops over 4000ms). */
+export const SMOKE_ANIM_FRAME_DURATION_MS = 150;
+
 // ─── Molotov ──────────────────────────────────────────────────────────────────
 
 /** Radius (px) of the fire damage zone. */
