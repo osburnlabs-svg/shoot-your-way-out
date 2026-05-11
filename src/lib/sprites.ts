@@ -170,9 +170,9 @@ export const PickupSprites = {
  *   ammo_hollow_points → Ammo.png (AMMO category coherence — shares bullet icon)
  *   gear_ceramic_insert → Armor_Small.png (small armor pickup = ceramic plate insert)
  *   optics_suppressor → MG_HUD.png (third weapon silhouette for OPTICS category)
- *   provisions_comms_headset → Money_Small.png (32×32 pickup sprite; functional link —
- *     skill extends money magnet range; Money_Icon.png from kit is 14×14, too small)
- *     Tech debt: pickup sprite used as skill icon; no headset/comms art in kit.
+ *   provisions_comms_headset → Comms_Headset.png (50×50 AI-generated pixel art, sourced
+ *     via ChatGPT image gen + Adobe Express transparency pass; pilot for batch sprite
+ *     replacement workflow. Replaces Money_Small.png placeholder.)
  *   gear_helmet → Armor_Icon.png (accepted duplicate with Plate Carrier within GEAR
  *     category; no helmet-specific art in kit)
  *     Tech debt: shares icon with gear_plate_carrier; flag for Phase 7 if distinct art sourced.
@@ -254,7 +254,7 @@ export const GuiSprites = {
     ammo_hollow_points:      require('../../assets/ui/icons/Ammo.png'),
     gear_ceramic_insert:     require('../../assets/ui/icons/Armor_Small.png'),
     optics_suppressor:       require('../../assets/ui/icons/MG_HUD.png'),
-    provisions_comms_headset: require('../../assets/sprites/pickups/money/Money_Small.png'),
+    provisions_comms_headset: require('../../assets/ui/icons/Comms_Headset.png'),
     gear_helmet:             require('../../assets/ui/icons/Armor_Icon.png'),
     // Phase 4b G2
     provisions_field_medic_kit: require('../../assets/ui/icons/HP_Box.png'),
