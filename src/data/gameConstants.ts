@@ -335,7 +335,7 @@ export const FLAMETHROWER_ZONE_RADIUS_PX = 25;
 export const FLAMETHROWER_ZONE_DURATION_MS = 500;
 
 /** DoT damage per second to enemies inside a flame zone. */
-export const FLAMETHROWER_ZONE_DAMAGE_PER_SEC = 3;
+export const FLAMETHROWER_ZONE_DAMAGE_PER_SEC = 35;
 
 /** Distance (px) from player center at which flame zones spawn along the cone. */
 export const FLAMETHROWER_SPAWN_DISTANCE_PX = 50;
