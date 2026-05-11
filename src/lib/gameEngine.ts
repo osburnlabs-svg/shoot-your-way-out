@@ -333,6 +333,8 @@ export type EffectZoneState = {
   type: 'smoke' | 'molotov' | 'flame' | 'explosion';
   x: number;
   y: number;
+  /** Spawn-time orientation in radians. Non-zero only for 'flame' (flamethrower cone zones). */
+  rotation: number;
   spawnedAtMs: number;
   lastTickAppliedMs: number;
 };

@@ -586,6 +586,7 @@ export default function GameCanvas({ width, height }: Props) {
         x: 0,
         y: 0,
         frame: 0,
+        rotation: 0,
       }));
       for (let i = 0; i < state.effectZones.length; i++) {
         const z = state.effectZones[i];
@@ -618,7 +619,7 @@ export default function GameCanvas({ width, height }: Props) {
           );
         }
         // Molotov zone uses a static explode frame — no frame cycling needed (zFrame stays 0).
-        zSlots[i] = { type: z.type, x: z.x, y: z.y, frame: zFrame };
+        zSlots[i] = { type: z.type, x: z.x, y: z.y, frame: zFrame, rotation: z.rotation };
       }
       setZoneSlotData(zSlots);
 
@@ -923,8 +924,9 @@ export default function GameCanvas({ width, height }: Props) {
     x: number;
     y: number;
     frame: number;
+    rotation: number;
   }>>(() => Array.from({ length: EFFECT_ZONE_SLOT_COUNT }, () => ({
-    type: null, x: 0, y: 0, frame: 0,
+    type: null, x: 0, y: 0, frame: 0, rotation: 0,
   })));
 
   // ─── Projectile rocket flags + animation frame (100ms timer bridge) ───────
@@ -1233,21 +1235,30 @@ export default function GameCanvas({ width, height }: Props) {
               );
             }
             if (z.type === 'flame') {
-              // Flamethrower zone: looping flame animation (7 frames × 120ms).
+              // Flamethrower zone: directional jet sprite rotated to cone angle.
+              // Group centers on zone position, rotates to spawn angle, image offsets to center.
               const flameImg = flameImages[z.frame] ?? flameImages[0] ?? null;
               if (!flameImg) return null;
               const fw = flameImg.width() * EFFECT_SPRITE_SCALE;
               const fh = flameImg.height() * EFFECT_SPRITE_SCALE;
               return (
-                <Image
+                <Group
                   key={`zone-${i}`}
-                  image={flameImg}
-                  x={z.x - fw / 2}
-                  y={z.y - fh / 2}
-                  width={fw}
-                  height={fh}
-                  sampling={{ filter: FilterMode.Nearest, mipmap: MipmapMode.None }}
-                />
+                  transform={[
+                    { translateX: z.x },
+                    { translateY: z.y },
+                    { rotate: z.rotation + SPRITE_ROTATION_OFFSET },
+                  ]}
+                >
+                  <Image
+                    image={flameImg}
+                    x={-fw / 2}
+                    y={-fh / 2}
+                    width={fw}
+                    height={fh}
+                    sampling={{ filter: FilterMode.Nearest, mipmap: MipmapMode.None }}
+                  />
+                </Group>
               );
             }
             if (z.type === 'explosion') {

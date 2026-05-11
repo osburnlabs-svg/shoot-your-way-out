@@ -166,6 +166,7 @@ export function spawnEffectZoneAt(
   type: 'flame' | 'explosion',
   x: number,
   y: number,
+  rotation = 0,
 ): GameState {
   'worklet';
 
@@ -182,6 +183,7 @@ export function spawnEffectZoneAt(
     type,
     x,
     y,
+    rotation,
     spawnedAtMs: state.elapsedMs,
     lastTickAppliedMs: 0,
   };
@@ -319,6 +321,7 @@ export function tickThrowables(state: GameState, _dtMs: number): GameState {
             type: t.type as 'smoke' | 'molotov',
             x: t.targetX,
             y: t.targetY,
+            rotation: 0,
             spawnedAtMs: elapsedMs,
             lastTickAppliedMs: 0,
           };
@@ -409,6 +412,7 @@ export function tickEffectZones(state: GameState, _dtMs: number): GameState {
           type: zone.type,
           x: zone.x,
           y: zone.y,
+          rotation: zone.rotation,
           spawnedAtMs: zone.spawnedAtMs,
           lastTickAppliedMs: elapsedMs,
         };
@@ -432,6 +436,7 @@ export function tickEffectZones(state: GameState, _dtMs: number): GameState {
           type: zone.type,
           x: zone.x,
           y: zone.y,
+          rotation: zone.rotation,
           spawnedAtMs: zone.spawnedAtMs,
           lastTickAppliedMs: elapsedMs,
         };

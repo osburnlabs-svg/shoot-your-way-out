@@ -184,7 +184,7 @@ export function tickCombat(state: GameState, dtMs: number): GameState {
         const angle = baseAngle + offset;
         const zx = player.x + Math.cos(angle) * FLAMETHROWER_SPAWN_DISTANCE_PX;
         const zy = player.y + Math.sin(angle) * FLAMETHROWER_SPAWN_DISTANCE_PX;
-        tmpState = spawnEffectZoneAt(tmpState, 'flame', zx, zy);
+        tmpState = spawnEffectZoneAt(tmpState, 'flame', zx, zy, angle);
       }
       effectZones = tmpState.effectZones;
       nextEffectZoneId = tmpState.nextEffectZoneId;
