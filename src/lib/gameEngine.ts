@@ -58,6 +58,7 @@ import { STARTING_WEAPON_ID, WEAPON_PROFILES } from '../data/weapons';
 import {
   PLAYER_MAX_ANGULAR_SPEED_RAD_PER_SEC,
   PLAYER_STARTING_HP,
+  ENEMY_SOFT_CAP,
 } from '../data/gameConstants';
 import type { SkillId } from '../data/skills';
 import { getEffectiveStats } from '../data/skills';
@@ -219,8 +220,15 @@ export type PickupState = {
 
 export type GameState = {
   player: PlayerState;
-  /** All currently live enemies (alive + dying). Filtered/replaced each tick — no mutation. */
-  enemies: EnemyState[];
+  /**
+   * Fixed-length sparse array of ENEMY_SOFT_CAP (50) slots.
+   * null = empty slot (enemy despawned or never spawned).
+   * Slot index is stable for each enemy's full lifetime — no compaction on death.
+   * Dying enemies set their slot to null after the die animation completes.
+   * This prevents slot-index drift between the UI-thread transforms (per-frame)
+   * and React sprite state (100ms poll), which caused die-frame flashes on alive enemies.
+   */
+  enemies: Array<EnemyState | null>;
   /** Monotonically increasing counter — ensures every enemy has a unique id. */
   nextEnemyId: number;
   /** Spawn time accumulator in ms — carries sub-interval remainder across ticks. */
@@ -268,6 +276,8 @@ export type GameState = {
 
 export function createInitialGameState(canvasWidth: number, canvasHeight: number): GameState {
   'worklet';
+  const emptyEnemies: Array<EnemyState | null> = [];
+  for (let i = 0; i < ENEMY_SOFT_CAP; i++) { emptyEnemies.push(null); }
   return {
     player: {
       x: canvasWidth / 2,
@@ -299,7 +309,7 @@ export function createInitialGameState(canvasWidth: number, canvasHeight: number
         provisions_stims: 0,
       },
     },
-    enemies: [],
+    enemies: emptyEnemies,
     nextEnemyId: 0,
     spawnAccMs: 0,
     projectiles: [],

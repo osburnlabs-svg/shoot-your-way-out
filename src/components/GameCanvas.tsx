@@ -407,6 +407,7 @@ export default function GameCanvas({ width, height }: Props) {
 
       for (let i = 0; i < state.enemies.length; i++) {
         const enemy = state.enemies[i];
+        if (!enemy) continue; // null slot — types[i] stays null (already initialized)
         types[i] = enemy.type;
         statuses[i] = enemy.status;
 
@@ -790,7 +791,8 @@ export default function GameCanvas({ width, height }: Props) {
       // Count only alive enemies for the display (dying ones are finishing their animation).
       let aliveCount = 0;
       for (let i = 0; i < state.enemies.length; i++) {
-        if (state.enemies[i].status === 'alive') aliveCount += 1;
+        const e = state.enemies[i];
+        if (e && e.status === 'alive') aliveCount += 1;
       }
       runOnJS(updateDebugDisplay)(
         fps,

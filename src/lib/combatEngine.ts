@@ -100,7 +100,7 @@ export function tickCombat(state: GameState, dtMs: number): GameState {
 
   for (let i = 0; i < enemies.length; i++) {
     const e = enemies[i];
-    if (e.status !== 'alive') continue;
+    if (!e || e.status !== 'alive') continue;
     const dx = e.x - player.x;
     const dy = e.y - player.y;
     const dSq = dx * dx + dy * dy;
@@ -190,7 +190,7 @@ export function tickCombat(state: GameState, dtMs: number): GameState {
 
     for (let ei = 0; ei < enemies.length; ei++) {
       const enemy = enemies[ei];
-      if (enemy.status !== 'alive') continue;
+      if (!enemy || enemy.status !== 'alive') continue;
 
       // Skip enemies this projectile has already hit.
       let alreadyHit = false;
@@ -246,9 +246,13 @@ export function tickCombat(state: GameState, dtMs: number): GameState {
   }
 
   // Apply damage to enemies, transition dying ones, spawn pickups on death.
-  const damagedEnemies: EnemyState[] = [];
+  const damagedEnemies: Array<EnemyState | null> = [];
   for (let i = 0; i < enemies.length; i++) {
     const enemy = enemies[i];
+    if (!enemy) {
+      damagedEnemies.push(null);
+      continue;
+    }
     const dmg = damageAccum[i];
     if (dmg === 0) {
       damagedEnemies.push(enemy);
@@ -287,13 +291,22 @@ export function tickCombat(state: GameState, dtMs: number): GameState {
     });
   }
 
-  // ─── 7. Cleanup: remove enemies whose die animation has finished ──────────
-  const survivingEnemies: EnemyState[] = [];
+  // ─── 7. Cleanup: null out slots whose die animation has finished ─────────
+  // Slot index is stable — null reclaims the slot without compacting the array.
+  // This prevents slot-index drift between UI-thread transforms and React sprite state.
+  const survivingEnemies: Array<EnemyState | null> = [];
   for (let i = 0; i < damagedEnemies.length; i++) {
     const enemy = damagedEnemies[i];
+    if (!enemy) {
+      survivingEnemies.push(null);
+      continue;
+    }
     if (enemy.status === 'dying') {
       const dieElapsed = elapsedMs - enemy.dyingStartedAtMs;
-      if (dieElapsed >= DIE_DURATION_MS) continue; // animation done, despawn
+      if (dieElapsed >= DIE_DURATION_MS) {
+        survivingEnemies.push(null); // animation done — slot reclaimed
+        continue;
+      }
     }
     survivingEnemies.push(enemy);
   }
@@ -304,10 +317,15 @@ export function tickCombat(state: GameState, dtMs: number): GameState {
   // (lastHitPlayerAtMs), so multiple overlapping enemies each deal damage.
   let newPlayerHp = player.hp;
   let newLastDamagedAtMs = player.lastDamagedAtMs;
-  const contactCheckedEnemies: EnemyState[] = [];
+  const contactCheckedEnemies: Array<EnemyState | null> = [];
 
   for (let i = 0; i < survivingEnemies.length; i++) {
     const enemy = survivingEnemies[i];
+
+    if (!enemy) {
+      contactCheckedEnemies.push(null);
+      continue;
+    }
 
     if (enemy.status !== 'alive') {
       contactCheckedEnemies.push(enemy);

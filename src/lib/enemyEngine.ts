@@ -105,22 +105,36 @@ export function tickEnemies(state: GameState, dtMs: number): GameState {
   let spawnAccMs = state.spawnAccMs;
 
   // ─── Spawner ──────────────────────────────────────────────────────────────
-  if (elapsedMs >= SPAWN_INITIAL_DELAY_MS && enemies.length < ENEMY_SOFT_CAP) {
+  // enemies is a fixed ENEMY_SOFT_CAP-length sparse array (null = empty slot).
+  // Count free slots to determine if we are at the soft cap.
+  let freeSlotCount = 0;
+  for (let i = 0; i < enemies.length; i++) {
+    if (enemies[i] === null) freeSlotCount += 1;
+  }
+
+  if (elapsedMs >= SPAWN_INITIAL_DELAY_MS && freeSlotCount > 0) {
     const rate = spawnRateAt(elapsedMs);
     const intervalMs = 1000 / rate;
     let acc = spawnAccMs + dtMs;
 
     // Build new array only if we're actually spawning something this tick.
     if (acc >= intervalMs) {
-      const next: EnemyState[] = [];
+      const next: Array<EnemyState | null> = [];
       for (let i = 0; i < enemies.length; i++) {
         next.push(enemies[i]);
       }
 
-      while (acc >= intervalMs && next.length < ENEMY_SOFT_CAP) {
+      while (acc >= intervalMs) {
+        // Find the first free (null) slot.
+        let freeSlot = -1;
+        for (let si = 0; si < next.length; si++) {
+          if (next[si] === null) { freeSlot = si; break; }
+        }
+        if (freeSlot === -1) break; // all slots occupied — at soft cap
+
         const pos = randomEdgePos(canvasWidth, canvasHeight);
         const type = rollEnemyType(elapsedMs);
-        next.push({
+        next[freeSlot] = {
           id: nextEnemyId,
           type,
           x: pos.x,
@@ -131,7 +145,7 @@ export function tickEnemies(state: GameState, dtMs: number): GameState {
           dyingStartedAtMs: 0,
           lastHitPlayerAtMs: 0,
           hitFlashUntilMs: 0,
-        });
+        };
         nextEnemyId += 1;
         acc -= intervalMs;
       }
@@ -144,7 +158,7 @@ export function tickEnemies(state: GameState, dtMs: number): GameState {
     // Hold accumulator at zero during the initial delay window.
     spawnAccMs = 0;
   } else {
-    // Soft cap hit — keep accumulating but don't spawn.
+    // Soft cap hit (no free slots) — keep accumulating but don't spawn.
     spawnAccMs = spawnAccMs + dtMs;
   }
 
@@ -155,12 +169,18 @@ export function tickEnemies(state: GameState, dtMs: number): GameState {
   const py = state.player.y;
   const dtSec = dtMs / 1000;
 
-  const moved: EnemyState[] = [];
+  const moved: Array<EnemyState | null> = [];
   for (let i = 0; i < enemies.length; i++) {
     const enemy = enemies[i];
 
+    if (enemy === null) {
+      // Empty slot — pass through unchanged.
+      moved.push(null);
+      continue;
+    }
+
     if (enemy.status === 'dying') {
-      // Leave in place; combatEngine will remove after die animation completes.
+      // Leave in place; combatEngine will null the slot after die animation completes.
       moved.push(enemy);
       continue;
     }
