@@ -379,13 +379,27 @@ This is acceptable for v1. Generating 20 unique pixel-art icons isn't necessary 
 | Scav | Soldier (kit 1a) | 15 | 1.2 | 5 | 3 | 1+ | Basic foot soldier |
 | Raider | Soldier 02 (kit 1a) | 40 | 1.8 | 12 | 8 | 2+ | Faster, more dangerous |
 | Gunner | Gunner (kit 1b) | 60 | 0.9 | 8/tick | 12 | 3+ | Stationary fire bursts |
-| Sniper | Sniper (kit 1b) | 30 | 0.7 | 30 | 15 | 4+ | Long range, red laser warning |
+| Sniper | Sniper (kit 1b) | 40–50 | — | 40–50 | 0 | Map start | Stationary rooftop turret — see design note below |
 | **Humvee** | Humvee | 80 | 1.5 | 15 | 18 | 5+ | Drives through, rams player |
 | **BTR** | BTR | 150 | 1.0 | 18 | 30 | 6+ | Drops guaranteed pickup |
 | **Panzer** | Panzer | 250 | 0.6 | 25 | 50 | 7+ | Mini-boss tank — drops crate (15% chance) |
 | **ACS** | ACS | 200 | 0.7 | 20 | 40 | 7+ | Alt to Panzer, drops crate (15% chance) |
 
 The Juggernaut concept is removed — Panzer and ACS replace it with proper sprites.
+
+### Sniper — Design Note (rooftop turret, Phase 5)
+
+**Decision (Phase 4c planning):** The kit's ghillie-suit sniper sprite is designed for stationary rooftop use, not mobile infantry. The reference art shows snipers mounted on building rooftops, not walking the arena. The Sniper is implemented as a building-mounted turret, not a walking enemy.
+
+**Behavior:** Spawns on building rooftops at map start (count per map locked during Phase 5 map planning). Does not move or path-find. Fires at the player when in range.
+
+**Fire pattern:** Slow rate (~3–5 second cooldown). High single-shot damage (~40–50, versus pistol baseline of 12). Visible telegraph: laser sight or muzzle flash glow for ~1 second before the shot fires. Player has time to break line of sight or rush the position.
+
+**Loot drops:** None. Snipers are environmental hazards, not loot sources. The reward for clearing one is eliminating that line of fire.
+
+**Tactical role:** Building placement on each map defines lines of fire the player must navigate around or clear before holding that area. Snipers turn structures into tactical terrain rather than passive props.
+
+**Numbers:** HP, damage, and spawn counts are Phase 5 balance targets. All values in the table above are starting points.
 
 ### Boss: The Hunter (Helicopter)
 
@@ -463,7 +477,7 @@ Players choose a location from main menu before deploying. Each map is a hand-au
 - Base tileset: `_0004_RoadTiles.png` (asphalt) with `_0005_RoadDecals.png` accents
 - Obstacles: wrecked cars from kit 2 `Broken_assets/` (cars, trucks, small_trucks, ambulance, police_car), `SandBag.png`, `Crates Barrels/` props
 - Background dressing: pristine cars from kit 2 (10 colors) parked along edges
-- One central `House01.png` structure
+- One central `House01.png` structure with a rooftop sniper position (additional positions TBD, Phase 5 map planning)
 - Slightly higher enemy density (1.1× spawn rate)
 - Atmosphere: cold gray-blue tint, less ambient light
 - Theme caption: *"Close-quarters firefight."*
@@ -471,9 +485,9 @@ Players choose a location from main menu before deploying. Each map is a hand-au
 **2. The Outskirts (Desert Compound)**
 - Base tileset: `_0002_SandTiles.png`, transitions via `_0007_SandToRoad.png`
 - Obstacles: `Rocks/Rock01-03.png`, `SandBag.png`, oil barrels, BTR/ACS wrecks (using broken sprites)
-- One `WatchTower.png` at center (tactical landmark)
-- Sparser cover, longer sightlines
-- Sniper enemies hit harder (1.3× damage), longer range
+- One `WatchTower.png` at center (tactical landmark) — primary rooftop sniper position
+- Sparser cover, longer sightlines — suits rooftop turrets; Outskirts snipers have greater effective range than Compound (Phase 5 balance)
+- Sniper positions: count TBD, Phase 5 map planning
 - Atmosphere: warm sand tint, dust haze, brighter
 - Theme caption: *"The snipers favor this terrain."*
 
@@ -482,6 +496,7 @@ Players choose a location from main menu before deploying. Each map is a hand-au
 - Obstacles: `Trees Bushes/Tree1-7.png` (multiple variants), `Bush-01-03.png`, `Stumps`, `Rocks`
 - More obstacles overall (1.4× cover density), tighter sightlines
 - Mid-range engagements favored
+- No buildings — snipers absent or minimal; forested terrain blocks the long sightlines rooftop turrets depend on
 - Atmosphere: green tint, slight fog, occasional bird sounds (if SFX available)
 - Theme caption: *"Watch the brush."*
 
@@ -844,6 +859,8 @@ Each phase = one focused CC session. Commit to GitHub after each phase. Test on 
 **Audio is added incrementally** — stubbed in Phase 1, called by all phases, fully wired in Phase 6.
 
 **Vehicle enemies (Humvee/BTR/Panzer/ACS)** are introduced in Phase 5 alongside maps because they need obstacle collision systems.
+
+**Phase 5 ships two new specialist enemy classes alongside the vehicle roster:** the Gunner (mobile, stationary fire bursts) and the Sniper (stationary rooftop turret). Both use kit 1b sprites. Gunner follows the standard wave-spawner path. Sniper uses a rooftop spawn system separate from the wave spawner — spawns at map start at fixed building positions defined in the map JSON. Phase 5 map JSONs need a `sniperPositions` array (or similar) specifying each rooftop spawn point. No pathfinding required for Sniper — AI is: find player in range → telegraph (~1s) → fire.
 
 **Phase 5 also owns the world camera system.** Deliverable: wrap all rendered world entities (tiles, player, enemies, projectiles, obstacles) in a single Skia `<Group>` with a camera transform — scale for zoom level, translate for follow-the-player offset. This replaces all per-sprite scale hardcoding (`HERO_SPRITE_SCALE` and equivalents). Final zoom level cannot be determined until tiles + enemies + HUD are all visible together, so Phase 5 is the right time to lock it.
 
