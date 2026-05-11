@@ -843,17 +843,6 @@ export default function GameCanvas({ width, height }: Props) {
     };
   }, [gameState]);
 
-  // ─── TEMPORARY G5 VERIFICATION DEBUG BUTTON — remove before phase close ──
-  // Grants +500 XP to fast-track leveling and verify throwable skill cards appear
-  // in the draw pool and behave correctly on device.
-  const handleAddXp = useCallback(() => {
-    const state = gameState.value;
-    gameState.value = {
-      ...state,
-      player: { ...state.player, xp: state.player.xp + 500 },
-    };
-  }, [gameState]);
-
   // ─── Skill selection handler ───────────────────────────────────────────────
   // Mutates gameState.value directly on the JS thread — safe because the engine
   // is frozen (pendingLevelUp guard in updateGameState) during the modal window.
@@ -866,15 +855,19 @@ export default function GameCanvas({ width, height }: Props) {
     const newStacks = { ...state.player.skillStacks, [id]: currentStacks + 1 };
     const newCount = state.pendingLevelUpCount - 1;
 
-    // On-selection effect: fires after stack increment, before modal close.
-    // Uses newStacks so any passive bonuses from this same selection apply to the cap.
+    // Compute effective stats with the new stacks — used for both the optional
+    // on-selection heal and the unconditional maxHp clamp below.
     const skillDef = SKILLS[id];
+    const weapon = WEAPON_PROFILES[state.player.equippedWeaponId];
+    const effective = getEffectiveStats(newStacks, weapon, state.player.maxHp);
     let newHp = state.player.hp;
     if (skillDef.onSelectEffect?.healHp) {
-      const weapon = WEAPON_PROFILES[state.player.equippedWeaponId];
-      const effective = getEffectiveStats(newStacks, weapon, state.player.maxHp);
-      newHp = Math.min(state.player.hp + skillDef.onSelectEffect.healHp, effective.maxHp);
+      newHp = Math.min(newHp + skillDef.onSelectEffect.healHp, effective.maxHp);
     }
+    // Always clamp current HP to new effective max. Handles max HP reductions
+    // (e.g. Stims: -10 max HP per stack) so HP drops immediately on selection
+    // rather than staying above the new cap until the next hit.
+    newHp = Math.min(newHp, effective.maxHp);
 
     // Weapon floor unlock: levels 4, 8, 12, 16 auto-equip the next weapon tier.
     // Sets both equippedWeaponId (combat stats) and weaponPose (animation).
@@ -1243,17 +1236,6 @@ export default function GameCanvas({ width, height }: Props) {
             Weapon: {WEAPON_LABELS[spriteState.weaponPose]}
           </Text>
           <Text style={[styles.debugText, styles.tapHint]}>tap to cycle</Text>
-        </Pressable>
-
-        {/* TEMPORARY G5 VERIFICATION DEBUG BUTTON — remove before phase close.
-            Grants +500 XP to fast-track leveling and verify throwable skill
-            cards appear in the draw pool and fire correctly on device.       */}
-        <Pressable
-          style={[styles.debugOverlay, styles.weaponButton, { top: 110, left: 10 }]}
-          onPress={handleAddXp}
-        >
-          <Text style={styles.debugText}>+500 XP</Text>
-          <Text style={[styles.debugText, styles.tapHint]}>verification only</Text>
         </Pressable>
 
         {/* Debug overlay — top-right. */}

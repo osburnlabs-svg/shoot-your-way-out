@@ -185,10 +185,10 @@ export const SKILLS: Record<SkillId, SkillDefinition> = {
   provisions_stims: {
     id: 'provisions_stims',
     displayName: 'Stims',
-    description: '+5% damage, -2 HP/sec',
+    description: '+5% damage, -10 max HP',
     category: 'provisions',
     maxStacks: 3,
-    effect: { damageMultAdd: 0.05, hpRegenPerSecAdd: -2 },
+    effect: { damageMultAdd: 0.05, maxHpAdd: -10 },
   },
 
   // ── Phase 4b G1 ─────────────────────────────────────────────────────────────
