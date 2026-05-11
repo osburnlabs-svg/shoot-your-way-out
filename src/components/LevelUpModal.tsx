@@ -1,15 +1,16 @@
 /**
- * LevelUpModal — Phase 4a G3
+ * LevelUpModal — Phase 4a G3 (fallback layout, Phase 4a G3 polish followup)
  *
- * Renders a full-screen dimmed overlay with the kit's Upgrade/BG.png panel centered.
- * BG.png is a 308×243 empty 3×3 slot grid with a gold "UPGRADE" header.
- * Three skill cards are absolutely positioned over the top row's three slot frames.
+ * Fallback layout: "LEVEL UP" gold header above 3 skill cards, floating on the
+ * dimmed background. The kit's BG.png was removed because each slot has a baked-in
+ * weapon placeholder icon that is part of the panel art and cannot be cropped out.
+ * BG.png remains registered in GuiSprites for Phase 7's kit UI evaluation.
  *
  * Props:
- *   visible          — mirrors GameState.pendingLevelUp (JS thread copy)
- *   choices          — up to 3 SkillIds drawn by the 100ms timer in GameCanvas
+ *   visible           — mirrors GameState.pendingLevelUp (JS thread copy)
+ *   choices           — up to 3 SkillIds drawn by the 100ms timer in GameCanvas
  *   playerSkillStacks — JS-thread copy of player.skillStacks for "Lv X/Y" display
- *   onSelect         — called when the player taps a card; GameCanvas handles engine mutation
+ *   onSelect          — called when the player taps a card; GameCanvas handles engine mutation
  *
  * Rendering notes:
  *   - Runs entirely on the React/JS thread. No Skia, no Reanimated worklets.
@@ -31,39 +32,17 @@ import type { SkillId } from '../data/skills';
 import { SKILLS } from '../data/skills';
 import { GuiSprites } from '../lib/sprites';
 
-// ─── Layout constants (derived from BG.png pixel analysis: 308×243) ───────────
+// ─── Layout constants ─────────────────────────────────────────────────────────
 
-/**
- * Display size of the modal background panel.
- * BG.png was cropped to 308×105 (banner + top slot row) in Phase 4a G3 polish
- * to remove the 6 unused slot cells visible in the original 308×243 image.
- */
-const MODAL_W = 308;
-const MODAL_H = 105;
+/** Card dimensions — kept from G3 to preserve card content layout. */
+const CARD_W = 100;
+const CARD_H = 80;
 
-/**
- * Pixel row where the top-row slot grid starts (below the "UPGRADE" header bar).
- * Header occupies roughly the top 32px of the image.
- */
-const GRID_TOP = 32;
+/** Gap between the header text and the card row. */
+const HEADER_CARD_GAP = 24;
 
-/**
- * Height of each slot row in BG.png.
- * Grid area ≈ 211px split across 3 rows → ~70px each.
- */
-const SLOT_H = 70;
-
-/**
- * Width of each slot column in BG.png.
- * 308px / 3 cols ≈ 102px; 2px gutter on left → each usable slot ≈ 100px.
- */
-const SLOT_W = 100;
-
-/**
- * X-axis origins (left edge) of the three top-row slots within the panel.
- * Measured from BG.png pixel layout with ~2px left border and ~2px inter-slot gap.
- */
-const SLOT_X: [number, number, number] = [4, 104, 204];
+/** Gap between cards in the row. */
+const CARD_GAP = 16;
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
@@ -87,42 +66,37 @@ export default function LevelUpModal({
       {/* Dim layer — covers full screen, blocks touches to game below */}
       <View style={styles.dim} />
 
-      {/* Modal panel — BG.png with cards overlaid */}
-      <View style={styles.panel}>
-        <Image
-          source={GuiSprites.upgrade.bg}
-          style={styles.bg}
-          resizeMode="stretch"
-        />
+      {/* Content column: header + card row */}
+      <View style={styles.content}>
+        <Text style={styles.header}>LEVEL UP</Text>
 
-        {choices.map((id, i) => {
-          const skill = SKILLS[id];
-          const stacks = playerSkillStacks[id] ?? 0;
-          const icon = (GuiSprites.skillIcons as Record<SkillId, number>)[id];
+        <View style={styles.cardRow}>
+          {choices.map((id) => {
+            const skill = SKILLS[id];
+            const stacks = playerSkillStacks[id] ?? 0;
+            const icon = (GuiSprites.skillIcons as Record<SkillId, number>)[id];
 
-          return (
-            <TouchableOpacity
-              key={id}
-              style={[
-                styles.card,
-                { left: SLOT_X[i] ?? 4, top: GRID_TOP, width: SLOT_W, height: SLOT_H },
-              ]}
-              onPress={() => onSelect(id)}
-              activeOpacity={0.7}
-            >
-              <Image source={icon} style={styles.icon} resizeMode="contain" />
-              <Text style={styles.name} numberOfLines={2}>
-                {skill.displayName}
-              </Text>
-              <Text style={styles.level}>
-                {`Lv ${stacks}/${skill.maxStacks}`}
-              </Text>
-              <Text style={styles.desc} numberOfLines={2}>
-                {skill.description}
-              </Text>
-            </TouchableOpacity>
-          );
-        })}
+            return (
+              <TouchableOpacity
+                key={id}
+                style={styles.card}
+                onPress={() => onSelect(id)}
+                activeOpacity={0.7}
+              >
+                <Image source={icon} style={styles.icon} resizeMode="contain" />
+                <Text style={styles.name} numberOfLines={2}>
+                  {skill.displayName}
+                </Text>
+                <Text style={styles.level}>
+                  {`Lv ${stacks}/${skill.maxStacks}`}
+                </Text>
+                <Text style={styles.desc} numberOfLines={2}>
+                  {skill.description}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
       </View>
     </View>
   );
@@ -138,21 +112,32 @@ const styles = StyleSheet.create({
   },
   dim: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.55)',
+    backgroundColor: 'rgba(0,0,0,0.65)',
   },
-  panel: {
-    width: MODAL_W,
-    height: MODAL_H,
+  content: {
+    alignItems: 'center',
   },
-  bg: {
-    position: 'absolute',
-    width: MODAL_W,
-    height: MODAL_H,
+  header: {
+    color: '#c9a356',
+    fontSize: 28,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    textShadowColor: '#000000',
+    textShadowRadius: 4,
+    textShadowOffset: { width: 1, height: 2 },
+    marginBottom: HEADER_CARD_GAP,
+    letterSpacing: 2,
+  },
+  cardRow: {
+    flexDirection: 'row',
+    gap: CARD_GAP,
   },
   card: {
-    position: 'absolute',
+    width: CARD_W,
+    height: CARD_H,
+    backgroundColor: 'rgba(10, 13, 8, 0.85)',
     paddingHorizontal: 4,
-    paddingVertical: 3,
+    paddingVertical: 6,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -168,7 +153,7 @@ const styles = StyleSheet.create({
     textShadowColor: '#000000',
     textShadowRadius: 2,
     textShadowOffset: { width: 1, height: 1 },
-    marginTop: 2,
+    marginTop: 4,
   },
   level: {
     color: '#ffd700',
