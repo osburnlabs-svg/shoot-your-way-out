@@ -834,7 +834,7 @@ Each phase = one focused CC session. Commit to GitHub after each phase. Test on 
 
 **Phase 5 ships two new specialist enemy classes alongside the vehicle roster:** Spec Ops (mobile, stationary fire bursts; formerly "Gunner") and the Sniper (stationary rooftop turret). Both use kit 1b sprites. Spec Ops follows the standard wave-spawner path. Sniper uses a rooftop spawn system separate from the wave spawner — spawns at run start at building positions tracked in the procedural generator's building metadata (a `rooftopPositions` array per placed building). Count per run is set in the generator's parameter budget. No pathfinding required for Sniper — AI is: find player in range → telegraph (~1s) → fire.
 
-**Phase 5 also owns the world camera system.** Deliverable: wrap all rendered world entities (tiles, player, enemies, projectiles, obstacles) in a single Skia `<Group>` with a camera transform — scale for zoom level, translate for follow-the-player offset. This replaces all per-sprite scale hardcoding (`HERO_SPRITE_SCALE` and equivalents). Final zoom level cannot be determined until tiles + enemies + HUD are all visible together, so Phase 5 is the right time to lock it.
+**Phase 5 G1 shipped the entity follow camera.** All entities compute screen position inline as `width/2 + (entity.x - player.x) * CAMERA_ZOOM`. `CAMERA_ZOOM = 1.0` is a placeholder — final zoom level cannot be locked until tiles + enemies + HUD are visible together. **Remaining Phase 5 camera work:** integrate tile rendering into the same coordinate system, replace per-sprite scale hardcoding (`HERO_SPRITE_SCALE` and equivalents) with a unified zoom constant, lock zoom by feel once the full visual context exists.
 
 **Boss is Phase 8** — late, intentionally. Boss needs all other systems (audio, hazards, projectile system, multiple enemy AI) already working.
 
@@ -876,7 +876,9 @@ Things the underlying frameworks (React Native, Reanimated, Skia, RNGH) do that 
 
 When a Pan gesture (or any RNGH gesture) runs as a UI-thread worklet, every gesture event calls `__flushAnimationFrame` internally — which synchronously drains the requestAnimationFrame queue and runs `useFrameCallback` early. On Android digitizers firing at 120–240 Hz, this drives the frame callback far above vsync rate. Symptom: FPS counter reads 100–200+ while gesture is active, normal-ish at rest. Reanimated's own source comments acknowledge this with a TODO.
 
-*Fix pattern:* Add `.runOnJS(true)` to the gesture. Routes events through the JS thread, bypassing the flush. Tradeoff: ~1ms input latency, imperceptible for analog input like joysticks. Used in `GameCanvas.tsx` for the movement Pan gesture (commit c47e000).
+*Original fix pattern (c47e000):* Add `.runOnJS(true)` to the gesture. Routes events through the JS thread, bypassing the flush. Tradeoff: introduces variable input latency (~1 JS-thread queue delay, up to one full frame) — imperceptible for large input changes but causes visible stutter for stationary world objects because `player.x` can advance by a variable amount per vsync.
+
+*Revised understanding (Phase 5 G1, commit 3c17fac):* `.runOnJS(true)` is only necessary when the gesture callbacks (as UI-thread worklets) trigger expensive derived-value cascades or Skia re-renders that interfere with the frame pipeline. Once nested animated Skia Groups were eliminated (commit 02acfad), the gesture worklets no longer triggered such cascades — they only write to `inputVectorX/Y`, which no derived value directly subscribes to. Removing `.runOnJS(true)` restored synchronous UI-thread input writes and eliminated the variable-latency stutter. If the gesture flush symptom (frame callback firing at digitizer rate) ever reappears, check whether any gesture-triggered SharedValue write has a downstream `useDerivedValue` subscribed to it that also feeds a Skia animated prop.
 
 **Per-frame runOnJS from useFrameCallback creates a feedback loop**
 
@@ -889,6 +891,18 @@ Any `runOnJS(...)` call inside `useFrameCallback` — even gated by a condition 
 Adding many (50+) `useDerivedValue` instances all reading from the same shared value, especially when each is wired to a Skia animated prop, produces enough scheduler "pending work" signals per tick to push the frame callback above vsync. Symptom: FPS reads 100–200, scaling with subscriber count.
 
 *Fix pattern:* Collapse N derived values into 1 derived value returning an array, OR keep separate hooks but render inactive slots as `null` in JSX (breaks the Skia subscription for that slot, the hook still runs cheaply). Used in `GameCanvas.tsx` for the 50 enemy slots.
+
+**Nested animated Skia Groups cause intermediate-frame stutter**
+
+Wrapping animated entity Groups inside an animated camera Group creates two layers of Skia subscriptions. Skia can render a frame where the outer (camera) transform has updated but the inner (entity) transforms haven't fired yet — producing a frame where the camera moved but entities didn't. Symptom: every entity stutters in sync with camera movement; enemies appear to rubber-band toward the player on each frame.
+
+*Fix pattern:* Never nest animated Groups. Instead, compute each entity's screen position inline in its own `useDerivedValue` as `width/2 + (entity.x - player.x) * CAMERA_ZOOM`. The entity is always at the correct screen position relative to the current player position in a single transform. Used in `GameCanvas.tsx` for all entity slot transforms (commit 02acfad).
+
+**Per-frame input via .runOnJS(true) causes variable camera lag**
+
+Routing gesture callbacks through `.runOnJS(true)` writes input SharedValues from the JS thread via Reanimated's async queue. `useFrameCallback` can read a stale input vector on any vsync where the JS thread hasn't flushed the write yet. For stationary world objects, variable `player.x` advancement per frame manifests as visible stutter. Moving entities (enemies walking) mask the same artifact via their own velocity.
+
+*Fix pattern:* Gesture handlers that feed game state must run as UI-thread worklets (default, no `.runOnJS`). Input SharedValue writes are then synchronous on the UI thread and always available before the next `useFrameCallback` invocation. Only add `.runOnJS(true)` if the gesture worklet triggers a downstream derived-value → Skia subscription cascade that causes the gesture-flush symptom described above. Used in `GameCanvas.tsx` (runOnJS removed commit 3c17fac after nested-group fix eliminated the original cascade).
 
 ---
 
