@@ -49,6 +49,8 @@
  *                HP/Score/XP/isDead for debug and overlay)
  */
 
+console.log('GESTURE-FIX VERSION: active');
+
 import React, { useCallback, useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import {
@@ -170,8 +172,8 @@ function useEnemySlotTransform(gameState: SharedValue<GameState>, slotIndex: num
  * circle is off-screen. This avoids needing React state to track slot activity
  * (which would add up to 100ms lag to bullet appearance/disappearance).
  *
- * 30 constant Skia subscriptions are safe given the runOnJS(true) gesture fix
- * that resolved the frame-flush issue in G1.
+ * 30 constant Skia subscriptions are safe — gesture runs as UI-thread worklet
+ * (runOnJS removed in Phase 5 stutter fix).
  */
 function useProjectileSlotTransform(gameState: SharedValue<GameState>, slotIndex: number, width: number, height: number) {
   return useDerivedValue(() => {
@@ -1100,7 +1102,6 @@ export default function GameCanvas({ width, height }: Props) {
 
   // ─── Virtual joystick gesture ──────────────────────────────────────────────
   const panGesture = Gesture.Pan()
-    .runOnJS(true)
     .onBegin((e) => {
       joystickOriginX.value = e.x;
       joystickOriginY.value = e.y;
