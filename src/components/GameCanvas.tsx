@@ -436,6 +436,15 @@ export default function GameCanvas({ width, height }: Props) {
     weaponPose: HeroWeaponPose;
   }>({ isMoving: false, frame: 0, weaponPose: 'pistol' });
 
+  // ─── Pickup slot active flags (React, updated by timer) ─────────────────────
+  // Only active slots render a <Group> in JSX — same conditional pattern as
+  // enemies. Prevents all 50 always-subscribed Skia Groups from triggering
+  // per-frame transform updates when inactive slots return a new [-9999,-9999]
+  // array reference each tick.
+  const [pickupSlotActive, setPickupSlotActive] = useState<boolean[]>(
+    () => Array.from({ length: PICKUP_SLOT_COUNT }, () => false),
+  );
+
   // ─── Enemy slot state (sprite selection, updated by timer) ──────────────────
   // Slot i = enemies[i]. type, status, and frame index are bridged to React;
   // positions/rotations live entirely on the UI thread (per-slot useDerivedValue).
@@ -557,6 +566,10 @@ export default function GameCanvas({ width, height }: Props) {
       setEnemySlotTypes(types);
       setEnemySlotStatuses(statuses);
       setEnemySlotFrames(frames);
+
+      // Pickup slot active flags.
+      const pickupActive = Array.from({ length: PICKUP_SLOT_COUNT }, (_, i) => !!state.pickups[i]);
+      setPickupSlotActive(pickupActive);
 
       // Throwable slot state.
       const tSlots = Array.from({ length: THROWABLE_SLOT_COUNT }, () => ({
@@ -1318,19 +1331,24 @@ export default function GameCanvas({ width, height }: Props) {
 
           {/* ── Pickups ──────────────────────────────────────────────────── */}
           {/* Screen-coord derived values — outside camera Group.            */}
-          {/* Z-order: pickups < projectiles < enemies < player < overlays.  */}
-          {moneySmallImage && allPickupTransforms.map((transform, i) => (
-            <Group key={`pickup-${i}`} transform={transform}>
-              <Image
-                image={moneySmallImage}
-                x={-moneyW / 2}
-                y={-moneyH / 2}
-                width={moneyW}
-                height={moneyH}
-                sampling={{ filter: FilterMode.Nearest, mipmap: MipmapMode.None }}
-              />
-            </Group>
-          ))}
+          {/* Only active slots render a Group (same conditional pattern as  */}
+          {/* enemies) — prevents 50 always-subscribed Skia Groups from      */}
+          {/* firing redundant per-frame transform updates when inactive.     */}
+          {moneySmallImage && allPickupTransforms.map((transform, i) => {
+            if (!pickupSlotActive[i]) return null;
+            return (
+              <Group key={`pickup-${i}`} transform={transform}>
+                <Image
+                  image={moneySmallImage}
+                  x={-moneyW / 2}
+                  y={-moneyH / 2}
+                  width={moneyW}
+                  height={moneyH}
+                  sampling={{ filter: FilterMode.Nearest, mipmap: MipmapMode.None }}
+                />
+              </Group>
+            );
+          })}
 
           {/* ── Projectiles ──────────────────────────────────────────────── */}
           {/* Screen-coord derived values — outside camera Group.            */}
