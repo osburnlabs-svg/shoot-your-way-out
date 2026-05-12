@@ -20,6 +20,8 @@
  *   player position — no tail-chase, no drift.
  */
 
+console.log('PICKUP-FIX VERSION: active');
+
 import type { GameState, PickupState, CrateState } from './gameEngine';
 import { audioEngine } from './audioEngine';
 import {
