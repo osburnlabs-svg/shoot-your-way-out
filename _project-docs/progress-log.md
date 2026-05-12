@@ -256,45 +256,35 @@ Decision made during G2 brainstorm: shift from constant auto-fire to Archero-sty
 
 ### Map generation system — to land in Phase 5
 
-Decision made during Phase 3 G2 brainstorm: maps in Shoot Your Way Out are procedurally generated each run via seeded scatter, with curated asset pools per map. No hand-authored layouts.
+Decision updated: a single dynamic procedural map generator runs once at game start, producing a fresh layout every run. No per-map config files, no map select screen, no per-map themes. Single consistent military theme throughout.
 
 **The model:**
 
-Maps differentiate by what assets are available and how dense they appear, not by where specific objects sit. The Compound feels different from the Outskirts because the asset pool is different (urban junk vs desert sparseness vs forest density), not because we hand-placed every car.
+One generator with parameterized asset budgets (buildings, vehicles, props, vegetation). Each run seeds from the current time and scatters assets within those budgets. Building sprites carry rooftop metadata so sniper enemies can be assigned valid positions at spawn time.
 
-Each map JSON in `data/maps/` specifies:
-- Tileset to use for ground
-- Central landmark (one fixed sprite at map center — house, watchtower, large tree)
-- Obstacle pool (list of valid sprite IDs the scatter can pull from)
-- Obstacle density (low / medium / high, mapping to a target obstacle count)
-- Background dressing pool (parked cars at edges, etc.)
-- Atmosphere parameters (tint, weather, vignette)
-- Gameplay parameters (spawn rate multiplier, sniper damage multiplier, etc.)
+**Procedural each run:**
 
-**Procedural each run, not locked per map:**
-
-Each time the player taps Deploy, the scatter algorithm uses the current time as the random seed. Layout changes every run on every map. This matches genre conventions (every run feels different) and exploits the variety in the installed asset packs (the civilian cars pack adds value here — different cars in different spots each run).
+Each time the player taps Deploy, the generator uses the current time as the random seed. Layout changes every run. This matches genre conventions (every run feels different) and exploits the variety in the installed asset packs (different buildings, vehicles, and props each run).
 
 **Four guard rails on the scatter algorithm (mandatory):**
 
 1. **Player spawn zone protection.** Center 200×200 px area always clear of obstacles. Player has room to start.
 2. **Minimum obstacle spacing.** No two obstacles spawn within ~60 px of each other (tunable). Prevents overlapping or visually crowded placements.
-3. **Central landmark always fixed.** Defined per-map in the JSON. Always sits at the map center regardless of seed. Gives each map a recognizable identity even though everything around it changes.
+3. **Central landmark always fixed.** One fixed landmark always sits at map center regardless of seed. Gives the player a consistent reference point each run.
 4. **No-spawn ring around the central landmark.** ~80 px clearance (tunable). Prevents the landmark getting buried in surrounding obstacles.
 
 **Why this approach:**
-- Less authoring work than hand-placing obstacles
-- Replayability for free — every run looks different on the same map
-- Exploits the variety asset packs (especially civilian cars)
+- Simpler to build than authoring separate configs for three distinct maps
+- Replayability for free — every run looks different
+- Exploits the variety asset packs (especially civilian vehicles and props)
 - Matches survivor-like genre conventions where mastery is about decision-making, not memorizing layouts
-- Procedural-each-run is no harder to implement than locked-per-map — only difference is the seed source
+- Single generator eliminates the map select screen entirely; one less system to build and maintain
 
 **Implementation notes for Phase 5:**
 - Scatter algorithm + four guard rails are CC's job to implement
-- Three maps spec'd in the context doc (lines ~420-466): The Compound (urban), The Outskirts (desert), The Treeline (forest)
-- Each map = one ~30-line JSON file in `data/maps/`
-- Engine reads JSON, applies scatter, places landmark, draws atmosphere overlay
-- Mo will tune density and parameters by playing each map and adjusting; CC implements the system, Mo iterates the values
+- Single generator config in `data/mapConfig.ts` (asset budgets, spacing params, landmark)
+- Building sprites carry rooftop metadata — sniper spawn system reads this at run start
+- Mo will tune density and parameters by playing runs and adjusting; CC implements the system, Mo iterates the values
 
 ### Enemy ranged fire — to land in Phase 5
 
@@ -915,7 +905,7 @@ Phase 4 transformed the engine from a static survival loop (Phase 3) into a full
 
 ## Phase 5 — Maps + obstacles + vehicle enemies
 
-**Goal:** Three hand-authored maps (Compound, Outskirts, Treeline) with tile rendering, map select screen, obstacle placement and collision, all 8 enemy types working including Humvee/BTR/Panzer/ACS vehicle enemies.
+**Goal:** Single dynamic procedural map generator (runs at game start, every run is unique), parameterized asset budgets (buildings, vehicles, props, vegetation), seeded random placement with spacing constraints, building metadata for sniper rooftop positions, world camera system, all 8 enemy types working including Humvee/BTR/Panzer/ACS vehicle enemies, enemy ranged fire, single consistent military theme.
 
 **Status:** Not started
 
