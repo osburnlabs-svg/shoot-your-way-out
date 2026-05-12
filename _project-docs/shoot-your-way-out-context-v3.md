@@ -374,24 +374,24 @@ This is acceptable for v1. Generating 20 unique pixel-art icons isn't necessary 
 
 ### Enemies
 
+> **Phase 5 stats TBD.** Gunner is renamed to **Spec Ops**. Humvee/BTR/Panzer/ACS collapse into a single **Tank** class with 3 visual variants (Light/Medium/Heavy). This table will be rewritten as 6 rows (Scav, Raider, Spec Ops, Sniper, Tank, Helicopter boss) once Phase 5 balance stats are locked.
+
 | Enemy | Sprite Source | HP | Speed | Damage | XP | Wave Tier | Notes |
 |---|---|---|---|---|---|---|---|
 | Scav | Soldier (kit 1a) | 15 | 1.2 | 5 | 3 | 1+ | Basic foot soldier |
 | Raider | Soldier 02 (kit 1a) | 40 | 1.8 | 12 | 8 | 2+ | Faster, more dangerous |
-| Gunner | Gunner (kit 1b) | 60 | 0.9 | 8/tick | 12 | 3+ | Stationary fire bursts |
-| Sniper | Sniper (kit 1b) | 40–50 | — | 40–50 | 0 | Map start | Stationary rooftop turret — see design note below |
-| **Humvee** | Humvee | 80 | 1.5 | 15 | 18 | 5+ | Drives through, rams player |
-| **BTR** | BTR | 150 | 1.0 | 18 | 30 | 6+ | Drops guaranteed pickup |
-| **Panzer** | Panzer | 250 | 0.6 | 25 | 50 | 7+ | Mini-boss tank — drops crate (15% chance) |
-| **ACS** | ACS | 200 | 0.7 | 20 | 40 | 7+ | Alt to Panzer, drops crate (15% chance) |
-
-The Juggernaut concept is removed — Panzer and ACS replace it with proper sprites.
+| Gunner → **Spec Ops** | Gunner (kit 1b) | 60 | 0.9 | 8/tick | 12 | 3+ | Stationary fire bursts |
+| Sniper | Sniper (kit 1b) | 40–50 | — | 40–50 | 0 | Run start | Stationary rooftop turret — see design note below |
+| **Humvee** *(Tank-Light)* | Humvee | 80 | 1.5 | 15 | 18 | 5+ | *stale — merging into Tank class* |
+| **BTR** *(Tank-Medium)* | BTR | 150 | 1.0 | 18 | 30 | 6+ | *stale — merging into Tank class* |
+| **Panzer** *(Tank-Heavy)* | Panzer | 250 | 0.6 | 25 | 50 | 7+ | *stale — merging into Tank class* |
+| **ACS** *(Tank-Heavy alt)* | ACS | 200 | 0.7 | 20 | 40 | 7+ | *stale — merging into Tank class* |
 
 ### Sniper — Design Note (rooftop turret, Phase 5)
 
 **Decision (Phase 4c planning):** The kit's ghillie-suit sniper sprite is designed for stationary rooftop use, not mobile infantry. The reference art shows snipers mounted on building rooftops, not walking the arena. The Sniper is implemented as a building-mounted turret, not a walking enemy.
 
-**Behavior:** Spawns on building rooftops at map start (count per map locked during Phase 5 map planning). Does not move or path-find. Fires at the player when in range.
+**Behavior:** Spawns on building rooftops at run start — count per run set in the procedural generator's parameter budget. Does not move or path-find. Fires at the player when in range.
 
 **Fire pattern:** Slow rate (~3–5 second cooldown). High single-shot damage (~40–50, versus pistol baseline of 12). Visible telegraph: laser sight or muzzle flash glow for ~1 second before the shot fires. Player has time to break line of sight or rush the position.
 
@@ -457,10 +457,11 @@ This is the only environmental hazard in v1. All other hazard concepts (toxic pu
 **Weapon Crate drop table:**
 - Common enemy: 0%
 - Raider: 1%
-- Gunner/Sniper: 3%
-- Humvee: 8%
-- BTR: 15%
-- Panzer/ACS: 25%
+- Spec Ops/Sniper: 3%
+- ~~Humvee: 8%~~ *(stale — collapsing into Tank)*
+- ~~BTR: 15%~~ *(stale — collapsing into Tank)*
+- ~~Panzer/ACS: 25%~~ *(stale — collapsing into Tank)*
+- **Tank (all variants):** TBD% — Phase 5 balance
 - Helicopter boss: 100% guaranteed
 
 **Crate weapon roll table (when player walks over crate):**
@@ -469,56 +470,38 @@ This is the only environmental hazard in v1. All other hazard concepts (toxic pu
 - 15% Rare: GP-25 grenade launcher
 - 5% Legendary: RPO flamethrower
 
-### Three Maps (replaces procedural reseeding)
+### Procedural Map Generator
 
-Players choose a location from main menu before deploying. Each map is a hand-authored JSON file specifying tile layout, obstacle pool, and atmosphere overrides.
+Every run generates a unique map at game start. There are no pre-authored map files. `lib/mapGenerator.ts` runs once on game start, takes a seed (timestamp-based), and returns the full map state: tile grid, obstacle list with positions and bounds, building list with rooftop sniper positions, and weather variable.
 
-**1. The Compound (Urban Decay)**
-- Base tileset: `_0004_RoadTiles.png` (asphalt) with `_0005_RoadDecals.png` accents
-- Obstacles: wrecked cars from kit 2 `Broken_assets/` (cars, trucks, small_trucks, ambulance, police_car), `SandBag.png`, `Crates Barrels/` props
-- Background dressing: pristine cars from kit 2 (10 colors) parked along edges
-- One central `House01.png` structure with a rooftop sniper position (additional positions TBD, Phase 5 map planning)
-- Slightly higher enemy density (1.1× spawn rate)
-- Atmosphere: cold gray-blue tint, less ambient light
-- Theme caption: *"Close-quarters firefight."*
-
-**2. The Outskirts (Desert Compound)**
-- Base tileset: `_0002_SandTiles.png`, transitions via `_0007_SandToRoad.png`
-- Obstacles: `Rocks/Rock01-03.png`, `SandBag.png`, oil barrels, BTR/ACS wrecks (using broken sprites)
-- One `WatchTower.png` at center (tactical landmark) — primary rooftop sniper position
-- Sparser cover, longer sightlines — suits rooftop turrets; Outskirts snipers have greater effective range than Compound (Phase 5 balance)
-- Sniper positions: count TBD, Phase 5 map planning
-- Atmosphere: warm sand tint, dust haze, brighter
-- Theme caption: *"The snipers favor this terrain."*
-
-**3. The Treeline (Forest)**
-- Base tileset: `_0003_GrassTiles.png`, transitions via `_0006_GrassToRoad.png`
-- Obstacles: `Trees Bushes/Tree1-7.png` (multiple variants), `Bush-01-03.png`, `Stumps`, `Rocks`
-- More obstacles overall (1.4× cover density), tighter sightlines
-- Mid-range engagements favored
-- No buildings — snipers absent or minimal; forested terrain blocks the long sightlines rooftop turrets depend on
-- Atmosphere: green tint, slight fog, occasional bird sounds (if SFX available)
-- Theme caption: *"Watch the brush."*
-
-Each map JSON specifies:
+**Generator parameters (tunable constants):**
 ```typescript
 {
-  id: 'compound',
-  displayName: 'The Compound',
-  caption: 'Close-quarters firefight.',
-  baseTile: 'road',
-  decalTiles: ['road_decals'],
-  centralStructure: { sprite: 'house_01', x: 0.5, y: 0.5 },
-  obstaclePool: ['wreck_car', 'wreck_truck', 'sandbag', 'crate', 'barrel'],
-  obstacleDensity: 0.6,
-  backgroundDressing: { sprites: ['car_blue', 'car_red', ...], placement: 'edges' },
-  spawnRateMultiplier: 1.1,
-  atmosphereTint: '#8a90a0',
-  vignette: 0.5,
+  seed: number,                   // from Date.now() at run start
+  arenaWidth: number,             // world units
+  arenaHeight: number,
+  baseTilePool: string[],         // e.g. ['road', 'dirt', 'sand'] — mix weighted by roll
+  buildingBudget: { min: 1, max: 3 },
+  obstacleBudget: { min: 20, max: 40 },
+  vehicleWreckBudget: { min: 5, max: 15 },
+  vegetationBudget: { min: 0, max: 20 },  // trees/bushes when rolled
+  sniperCountPerBuilding: { min: 0, max: 1 },
+  weather: 'rain' | 'dust' | 'leaves' | 'clear',  // rolled at generation time
 }
 ```
 
-Map files live in `data/maps/`. Adding a 4th map for v1.1 (River Crossing — uses water tiles + bridge) is a single new JSON.
+**Placement rules:**
+- Buildings placed first, minimum spacing enforced (no two buildings closer than N world units)
+- Each placed building carries a `rooftopPositions: [{x, y}]` array — the Sniper spawn system reads this
+- Obstacles placed after buildings, with clearance zones around buildings and player spawn point
+- Vehicle wrecks, sandbags, crates, barrels drawn from a single pool weighted by what was placed
+- Vegetation (trees/bushes) only included when weather ≠ rain (aesthetic consistency)
+
+**Asset pools the generator draws from — inherited from the original three-map concepts:**
+- *Urban-heavy bias:* road/asphalt tiles, wrecked cars (kit 2 `Broken_assets/`), pristine parked cars along edges, `House01.png` structures, sandbags, crates/barrels
+- *Open/desert bias:* sand + dirt tiles, rocks, sandbags, oil barrels, watchtower landmark, longer obstacle spacing (wider sightlines)
+- *Woodland bias:* grass tiles, trees (`Tree1-7.png` variants), bushes, stumps, rocks — no buildings, no wrecked vehicles
+- The generator blends these pools based on tile rolls; it does not have named "modes." Any run may include elements from multiple biases.
 
 ### Visual & Atmosphere
 
@@ -534,8 +517,7 @@ Per-map tints layer on top via Skia color matrix.
 **Atmospheric effects:**
 - Dynamic fog-of-war — dark mask softens around player with breathing animation, warm amber torch tint
 - Corner vignette — permanent dark edges
-- Weather: diagonal rain on Compound, dust motes on Outskirts, falling leaves on Treeline (single weather variable, swap particles per map)
-- Lightning flashes (Compound only)
+- Weather: randomly assigned per run — generator rolls one of: rain / dust / leaves / clear. Lightning is a sub-effect of rain rolls.
 
 ---
 
@@ -561,7 +543,7 @@ Safe area insets are respected — iPhone notch and dynamic island get padding. 
 ## Screens & Flow
 
 ```
-[Loading] → [Main Menu] → [Map Select] → [Game] ⇄ [Pause] → [Game Over] → loop back to Main Menu
+[Loading] → [Main Menu] → [Pre-Run Modal] → [Game] ⇄ [Pause] → [Game Over] → loop back to Main Menu
 ```
 
 **Loading Screen** — Uses `Loading Screen/Background.png`, `Loading Bar BG/Loading Bar.png`. Replaces `Test Logo.png` with our logo (TBD). Preloads all SFX into memory during this screen.
@@ -574,13 +556,7 @@ Safe area insets are respected — iPhone notch and dynamic island get padding. 
 - Support the Dev button — small, corner ("☕ Support" — see Monetization)
 - Background music: menu loop track
 
-**Map Select** — Uses kit's `Levels Menu/` assets reframed as 3 location cards. Each card shows:
-- Map preview thumbnail (rendered from tile assets)
-- Map name (Compound / Outskirts / Treeline)
-- Caption
-- "Best run" stat for that map
-- Run modifier offer (from rewarded ad — see Monetization): "Watch ad for: Bonus XP / Cursed Run / Mystery Crate"
-- DEPLOY button at bottom
+**Pre-Run Modal** — Appears after tapping DEPLOY on Main Menu. Single-screen offer: "Watch ad for a perk?" with 3 random modifier options (Bonus Loadout / +50% XP / Cursed Run). One-tap skip. Tapping DEPLOY or skipping starts the run immediately — the procedural map generator runs at this point.
 
 **Game** — Full gameplay with HUD overlay. Music: combat loop. On boss spawn, ducks combat → boss loop. Returns to combat on boss death.
 
@@ -608,7 +584,7 @@ Safe area insets are respected — iPhone notch and dynamic island get padding. 
 - Persistence: AsyncStorage flag `support_unlocked: true`
 
 ### 2. Pre-run Rewarded Ad — Run Modifiers
-- Shown on Map Select screen
+- Shown on pre-run modal (appears after tapping DEPLOY on Main Menu)
 - "Watch ad for a perk?" with 3 random options:
   - **Bonus loadout** — start with tier-2 weapon already equipped
   - **+50% XP run** — accelerates skill unlocks for one run
@@ -624,7 +600,7 @@ Safe area insets are respected — iPhone notch and dynamic island get padding. 
 
 ### 4. Banner Ad — Main Menu only
 - AdMob banner at bottom of main menu
-- **Never shown:** in-game, on game-over screen, on pause menu, during loading, on map select
+- **Never shown:** in-game, on game-over screen, on pause menu, during loading
 - Game-over especially is off-limits — players are emotional, ads there are predatory
 - Hidden entirely if Support IAP purchased
 
@@ -738,7 +714,6 @@ shoot-your-way-out/
     screens/
       LoadingScreen.tsx
       MenuScreen.tsx
-      MapSelectScreen.tsx
       GameScreen.tsx
       GameOverScreen.tsx
       SettingsScreen.tsx
@@ -757,7 +732,8 @@ shoot-your-way-out/
       input.ts                   — drag-to-move handler
       sprites.ts                 — sprite loading and atlas management
       animation.ts               — frame-based animation system
-      mapLoader.ts               — load and render map JSON
+      mapGenerator.ts            — procedural map generator (seed, tile grid, building + obstacle placement)
+      mapLoader.ts               — render procedurally generated map data (tiles, obstacles, structures)
       pathfinding.ts             — simple enemy AI movement
       collision.ts               — entity-vs-entity, entity-vs-obstacle
       audioEngine.ts             — music + SFX (stubbed Phase 1, full Phase 6)
@@ -772,11 +748,7 @@ shoot-your-way-out/
       hazards.ts                 — Gas Bomb, Bomber Strafe
       pickups.ts                 — pickup types and effects
       crateTable.ts              — drop tables and roll tables
-      maps/
-        compound.ts
-        outskirts.ts
-        treeline.ts
-      theme.ts                   — palette, fonts, per-map tints
+      theme.ts                   — palette, fonts, per-run weather tints
   assets/
     sprites/
       hero/
@@ -850,17 +822,17 @@ Each phase = one focused CC session. Commit to GitHub after each phase. Test on 
 | 3 | Enemy spawning (Scav + Raider only), wave scaling, auto-fire targeting, basic AI, projectile system, kill/XP | Survive a 60-second basic wave |
 | 4a | Money pickups (XP source), level-up modal (kit Upgrade Preset), 10 stat-modifier skills, weapon progression unlocks (level 4/8/12/16) | Full progression for stat skills works |
 | 4b | 10 ability skills (grenades, molotovs, smoke), throwable system, crate drop system + reveal animation | All 20 skills functional, crates working |
-| 5 | Tile rendering, three map JSONs, map select screen, obstacle placement, collision with obstacles, all enemy types (Gunner/Sniper/Humvee/BTR/Panzer/ACS), world camera system | Three playable maps with full enemy roster + camera/zoom system implemented |
+| 5 | Procedural map generator, tile rendering, obstacle placement + collision, all remaining enemy types (Spec Ops / Sniper / Tank variants), world camera system | Single dynamic map generates each run; full 6-type enemy roster active; camera/zoom locked |
 | 6 | Audio engine full implementation, all SFX wired, music tracks playing, atmospheric effects (fog, weather, vignette), explosions, smoke | Game feels and sounds complete |
-| 7 | Full UI — main menu, map select polish, settings, pause, game over, persistence (high score, stats), minimap, analytics integration | Production-ready menu flow |
+| 7 | Full UI — main menu, pre-run modal polish, settings, pause, game over, persistence (high score, stats), minimap, analytics integration | Production-ready menu flow |
 | 8 | Helicopter boss (both phases), Gas Bomb hazard, Bomber strafe events, hero death animation polish | Boss encounters working |
 | 9 | Monetization implementation (AdMob + IAP), Support Dev button, rewarded ad integration, App Store and Google Play submission prep | Ready to submit |
 
 **Audio is added incrementally** — stubbed in Phase 1, called by all phases, fully wired in Phase 6.
 
-**Vehicle enemies (Humvee/BTR/Panzer/ACS)** are introduced in Phase 5 alongside maps because they need obstacle collision systems.
+**Vehicle enemies (Tank class — Light/Medium/Heavy variants)** are introduced in Phase 5 alongside the map system because they need obstacle collision systems.
 
-**Phase 5 ships two new specialist enemy classes alongside the vehicle roster:** the Gunner (mobile, stationary fire bursts) and the Sniper (stationary rooftop turret). Both use kit 1b sprites. Gunner follows the standard wave-spawner path. Sniper uses a rooftop spawn system separate from the wave spawner — spawns at map start at fixed building positions defined in the map JSON. Phase 5 map JSONs need a `sniperPositions` array (or similar) specifying each rooftop spawn point. No pathfinding required for Sniper — AI is: find player in range → telegraph (~1s) → fire.
+**Phase 5 ships two new specialist enemy classes alongside the vehicle roster:** Spec Ops (mobile, stationary fire bursts; formerly "Gunner") and the Sniper (stationary rooftop turret). Both use kit 1b sprites. Spec Ops follows the standard wave-spawner path. Sniper uses a rooftop spawn system separate from the wave spawner — spawns at run start at building positions tracked in the procedural generator's building metadata (a `rooftopPositions` array per placed building). Count per run is set in the generator's parameter budget. No pathfinding required for Sniper — AI is: find player in range → telegraph (~1s) → fire.
 
 **Phase 5 also owns the world camera system.** Deliverable: wrap all rendered world entities (tiles, player, enemies, projectiles, obstacles) in a single Skia `<Group>` with a camera transform — scale for zoom level, translate for follow-the-player offset. This replaces all per-sprite scale hardcoding (`HERO_SPRITE_SCALE` and equivalents). Final zoom level cannot be determined until tiles + enemies + HUD are all visible together, so Phase 5 is the right time to lock it.
 
@@ -974,7 +946,6 @@ syo_high_score: number
 syo_best_time: number
 syo_total_kills: number
 syo_total_runs: number
-syo_high_score_per_map: { compound: number, outskirts: number, treeline: number }
 syo_settings: { music_volume: number, sfx_volume: number, vibration: boolean, weather: boolean }
 syo_support_unlocked: boolean
 syo_revives_remaining_session: number    // resets on app close
@@ -1005,7 +976,7 @@ syo_install_date: string                  // for analytics cohort
 - Verify file paths against this doc before assuming structure
 - Five hero weapon animations, eight weapon stat profiles, mapped by `weapon.animation` field
 - Helicopter boss uses componentized parts (base + rotor + MG + rocket) layered at runtime, not a single sprite sheet
-- Three pre-authored maps via JSON, never procedural reseeding
+- Single procedural map generator (`lib/mapGenerator.ts`) — runs once at game start, every run unique, no pre-authored map files
 - 20 skills, modular effects, all swap-out-able
 
 **Phase discipline:**
@@ -1035,16 +1006,16 @@ syo_install_date: string                  // for analytics cohort
 ## v1 Scope Summary (what ships day one)
 
 **Locked in v1:**
-- Three maps (Compound, Outskirts, Treeline)
+- Single procedural map (dynamically generated per run)
 - 8 weapons across 5 visual tiers (incl. crate-only GP-25 + Flamethrower)
 - 20 skills across 5 categories
-- 8 enemy types (incl. 4 vehicle enemies)
+- 6 enemy types: Scav, Raider (Phase 3); Spec Ops, Sniper, Tank (Phase 5); Helicopter boss (Phase 8). Tank has 3 visual variants sharing one mechanical class.
 - Helicopter boss (2 phases) every 2 minutes
 - Bomber strafe hazard event
 - Gas Bomb hazard
 - Crate drop system
 - Three-tier pickup system (HP, Armor, Speed, Ammo, Money + Weapon Crate)
-- Full menu flow with map select, settings, pause, game over
+- Full menu flow with pre-run modal, settings, pause, game over
 - Minimap
 - Atmospheric effects (fog of war, weather per map, vignette)
 - 4 music tracks + ~25 SFX
@@ -1061,7 +1032,7 @@ syo_install_date: string                  // for analytics cohort
 - Soft currency / Unlock Tokens
 - "Overcharge revive" tier
 - Sound effects beyond core SFX (ambient variety)
-- 4th map (River Crossing — water + bridge tiles)
+- Additional map biome expansion (e.g. water/bridge tiles, additional asset pools)
 
 **Deferred to v2.0+:**
 - Multiplayer/leaderboards
