@@ -1104,6 +1104,7 @@ export default function GameCanvas({ width, height }: Props) {
   // ─── Game loop ─────────────────────────────────────────────────────────────
   useFrameCallback((frameInfo) => {
     const dtMs = frameInfo.timeSincePreviousFrame ?? 0;
+    if (dtMs <= 0) return; // skip spurious zero-dt frames (JS-thread timer activity triggers extra UI-thread callbacks)
 
     const ivx = inputActive.value ? inputVectorX.value : 0;
     const ivy = inputActive.value ? inputVectorY.value : 0;
