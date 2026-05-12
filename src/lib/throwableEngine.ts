@@ -68,7 +68,7 @@ import type { PickupState } from './gameEngine';
  */
 export function applyAOEDamage(
   enemies: GameState['enemies'],
-  pickups: PickupState[],
+  pickups: Array<PickupState | null>,
   nextPickupId: number,
   killCount: number,
   centerX: number,
@@ -78,7 +78,7 @@ export function applyAOEDamage(
   elapsedMs: number,
 ): {
   enemies: GameState['enemies'];
-  pickups: PickupState[];
+  pickups: Array<PickupState | null>;
   nextPickupId: number;
   killCount: number;
 } {
@@ -86,8 +86,7 @@ export function applyAOEDamage(
 
   const threshold = radiusPx + ENEMY_COLLISION_RADIUS_PX;
   const newEnemies: GameState['enemies'] = [];
-  const newPickups: PickupState[] = [];
-  for (let i = 0; i < pickups.length; i++) { newPickups.push(pickups[i]); }
+  const newPickups: Array<PickupState | null> = pickups.slice();
   let pid = nextPickupId;
   let kills = killCount;
 
@@ -123,18 +122,25 @@ export function applyAOEDamage(
         hitFlashUntilMs: elapsedMs + 80,
       });
       kills += 1;
-      newPickups.push({
-        id: pid,
-        x: enemy.x,
-        y: enemy.y,
-        vxPxPerSec: 0,
-        vyPxPerSec: 0,
-        type: 'money_small',
-        scoreValue: 10,
-        xpValue: 10,
-        spawnedAtMs: elapsedMs,
-      });
-      pid += 1;
+      // Silent drop if all slots full — same policy as crates. Tune PICKUP_SLOT_COUNT if Phase 5+ density requires.
+      let aoeSpawnSlot = -1;
+      for (let s = 0; s < newPickups.length; s++) {
+        if (newPickups[s] === null) { aoeSpawnSlot = s; break; }
+      }
+      if (aoeSpawnSlot !== -1) {
+        newPickups[aoeSpawnSlot] = {
+          id: pid,
+          x: enemy.x,
+          y: enemy.y,
+          vxPxPerSec: 0,
+          vyPxPerSec: 0,
+          type: 'money_small',
+          scoreValue: 10,
+          xpValue: 10,
+          spawnedAtMs: elapsedMs,
+        };
+        pid += 1;
+      }
     } else {
       newEnemies.push({
         id: enemy.id,

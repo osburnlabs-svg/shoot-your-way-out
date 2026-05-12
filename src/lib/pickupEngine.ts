@@ -53,10 +53,11 @@ export function tickPickups(state: GameState, dtMs: number): GameState {
   let newScore = player.score;
   let newXp = player.xp;
 
-  const survivingPickups: PickupState[] = [];
+  const newPickups: Array<PickupState | null> = pickups.slice();
 
-  for (let i = 0; i < pickups.length; i++) {
-    const pickup = pickups[i];
+  for (let i = 0; i < newPickups.length; i++) {
+    const pickup = newPickups[i];
+    if (!pickup) continue;
 
     const dx = player.x - pickup.x;
     const dy = player.y - pickup.y;
@@ -67,7 +68,8 @@ export function tickPickups(state: GameState, dtMs: number): GameState {
       newScore += pickup.scoreValue;
       newXp += pickup.xpValue;
       audioEngine.playSFX('xp_absorb');
-      continue; // despawn — do not push to survivingPickups
+      newPickups[i] = null; // null the slot — index does not shift
+      continue;
     }
 
     // ─── Magnet pull ────────────────────────────────────────────────────────
@@ -77,7 +79,7 @@ export function tickPickups(state: GameState, dtMs: number): GameState {
       const vx = (dx / dist) * MAGNET_MAX_SPEED_PX_PER_SEC;
       const vy = (dy / dist) * MAGNET_MAX_SPEED_PX_PER_SEC;
 
-      survivingPickups.push({
+      newPickups[i] = {
         id: pickup.id,
         x: pickup.x + vx * dtSec,
         y: pickup.y + vy * dtSec,
@@ -87,10 +89,10 @@ export function tickPickups(state: GameState, dtMs: number): GameState {
         scoreValue: pickup.scoreValue,
         xpValue: pickup.xpValue,
         spawnedAtMs: pickup.spawnedAtMs,
-      });
+      };
     } else {
       // Out of magnet range — stationary, velocity explicitly zeroed (no drift).
-      survivingPickups.push({ ...pickup, vxPxPerSec: 0, vyPxPerSec: 0 });
+      newPickups[i] = { ...pickup, vxPxPerSec: 0, vyPxPerSec: 0 };
     }
   }
 
@@ -135,7 +137,7 @@ export function tickPickups(state: GameState, dtMs: number): GameState {
 
   return {
     ...state,
-    pickups: survivingPickups,
+    pickups: newPickups,
     player: {
       ...state.player,
       score: newScore,

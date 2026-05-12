@@ -640,7 +640,7 @@ The full progression loop is closed. Run shape: kill → XP → freeze → modal
 
 ### Architectural decisions
 
-- **Fixed-slot nullable-array is the canonical project pattern for all entity arrays.** Stable slot index = stable React key = no spurious animation state resets. Arrays that compact after removal break key stability: a surviving enemy can shift into a lower slot and inherit a different slot's Skia animation state, producing the die-frame flash this fix eliminates. The pattern now applies to projectiles, pickups, enemies, throwables, and effect zones.
+- **Fixed-slot nullable-array is the canonical project pattern for all entity arrays.** Stable slot index = stable React key = no spurious animation state resets. Arrays that compact after removal break key stability: a surviving enemy can shift into a lower slot and inherit a different slot's Skia animation state, producing the die-frame flash this fix eliminates. The pattern applies to enemies, throwables, effect zones, crates, and pickups (converted post-G1 to fix pickup stutter — see Phase 5 G1 pickup fix commit). Projectiles still compact — deferred because no reported stutter and the pickup fix should ship in isolation. Revisit during template cleanup pass post-launch.
 
 ---
 

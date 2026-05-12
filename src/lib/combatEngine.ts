@@ -96,11 +96,8 @@ export function tickCombat(state: GameState, dtMs: number): GameState {
   let effectZones = state.effectZones;
   let nextEffectZoneId = state.nextEffectZoneId;
 
-  // Pickup array — carry existing pickups forward; deaths add to it below.
-  const newPickups: PickupState[] = [];
-  for (let i = 0; i < state.pickups.length; i++) {
-    newPickups.push(state.pickups[i]);
-  }
+  // Pickup array — carry existing pickups forward; deaths fill first null slot below.
+  const newPickups: Array<PickupState | null> = state.pickups.slice();
 
   // ─── 2. Find nearest alive enemy within range ─────────────────────────────
   const rangeSq = effective.rangePx * effective.rangePx;
@@ -347,18 +344,25 @@ export function tickCombat(state: GameState, dtMs: number): GameState {
     if (dies) {
       killCount += 1;
       // Spawn a Money Small pickup at the dying enemy's position.
-      newPickups.push({
-        id: nextPickupId,
-        x: enemy.x,
-        y: enemy.y,
-        vxPxPerSec: 0,
-        vyPxPerSec: 0,
-        type: 'money_small',
-        scoreValue: MONEY_SMALL_SCORE,
-        xpValue: MONEY_SMALL_XP,
-        spawnedAtMs: elapsedMs,
-      });
-      nextPickupId += 1;
+      // Silent drop if all slots full — same policy as crates. Tune PICKUP_SLOT_COUNT if Phase 5+ density requires.
+      let pickupSpawnSlot = -1;
+      for (let s = 0; s < newPickups.length; s++) {
+        if (newPickups[s] === null) { pickupSpawnSlot = s; break; }
+      }
+      if (pickupSpawnSlot !== -1) {
+        newPickups[pickupSpawnSlot] = {
+          id: nextPickupId,
+          x: enemy.x,
+          y: enemy.y,
+          vxPxPerSec: 0,
+          vyPxPerSec: 0,
+          type: 'money_small',
+          scoreValue: MONEY_SMALL_SCORE,
+          xpValue: MONEY_SMALL_XP,
+          spawnedAtMs: elapsedMs,
+        };
+        nextPickupId += 1;
+      }
     }
     damagedEnemies.push({
       id: enemy.id,
@@ -400,7 +404,7 @@ export function tickCombat(state: GameState, dtMs: number): GameState {
   // AOE damage is applied after regular die-animation cleanup so we don't re-kill
   // enemies that were already transitioned to dying by direct bullet hits this tick.
   let postRocketEnemies: Array<EnemyState | null> = survivingEnemies;
-  let finalPickups: PickupState[] = newPickups;
+  let finalPickups: Array<PickupState | null> = newPickups;
 
   for (let ri = 0; ri < rocketImpacts.length; ri++) {
     const impact = rocketImpacts[ri];

@@ -81,6 +81,7 @@ import {
   EFFECT_ZONE_SLOT_COUNT,
   CRATE_SLOT_COUNT,
   CRATE_SPAWN_INTERVAL_MS,
+  PICKUP_SLOT_COUNT,
   WORLD_WIDTH,
   WORLD_HEIGHT,
 } from '../data/gameConstants';
@@ -376,8 +377,11 @@ export type GameState = {
   nextProjectileId: number;
   /** Total enemies killed this run. Displayed in debug overlay. */
   killCount: number;
-  /** All active pickups. Filtered/replaced each tick — no mutation. */
-  pickups: PickupState[];
+  /**
+   * Fixed-length sparse array of PICKUP_SLOT_COUNT (50) slots.
+   * null = empty slot. Slot index stable for pickup lifetime (no compaction).
+   */
+  pickups: Array<PickupState | null>;
   /** Monotonically increasing counter — ensures every pickup has a unique id. */
   nextPickupId: number;
   /**
@@ -497,7 +501,11 @@ export function createInitialGameState(canvasWidth: number, canvasHeight: number
     projectiles: [],
     nextProjectileId: 0,
     killCount: 0,
-    pickups: [],
+    pickups: (function () {
+      const arr: Array<PickupState | null> = [];
+      for (let i = 0; i < PICKUP_SLOT_COUNT; i++) { arr.push(null); }
+      return arr;
+    }()),
     nextPickupId: 0,
     isDead: false,
     pendingLevelUp: false,
