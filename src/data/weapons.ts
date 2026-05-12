@@ -129,7 +129,7 @@ export const WEAPON_PROFILES: Record<string, WeaponProfile> = {
     // cooldownMs matches FLAMETHROWER_ZONE_DURATION_MS (1000ms) so exactly one batch
     // of zones is alive at a time — clean single animation cycle with no multi-batch
     // phase overlap. Was 250ms (4 overlapping batches caused animation churn).
-    cooldownMs: 1000,
+    cooldownMs: 900,
     rangePx: 140,
     projectileSpeedPxPerSec: 200,
   },
