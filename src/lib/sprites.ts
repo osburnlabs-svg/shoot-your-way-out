@@ -165,8 +165,10 @@ export const PickupSprites = {
  * explode: Effects/Explode/1–4.png (4 frames, 100ms each, linear non-looping).
  *   Used for frag grenade detonation visual — plays once in-slot then clears.
  *
- * flame: Effects/Flamethrower/1–7.png (7 frames, 120ms each, looping).
- *   Used for molotov fire zone visual — loops for MOLOTOV_DURATION_MS.
+ * flame: Effects/ACS Fire/ACSF_01–03.png (3 frames, 120ms each, looping).
+ *   48×96px portrait sprites — suit a directional flame stream better than
+ *   the original 32×32 Flamethrower frames. Swapped for diagnostic test;
+ *   revert to assets/effects/flame/1–7.png if ACS art doesn't read well.
  *
  * smoke: Effects/LightSmoke/1–7.png (7 frames, 150ms each, looping).
  *   Used for smoke zone visual — dissipation sequence (large puff → tiny wisp),
