@@ -148,15 +148,17 @@ const SPRITE_ROTATION_OFFSET = -Math.PI / 2;
  * to as a Skia animated prop, so its per-tick recalculation causes zero Skia
  * notifications — even though the returned array is a new object each tick.
  */
-function useEnemySlotTransform(gameState: SharedValue<GameState>, slotIndex: number) {
+function useEnemySlotTransform(gameState: SharedValue<GameState>, slotIndex: number, width: number, height: number) {
   return useDerivedValue(() => {
     const enemy = gameState.value.enemies[slotIndex];
+    const px = gameState.value.player.x;
+    const py = gameState.value.player.y;
     if (!enemy) return [{ translateX: 0 }, { translateY: 0 }, { rotate: 0 }];
-    const dx = gameState.value.player.x - enemy.x;
-    const dy = gameState.value.player.y - enemy.y;
+    const dx = px - enemy.x;
+    const dy = py - enemy.y;
     return [
-      { translateX: enemy.x },
-      { translateY: enemy.y },
+      { translateX: width / 2 + (enemy.x - px) * CAMERA_ZOOM },
+      { translateY: height / 2 + (enemy.y - py) * CAMERA_ZOOM },
       { rotate: Math.atan2(dy, dx) + SPRITE_ROTATION_OFFSET },
     ];
   });
@@ -171,13 +173,15 @@ function useEnemySlotTransform(gameState: SharedValue<GameState>, slotIndex: num
  * 30 constant Skia subscriptions are safe given the runOnJS(true) gesture fix
  * that resolved the frame-flush issue in G1.
  */
-function useProjectileSlotTransform(gameState: SharedValue<GameState>, slotIndex: number) {
+function useProjectileSlotTransform(gameState: SharedValue<GameState>, slotIndex: number, width: number, height: number) {
   return useDerivedValue(() => {
     const proj = gameState.value.projectiles[slotIndex];
+    const px = gameState.value.player.x;
+    const py = gameState.value.player.y;
     if (!proj) return [{ translateX: -9999 }, { translateY: -9999 }, { rotate: 0 }];
     return [
-      { translateX: proj.x },
-      { translateY: proj.y },
+      { translateX: width / 2 + (proj.x - px) * CAMERA_ZOOM },
+      { translateY: height / 2 + (proj.y - py) * CAMERA_ZOOM },
       { rotate: Math.atan2(proj.vyPxPerSec, proj.vxPxPerSec) + SPRITE_ROTATION_OFFSET },
     ];
   });
@@ -189,11 +193,16 @@ function useProjectileSlotTransform(gameState: SharedValue<GameState>, slotIndex
  * (-9999, -9999). No React state needed for pickup slot activity — position
  * updates happen every frame via derived value.
  */
-function usePickupSlotTransform(gameState: SharedValue<GameState>, slotIndex: number) {
+function usePickupSlotTransform(gameState: SharedValue<GameState>, slotIndex: number, width: number, height: number) {
   return useDerivedValue(() => {
     const pickup = gameState.value.pickups[slotIndex];
+    const px = gameState.value.player.x;
+    const py = gameState.value.player.y;
     if (!pickup) return [{ translateX: -9999 }, { translateY: -9999 }];
-    return [{ translateX: pickup.x }, { translateY: pickup.y }];
+    return [
+      { translateX: width / 2 + (pickup.x - px) * CAMERA_ZOOM },
+      { translateY: height / 2 + (pickup.y - py) * CAMERA_ZOOM },
+    ];
   });
 }
 
@@ -201,11 +210,16 @@ function usePickupSlotTransform(gameState: SharedValue<GameState>, slotIndex: nu
  * Per-slot crate transform — one useDerivedValue per pre-allocated slot.
  * Same always-render pattern as pickups: inactive slots go to (-9999, -9999).
  */
-function useCrateSlotTransform(gameState: SharedValue<GameState>, slotIndex: number) {
+function useCrateSlotTransform(gameState: SharedValue<GameState>, slotIndex: number, width: number, height: number) {
   return useDerivedValue(() => {
     const crate = gameState.value.crates[slotIndex];
+    const px = gameState.value.player.x;
+    const py = gameState.value.player.y;
     if (!crate) return [{ translateX: -9999 }, { translateY: -9999 }];
-    return [{ translateX: crate.x }, { translateY: crate.y }];
+    return [
+      { translateX: width / 2 + (crate.x - px) * CAMERA_ZOOM },
+      { translateY: height / 2 + (crate.y - py) * CAMERA_ZOOM },
+    ];
   });
 }
 
@@ -222,16 +236,21 @@ function useCrateSlotTransform(gameState: SharedValue<GameState>, slotIndex: num
  *   x = lerp(spawnX, targetX, fraction)
  *   y = lerp(spawnY, targetY, fraction) - sin(fraction * PI) * THROWABLE_ARC_HEIGHT_PX
  */
-function useThrowableSlotTransform(gameState: SharedValue<GameState>, slotIndex: number) {
+function useThrowableSlotTransform(gameState: SharedValue<GameState>, slotIndex: number, width: number, height: number) {
   return useDerivedValue(() => {
     const t = gameState.value.throwables[slotIndex];
+    const px = gameState.value.player.x;
+    const py = gameState.value.player.y;
     if (!t || t.status !== 'flying') return [{ translateX: -9999 }, { translateY: -9999 }];
     const elapsed = gameState.value.elapsedMs - t.thrownAtMs;
     const frac = Math.min(elapsed / THROWABLE_TRAVEL_TIME_MS, 1);
     const arcX = t.spawnX + (t.targetX - t.spawnX) * frac;
     const arcY = (t.spawnY + (t.targetY - t.spawnY) * frac)
                - Math.sin(frac * Math.PI) * THROWABLE_ARC_HEIGHT_PX;
-    return [{ translateX: arcX }, { translateY: arcY }];
+    return [
+      { translateX: width / 2 + (arcX - px) * CAMERA_ZOOM },
+      { translateY: height / 2 + (arcY - py) * CAMERA_ZOOM },
+    ];
   });
 }
 
@@ -277,7 +296,6 @@ type Props = {
 };
 
 export default function GameCanvas({ width, height }: Props) {
-  console.log('FIX VERSION: pre-rewrite check — should appear once on app load');
   // ─── Hero sprite images (loaded once at mount) ────────────────────────────
   const walk0 = useImage(HeroSprites.walk[0]);
   const walk1 = useImage(HeroSprites.walk[1]);
@@ -624,56 +642,56 @@ export default function GameCanvas({ width, height }: Props) {
   // ─── Per-slot enemy transforms (UI thread, no runOnJS) ────────────────────
   // One useDerivedValue per slot. Only slots with an active enemy are rendered
   // in JSX, so only those create Skia animated-prop subscriptions.
-  const eTransform0  = useEnemySlotTransform(gameState, 0);
-  const eTransform1  = useEnemySlotTransform(gameState, 1);
-  const eTransform2  = useEnemySlotTransform(gameState, 2);
-  const eTransform3  = useEnemySlotTransform(gameState, 3);
-  const eTransform4  = useEnemySlotTransform(gameState, 4);
-  const eTransform5  = useEnemySlotTransform(gameState, 5);
-  const eTransform6  = useEnemySlotTransform(gameState, 6);
-  const eTransform7  = useEnemySlotTransform(gameState, 7);
-  const eTransform8  = useEnemySlotTransform(gameState, 8);
-  const eTransform9  = useEnemySlotTransform(gameState, 9);
-  const eTransform10 = useEnemySlotTransform(gameState, 10);
-  const eTransform11 = useEnemySlotTransform(gameState, 11);
-  const eTransform12 = useEnemySlotTransform(gameState, 12);
-  const eTransform13 = useEnemySlotTransform(gameState, 13);
-  const eTransform14 = useEnemySlotTransform(gameState, 14);
-  const eTransform15 = useEnemySlotTransform(gameState, 15);
-  const eTransform16 = useEnemySlotTransform(gameState, 16);
-  const eTransform17 = useEnemySlotTransform(gameState, 17);
-  const eTransform18 = useEnemySlotTransform(gameState, 18);
-  const eTransform19 = useEnemySlotTransform(gameState, 19);
-  const eTransform20 = useEnemySlotTransform(gameState, 20);
-  const eTransform21 = useEnemySlotTransform(gameState, 21);
-  const eTransform22 = useEnemySlotTransform(gameState, 22);
-  const eTransform23 = useEnemySlotTransform(gameState, 23);
-  const eTransform24 = useEnemySlotTransform(gameState, 24);
-  const eTransform25 = useEnemySlotTransform(gameState, 25);
-  const eTransform26 = useEnemySlotTransform(gameState, 26);
-  const eTransform27 = useEnemySlotTransform(gameState, 27);
-  const eTransform28 = useEnemySlotTransform(gameState, 28);
-  const eTransform29 = useEnemySlotTransform(gameState, 29);
-  const eTransform30 = useEnemySlotTransform(gameState, 30);
-  const eTransform31 = useEnemySlotTransform(gameState, 31);
-  const eTransform32 = useEnemySlotTransform(gameState, 32);
-  const eTransform33 = useEnemySlotTransform(gameState, 33);
-  const eTransform34 = useEnemySlotTransform(gameState, 34);
-  const eTransform35 = useEnemySlotTransform(gameState, 35);
-  const eTransform36 = useEnemySlotTransform(gameState, 36);
-  const eTransform37 = useEnemySlotTransform(gameState, 37);
-  const eTransform38 = useEnemySlotTransform(gameState, 38);
-  const eTransform39 = useEnemySlotTransform(gameState, 39);
-  const eTransform40 = useEnemySlotTransform(gameState, 40);
-  const eTransform41 = useEnemySlotTransform(gameState, 41);
-  const eTransform42 = useEnemySlotTransform(gameState, 42);
-  const eTransform43 = useEnemySlotTransform(gameState, 43);
-  const eTransform44 = useEnemySlotTransform(gameState, 44);
-  const eTransform45 = useEnemySlotTransform(gameState, 45);
-  const eTransform46 = useEnemySlotTransform(gameState, 46);
-  const eTransform47 = useEnemySlotTransform(gameState, 47);
-  const eTransform48 = useEnemySlotTransform(gameState, 48);
-  const eTransform49 = useEnemySlotTransform(gameState, 49);
+  const eTransform0  = useEnemySlotTransform(gameState, 0,  width, height);
+  const eTransform1  = useEnemySlotTransform(gameState, 1,  width, height);
+  const eTransform2  = useEnemySlotTransform(gameState, 2,  width, height);
+  const eTransform3  = useEnemySlotTransform(gameState, 3,  width, height);
+  const eTransform4  = useEnemySlotTransform(gameState, 4,  width, height);
+  const eTransform5  = useEnemySlotTransform(gameState, 5,  width, height);
+  const eTransform6  = useEnemySlotTransform(gameState, 6,  width, height);
+  const eTransform7  = useEnemySlotTransform(gameState, 7,  width, height);
+  const eTransform8  = useEnemySlotTransform(gameState, 8,  width, height);
+  const eTransform9  = useEnemySlotTransform(gameState, 9,  width, height);
+  const eTransform10 = useEnemySlotTransform(gameState, 10, width, height);
+  const eTransform11 = useEnemySlotTransform(gameState, 11, width, height);
+  const eTransform12 = useEnemySlotTransform(gameState, 12, width, height);
+  const eTransform13 = useEnemySlotTransform(gameState, 13, width, height);
+  const eTransform14 = useEnemySlotTransform(gameState, 14, width, height);
+  const eTransform15 = useEnemySlotTransform(gameState, 15, width, height);
+  const eTransform16 = useEnemySlotTransform(gameState, 16, width, height);
+  const eTransform17 = useEnemySlotTransform(gameState, 17, width, height);
+  const eTransform18 = useEnemySlotTransform(gameState, 18, width, height);
+  const eTransform19 = useEnemySlotTransform(gameState, 19, width, height);
+  const eTransform20 = useEnemySlotTransform(gameState, 20, width, height);
+  const eTransform21 = useEnemySlotTransform(gameState, 21, width, height);
+  const eTransform22 = useEnemySlotTransform(gameState, 22, width, height);
+  const eTransform23 = useEnemySlotTransform(gameState, 23, width, height);
+  const eTransform24 = useEnemySlotTransform(gameState, 24, width, height);
+  const eTransform25 = useEnemySlotTransform(gameState, 25, width, height);
+  const eTransform26 = useEnemySlotTransform(gameState, 26, width, height);
+  const eTransform27 = useEnemySlotTransform(gameState, 27, width, height);
+  const eTransform28 = useEnemySlotTransform(gameState, 28, width, height);
+  const eTransform29 = useEnemySlotTransform(gameState, 29, width, height);
+  const eTransform30 = useEnemySlotTransform(gameState, 30, width, height);
+  const eTransform31 = useEnemySlotTransform(gameState, 31, width, height);
+  const eTransform32 = useEnemySlotTransform(gameState, 32, width, height);
+  const eTransform33 = useEnemySlotTransform(gameState, 33, width, height);
+  const eTransform34 = useEnemySlotTransform(gameState, 34, width, height);
+  const eTransform35 = useEnemySlotTransform(gameState, 35, width, height);
+  const eTransform36 = useEnemySlotTransform(gameState, 36, width, height);
+  const eTransform37 = useEnemySlotTransform(gameState, 37, width, height);
+  const eTransform38 = useEnemySlotTransform(gameState, 38, width, height);
+  const eTransform39 = useEnemySlotTransform(gameState, 39, width, height);
+  const eTransform40 = useEnemySlotTransform(gameState, 40, width, height);
+  const eTransform41 = useEnemySlotTransform(gameState, 41, width, height);
+  const eTransform42 = useEnemySlotTransform(gameState, 42, width, height);
+  const eTransform43 = useEnemySlotTransform(gameState, 43, width, height);
+  const eTransform44 = useEnemySlotTransform(gameState, 44, width, height);
+  const eTransform45 = useEnemySlotTransform(gameState, 45, width, height);
+  const eTransform46 = useEnemySlotTransform(gameState, 46, width, height);
+  const eTransform47 = useEnemySlotTransform(gameState, 47, width, height);
+  const eTransform48 = useEnemySlotTransform(gameState, 48, width, height);
+  const eTransform49 = useEnemySlotTransform(gameState, 49, width, height);
   const allSlotTransforms = [
     eTransform0,  eTransform1,  eTransform2,  eTransform3,  eTransform4,
     eTransform5,  eTransform6,  eTransform7,  eTransform8,  eTransform9,
@@ -757,36 +775,36 @@ export default function GameCanvas({ width, height }: Props) {
   // 30 pre-allocated slots. Always rendered — inactive slots go to (-9999, -9999)
   // so their circles are off-screen. No React state needed for slot activity;
   // position updates happen every frame via derived value.
-  const pTransform0  = useProjectileSlotTransform(gameState, 0);
-  const pTransform1  = useProjectileSlotTransform(gameState, 1);
-  const pTransform2  = useProjectileSlotTransform(gameState, 2);
-  const pTransform3  = useProjectileSlotTransform(gameState, 3);
-  const pTransform4  = useProjectileSlotTransform(gameState, 4);
-  const pTransform5  = useProjectileSlotTransform(gameState, 5);
-  const pTransform6  = useProjectileSlotTransform(gameState, 6);
-  const pTransform7  = useProjectileSlotTransform(gameState, 7);
-  const pTransform8  = useProjectileSlotTransform(gameState, 8);
-  const pTransform9  = useProjectileSlotTransform(gameState, 9);
-  const pTransform10 = useProjectileSlotTransform(gameState, 10);
-  const pTransform11 = useProjectileSlotTransform(gameState, 11);
-  const pTransform12 = useProjectileSlotTransform(gameState, 12);
-  const pTransform13 = useProjectileSlotTransform(gameState, 13);
-  const pTransform14 = useProjectileSlotTransform(gameState, 14);
-  const pTransform15 = useProjectileSlotTransform(gameState, 15);
-  const pTransform16 = useProjectileSlotTransform(gameState, 16);
-  const pTransform17 = useProjectileSlotTransform(gameState, 17);
-  const pTransform18 = useProjectileSlotTransform(gameState, 18);
-  const pTransform19 = useProjectileSlotTransform(gameState, 19);
-  const pTransform20 = useProjectileSlotTransform(gameState, 20);
-  const pTransform21 = useProjectileSlotTransform(gameState, 21);
-  const pTransform22 = useProjectileSlotTransform(gameState, 22);
-  const pTransform23 = useProjectileSlotTransform(gameState, 23);
-  const pTransform24 = useProjectileSlotTransform(gameState, 24);
-  const pTransform25 = useProjectileSlotTransform(gameState, 25);
-  const pTransform26 = useProjectileSlotTransform(gameState, 26);
-  const pTransform27 = useProjectileSlotTransform(gameState, 27);
-  const pTransform28 = useProjectileSlotTransform(gameState, 28);
-  const pTransform29 = useProjectileSlotTransform(gameState, 29);
+  const pTransform0  = useProjectileSlotTransform(gameState, 0,  width, height);
+  const pTransform1  = useProjectileSlotTransform(gameState, 1,  width, height);
+  const pTransform2  = useProjectileSlotTransform(gameState, 2,  width, height);
+  const pTransform3  = useProjectileSlotTransform(gameState, 3,  width, height);
+  const pTransform4  = useProjectileSlotTransform(gameState, 4,  width, height);
+  const pTransform5  = useProjectileSlotTransform(gameState, 5,  width, height);
+  const pTransform6  = useProjectileSlotTransform(gameState, 6,  width, height);
+  const pTransform7  = useProjectileSlotTransform(gameState, 7,  width, height);
+  const pTransform8  = useProjectileSlotTransform(gameState, 8,  width, height);
+  const pTransform9  = useProjectileSlotTransform(gameState, 9,  width, height);
+  const pTransform10 = useProjectileSlotTransform(gameState, 10, width, height);
+  const pTransform11 = useProjectileSlotTransform(gameState, 11, width, height);
+  const pTransform12 = useProjectileSlotTransform(gameState, 12, width, height);
+  const pTransform13 = useProjectileSlotTransform(gameState, 13, width, height);
+  const pTransform14 = useProjectileSlotTransform(gameState, 14, width, height);
+  const pTransform15 = useProjectileSlotTransform(gameState, 15, width, height);
+  const pTransform16 = useProjectileSlotTransform(gameState, 16, width, height);
+  const pTransform17 = useProjectileSlotTransform(gameState, 17, width, height);
+  const pTransform18 = useProjectileSlotTransform(gameState, 18, width, height);
+  const pTransform19 = useProjectileSlotTransform(gameState, 19, width, height);
+  const pTransform20 = useProjectileSlotTransform(gameState, 20, width, height);
+  const pTransform21 = useProjectileSlotTransform(gameState, 21, width, height);
+  const pTransform22 = useProjectileSlotTransform(gameState, 22, width, height);
+  const pTransform23 = useProjectileSlotTransform(gameState, 23, width, height);
+  const pTransform24 = useProjectileSlotTransform(gameState, 24, width, height);
+  const pTransform25 = useProjectileSlotTransform(gameState, 25, width, height);
+  const pTransform26 = useProjectileSlotTransform(gameState, 26, width, height);
+  const pTransform27 = useProjectileSlotTransform(gameState, 27, width, height);
+  const pTransform28 = useProjectileSlotTransform(gameState, 28, width, height);
+  const pTransform29 = useProjectileSlotTransform(gameState, 29, width, height);
   const allProjectileTransforms = [
     pTransform0,  pTransform1,  pTransform2,  pTransform3,  pTransform4,
     pTransform5,  pTransform6,  pTransform7,  pTransform8,  pTransform9,
@@ -800,56 +818,56 @@ export default function GameCanvas({ width, height }: Props) {
   // 50 pre-allocated slots. Same always-render pattern as projectiles:
   // inactive slots sit at (-9999, -9999). No React state needed — the image
   // is always Money_Small so no per-slot image selection required.
-  const pkTransform0  = usePickupSlotTransform(gameState, 0);
-  const pkTransform1  = usePickupSlotTransform(gameState, 1);
-  const pkTransform2  = usePickupSlotTransform(gameState, 2);
-  const pkTransform3  = usePickupSlotTransform(gameState, 3);
-  const pkTransform4  = usePickupSlotTransform(gameState, 4);
-  const pkTransform5  = usePickupSlotTransform(gameState, 5);
-  const pkTransform6  = usePickupSlotTransform(gameState, 6);
-  const pkTransform7  = usePickupSlotTransform(gameState, 7);
-  const pkTransform8  = usePickupSlotTransform(gameState, 8);
-  const pkTransform9  = usePickupSlotTransform(gameState, 9);
-  const pkTransform10 = usePickupSlotTransform(gameState, 10);
-  const pkTransform11 = usePickupSlotTransform(gameState, 11);
-  const pkTransform12 = usePickupSlotTransform(gameState, 12);
-  const pkTransform13 = usePickupSlotTransform(gameState, 13);
-  const pkTransform14 = usePickupSlotTransform(gameState, 14);
-  const pkTransform15 = usePickupSlotTransform(gameState, 15);
-  const pkTransform16 = usePickupSlotTransform(gameState, 16);
-  const pkTransform17 = usePickupSlotTransform(gameState, 17);
-  const pkTransform18 = usePickupSlotTransform(gameState, 18);
-  const pkTransform19 = usePickupSlotTransform(gameState, 19);
-  const pkTransform20 = usePickupSlotTransform(gameState, 20);
-  const pkTransform21 = usePickupSlotTransform(gameState, 21);
-  const pkTransform22 = usePickupSlotTransform(gameState, 22);
-  const pkTransform23 = usePickupSlotTransform(gameState, 23);
-  const pkTransform24 = usePickupSlotTransform(gameState, 24);
-  const pkTransform25 = usePickupSlotTransform(gameState, 25);
-  const pkTransform26 = usePickupSlotTransform(gameState, 26);
-  const pkTransform27 = usePickupSlotTransform(gameState, 27);
-  const pkTransform28 = usePickupSlotTransform(gameState, 28);
-  const pkTransform29 = usePickupSlotTransform(gameState, 29);
-  const pkTransform30 = usePickupSlotTransform(gameState, 30);
-  const pkTransform31 = usePickupSlotTransform(gameState, 31);
-  const pkTransform32 = usePickupSlotTransform(gameState, 32);
-  const pkTransform33 = usePickupSlotTransform(gameState, 33);
-  const pkTransform34 = usePickupSlotTransform(gameState, 34);
-  const pkTransform35 = usePickupSlotTransform(gameState, 35);
-  const pkTransform36 = usePickupSlotTransform(gameState, 36);
-  const pkTransform37 = usePickupSlotTransform(gameState, 37);
-  const pkTransform38 = usePickupSlotTransform(gameState, 38);
-  const pkTransform39 = usePickupSlotTransform(gameState, 39);
-  const pkTransform40 = usePickupSlotTransform(gameState, 40);
-  const pkTransform41 = usePickupSlotTransform(gameState, 41);
-  const pkTransform42 = usePickupSlotTransform(gameState, 42);
-  const pkTransform43 = usePickupSlotTransform(gameState, 43);
-  const pkTransform44 = usePickupSlotTransform(gameState, 44);
-  const pkTransform45 = usePickupSlotTransform(gameState, 45);
-  const pkTransform46 = usePickupSlotTransform(gameState, 46);
-  const pkTransform47 = usePickupSlotTransform(gameState, 47);
-  const pkTransform48 = usePickupSlotTransform(gameState, 48);
-  const pkTransform49 = usePickupSlotTransform(gameState, 49);
+  const pkTransform0  = usePickupSlotTransform(gameState, 0,  width, height);
+  const pkTransform1  = usePickupSlotTransform(gameState, 1,  width, height);
+  const pkTransform2  = usePickupSlotTransform(gameState, 2,  width, height);
+  const pkTransform3  = usePickupSlotTransform(gameState, 3,  width, height);
+  const pkTransform4  = usePickupSlotTransform(gameState, 4,  width, height);
+  const pkTransform5  = usePickupSlotTransform(gameState, 5,  width, height);
+  const pkTransform6  = usePickupSlotTransform(gameState, 6,  width, height);
+  const pkTransform7  = usePickupSlotTransform(gameState, 7,  width, height);
+  const pkTransform8  = usePickupSlotTransform(gameState, 8,  width, height);
+  const pkTransform9  = usePickupSlotTransform(gameState, 9,  width, height);
+  const pkTransform10 = usePickupSlotTransform(gameState, 10, width, height);
+  const pkTransform11 = usePickupSlotTransform(gameState, 11, width, height);
+  const pkTransform12 = usePickupSlotTransform(gameState, 12, width, height);
+  const pkTransform13 = usePickupSlotTransform(gameState, 13, width, height);
+  const pkTransform14 = usePickupSlotTransform(gameState, 14, width, height);
+  const pkTransform15 = usePickupSlotTransform(gameState, 15, width, height);
+  const pkTransform16 = usePickupSlotTransform(gameState, 16, width, height);
+  const pkTransform17 = usePickupSlotTransform(gameState, 17, width, height);
+  const pkTransform18 = usePickupSlotTransform(gameState, 18, width, height);
+  const pkTransform19 = usePickupSlotTransform(gameState, 19, width, height);
+  const pkTransform20 = usePickupSlotTransform(gameState, 20, width, height);
+  const pkTransform21 = usePickupSlotTransform(gameState, 21, width, height);
+  const pkTransform22 = usePickupSlotTransform(gameState, 22, width, height);
+  const pkTransform23 = usePickupSlotTransform(gameState, 23, width, height);
+  const pkTransform24 = usePickupSlotTransform(gameState, 24, width, height);
+  const pkTransform25 = usePickupSlotTransform(gameState, 25, width, height);
+  const pkTransform26 = usePickupSlotTransform(gameState, 26, width, height);
+  const pkTransform27 = usePickupSlotTransform(gameState, 27, width, height);
+  const pkTransform28 = usePickupSlotTransform(gameState, 28, width, height);
+  const pkTransform29 = usePickupSlotTransform(gameState, 29, width, height);
+  const pkTransform30 = usePickupSlotTransform(gameState, 30, width, height);
+  const pkTransform31 = usePickupSlotTransform(gameState, 31, width, height);
+  const pkTransform32 = usePickupSlotTransform(gameState, 32, width, height);
+  const pkTransform33 = usePickupSlotTransform(gameState, 33, width, height);
+  const pkTransform34 = usePickupSlotTransform(gameState, 34, width, height);
+  const pkTransform35 = usePickupSlotTransform(gameState, 35, width, height);
+  const pkTransform36 = usePickupSlotTransform(gameState, 36, width, height);
+  const pkTransform37 = usePickupSlotTransform(gameState, 37, width, height);
+  const pkTransform38 = usePickupSlotTransform(gameState, 38, width, height);
+  const pkTransform39 = usePickupSlotTransform(gameState, 39, width, height);
+  const pkTransform40 = usePickupSlotTransform(gameState, 40, width, height);
+  const pkTransform41 = usePickupSlotTransform(gameState, 41, width, height);
+  const pkTransform42 = usePickupSlotTransform(gameState, 42, width, height);
+  const pkTransform43 = usePickupSlotTransform(gameState, 43, width, height);
+  const pkTransform44 = usePickupSlotTransform(gameState, 44, width, height);
+  const pkTransform45 = usePickupSlotTransform(gameState, 45, width, height);
+  const pkTransform46 = usePickupSlotTransform(gameState, 46, width, height);
+  const pkTransform47 = usePickupSlotTransform(gameState, 47, width, height);
+  const pkTransform48 = usePickupSlotTransform(gameState, 48, width, height);
+  const pkTransform49 = usePickupSlotTransform(gameState, 49, width, height);
   const allPickupTransforms = [
     pkTransform0,  pkTransform1,  pkTransform2,  pkTransform3,  pkTransform4,
     pkTransform5,  pkTransform6,  pkTransform7,  pkTransform8,  pkTransform9,
@@ -865,24 +883,24 @@ export default function GameCanvas({ width, height }: Props) {
 
   // ─── Per-slot crate transforms (UI thread, no runOnJS) ───────────────────
   // 3 pre-allocated slots — matches CRATE_SLOT_COUNT / CRATE_MAX_ACTIVE exactly.
-  const crTransform0 = useCrateSlotTransform(gameState, 0);
-  const crTransform1 = useCrateSlotTransform(gameState, 1);
-  const crTransform2 = useCrateSlotTransform(gameState, 2);
+  const crTransform0 = useCrateSlotTransform(gameState, 0, width, height);
+  const crTransform1 = useCrateSlotTransform(gameState, 1, width, height);
+  const crTransform2 = useCrateSlotTransform(gameState, 2, width, height);
   const allCrateTransforms = [crTransform0, crTransform1, crTransform2];
 
   // ─── Throwable slot arc positions (UI thread, no runOnJS) ────────────────
   // 10 pre-allocated slots. Flying slots interpolate the arc each frame.
   // Detonating/null slots return {x:-9999,y:-9999} — rendered off-screen.
-  const tTransform0 = useThrowableSlotTransform(gameState, 0);
-  const tTransform1 = useThrowableSlotTransform(gameState, 1);
-  const tTransform2 = useThrowableSlotTransform(gameState, 2);
-  const tTransform3 = useThrowableSlotTransform(gameState, 3);
-  const tTransform4 = useThrowableSlotTransform(gameState, 4);
-  const tTransform5 = useThrowableSlotTransform(gameState, 5);
-  const tTransform6 = useThrowableSlotTransform(gameState, 6);
-  const tTransform7 = useThrowableSlotTransform(gameState, 7);
-  const tTransform8 = useThrowableSlotTransform(gameState, 8);
-  const tTransform9 = useThrowableSlotTransform(gameState, 9);
+  const tTransform0 = useThrowableSlotTransform(gameState, 0, width, height);
+  const tTransform1 = useThrowableSlotTransform(gameState, 1, width, height);
+  const tTransform2 = useThrowableSlotTransform(gameState, 2, width, height);
+  const tTransform3 = useThrowableSlotTransform(gameState, 3, width, height);
+  const tTransform4 = useThrowableSlotTransform(gameState, 4, width, height);
+  const tTransform5 = useThrowableSlotTransform(gameState, 5, width, height);
+  const tTransform6 = useThrowableSlotTransform(gameState, 6, width, height);
+  const tTransform7 = useThrowableSlotTransform(gameState, 7, width, height);
+  const tTransform8 = useThrowableSlotTransform(gameState, 8, width, height);
+  const tTransform9 = useThrowableSlotTransform(gameState, 9, width, height);
   const allThrowableTransforms = [tTransform0, tTransform1, tTransform2, tTransform3, tTransform4, tTransform5, tTransform6, tTransform7, tTransform8, tTransform9];
 
   // ─── Throwable slot React state (100ms timer bridge) ─────────────────────
@@ -1096,9 +1114,11 @@ export default function GameCanvas({ width, height }: Props) {
   });
 
   // ─── Hero group transform (UI thread → Skia) ───────────────────────────────
+  // Player is always at screen center — camera math is baked into entity slot
+  // transforms, so the player just sits at width/2, height/2 every frame.
   const groupTransform = useDerivedValue(() => [
-    { translateX: gameState.value.player.x },
-    { translateY: gameState.value.player.y },
+    { translateX: width / 2 },
+    { translateY: height / 2 },
     { rotate: gameState.value.player.rotation + SPRITE_ROTATION_OFFSET },
   ]);
 
@@ -1162,10 +1182,14 @@ export default function GameCanvas({ width, height }: Props) {
     <GestureDetector gesture={panGesture}>
       <View style={StyleSheet.absoluteFill}>
         <Canvas style={StyleSheet.absoluteFill}>
+          {/*
+           * Camera Group contains ONLY React-state-positioned elements (static inner
+           * transforms). All animated-derived-value entities live outside this Group
+           * so there are no nested animated Skia Groups — the root cause of stutter.
+           */}
           <Group transform={cameraTransform}>
 
-          {/* ── Effect zones (below crates) ──────────────────────────────── */}
-          {/* Z-order: zones < crates < pickups < projectiles < throwables < enemies. */}
+          {/* ── Effect zones (React state positions, static transforms) ──── */}
           {/* Smoke: 7-frame LightSmoke animation (dissipation loop, 150ms/frame). */}
           {/* Molotov: static Explode frame 3 (index 2) — peak-bloom reads as   */}
           {/*   "fire patch on ground" vs flamethrower stream. Phase 6: tune.    */}
@@ -1252,8 +1276,33 @@ export default function GameCanvas({ width, height }: Props) {
             );
           })}
 
-          {/* ── Crates (above effect zones, below pickups) ───────────────── */}
-          {/* Always render all 10 slots. Inactive slots sit at (-9999,-9999). */}
+          {/* ── Detonating throwables (React state positions, static) ──── */}
+          {/* Kept in camera Group: static inner transforms, no nested-animated issue. */}
+          {throwableSlotData.map((t, i) => {
+            if (t.status !== 'detonating') return null;
+            const expImg = explodeImages[t.frame] ?? null;
+            if (!expImg) return null;
+            const ew = expImg.width() * EFFECT_SPRITE_SCALE;
+            const eh = expImg.height() * EFFECT_SPRITE_SCALE;
+            return (
+              <Image
+                key={`throw-det-${i}`}
+                image={expImg}
+                x={t.targetX - ew / 2}
+                y={t.targetY - eh / 2}
+                width={ew}
+                height={eh}
+                sampling={{ filter: FilterMode.Nearest, mipmap: MipmapMode.None }}
+              />
+            );
+          })}
+
+          </Group>
+
+          {/* ── Crates ───────────────────────────────────────────────────── */}
+          {/* Screen-coord derived values — outside camera Group to avoid    */}
+          {/* nested animated Skia Groups (root cause of stutter).           */}
+          {/* Inactive slots sit at (-9999,-9999).                           */}
           {crateImage && allCrateTransforms.map((transform, i) => (
             <Group key={`crate-${i}`} transform={transform}>
               <Image
@@ -1267,9 +1316,9 @@ export default function GameCanvas({ width, height }: Props) {
             </Group>
           ))}
 
-          {/* ── Pickups (below projectiles and enemies) ───────────────────── */}
-          {/* Always render all 50 slots. Inactive slots sit at (-9999,-9999). */}
-          {/* Z-order: pickups < projectiles < enemies < player < overlays.    */}
+          {/* ── Pickups ──────────────────────────────────────────────────── */}
+          {/* Screen-coord derived values — outside camera Group.            */}
+          {/* Z-order: pickups < projectiles < enemies < player < overlays.  */}
           {moneySmallImage && allPickupTransforms.map((transform, i) => (
             <Group key={`pickup-${i}`} transform={transform}>
               <Image
@@ -1283,8 +1332,8 @@ export default function GameCanvas({ width, height }: Props) {
             </Group>
           ))}
 
-          {/* ── Projectiles (below enemies, above pickups) ─────────────────── */}
-          {/* Always render all 30 slots. Inactive slots sit at (-9999,-9999).  */}
+          {/* ── Projectiles ──────────────────────────────────────────────── */}
+          {/* Screen-coord derived values — outside camera Group.            */}
           {/* Rockets: Image sprite (transform includes rotation). Bullets: Circle. */}
           {allProjectileTransforms.map((transform, i) => {
             if (projIsRocket[i]) {
@@ -1318,14 +1367,11 @@ export default function GameCanvas({ width, height }: Props) {
             );
           })}
 
-          {/* ── Throwables (above projectiles, below enemies) ─────────────── */}
-          {/* Flying circles: always-render (10 slots), inactive go to -9999.  */}
-          {/*   transform from useDerivedValue — no .value read during render.  */}
-          {/* Detonating frag: Explode sprite at React-state targetX/Y.         */}
+          {/* ── Flying throwables ────────────────────────────────────────── */}
+          {/* Screen-coord derived values — outside camera Group.            */}
+          {/* Inactive/detonating slots sit at (-9999,-9999) — invisible.   */}
           {allThrowableTransforms.map((transform, i) => {
             const t = throwableSlotData[i]!;
-            // Always render the flying circle for this slot.
-            // Inactive/detonating slots sit at (-9999,-9999) — circle invisible.
             const color = t.type ? THROWABLE_COLORS[t.type] : '#000000';
             return (
               <Group key={`throw-fly-${i}`} transform={transform}>
@@ -1333,37 +1379,17 @@ export default function GameCanvas({ width, height }: Props) {
               </Group>
             );
           })}
-          {throwableSlotData.map((t, i) => {
-            if (t.status !== 'detonating') return null;
-            const expImg = explodeImages[t.frame] ?? null;
-            if (!expImg) return null;
-            const ew = expImg.width() * EFFECT_SPRITE_SCALE;
-            const eh = expImg.height() * EFFECT_SPRITE_SCALE;
-            return (
-              <Image
-                key={`throw-det-${i}`}
-                image={expImg}
-                x={t.targetX - ew / 2}
-                y={t.targetY - eh / 2}
-                width={ew}
-                height={eh}
-                sampling={{ filter: FilterMode.Nearest, mipmap: MipmapMode.None }}
-              />
-            );
-          })}
 
-          {/* ── Enemies (below player) ────────────────────────────────────── */}
-          {/* transform = per-slot useDerivedValue (UI thread, no runOnJS).   */}
+          {/* ── Enemies ──────────────────────────────────────────────────── */}
+          {/* Screen-coord derived values — outside camera Group.            */}
           {/* Only active slots render a <Group>, breaking Skia subscriptions */}
-          {/* for empty slots.                                                 */}
+          {/* for empty slots.                                                */}
           {allSlotTransforms.map((transform, i) => {
             const type = enemySlotTypes[i];
             if (!type) return null;
             const status = enemySlotStatuses[i];
             const isDying = status === 'dying';
 
-            // Select image array based on type and current state.
-            // Dying enemies use die frames; alive enemies use walk/fire frames.
             const images = isDying
               ? (type === 'scav' ? scavDieImages : raiderDieImages)
               : (type === 'scav' ? scavWalkImages : raiderFireImages);
@@ -1373,15 +1399,12 @@ export default function GameCanvas({ width, height }: Props) {
             const w = img.width() * ENEMY_SPRITE_SCALE;
             const h = img.height() * ENEMY_SPRITE_SCALE;
 
-            // Body overlay: only for alive Scavs.
-            // Dying Scavs show die frames which are full-body — no overlay needed.
             const bodyOverlay = (type === 'scav' && !isDying) ? scavBodyImage : null;
             const bw = bodyOverlay ? bodyOverlay.width() * ENEMY_SPRITE_SCALE : 0;
             const bh = bodyOverlay ? bodyOverlay.height() * ENEMY_SPRITE_SCALE : 0;
 
             return (
               <Group key={i} transform={transform}>
-                {/* Bottom layer: walk/fire frame (alive) or die frame (dying) */}
                 <Image
                   image={img}
                   x={-w / 2}
@@ -1390,7 +1413,6 @@ export default function GameCanvas({ width, height }: Props) {
                   height={h}
                   sampling={{ filter: FilterMode.Nearest, mipmap: MipmapMode.None }}
                 />
-                {/* Top layer: Scav upper body — only while alive */}
                 {bodyOverlay && (
                   <Image
                     image={bodyOverlay}
@@ -1402,8 +1424,6 @@ export default function GameCanvas({ width, height }: Props) {
                   />
                 )}
                 {/* Hit-flash: red circle centered on enemy, visible for HIT_FLASH_DURATION_MS.
-                    Radius uses HIT_FLASH_RADIUS_PX (~1/3 of collision radius) so the flash
-                    reads as an impact splash rather than enveloping the sprite.
                     Sprite color-filter is not supported for <Image> in Skia v2.2.12. */}
                 <Circle
                   cx={0}
@@ -1416,9 +1436,9 @@ export default function GameCanvas({ width, height }: Props) {
             );
           })}
 
-          {/* ── Player (above enemies) ────────────────────────────────────── */}
+          {/* ── Player ───────────────────────────────────────────────────── */}
+          {/* Screen-coord derived value — always at screen center.          */}
           <Group transform={groupTransform}>
-            {/* Bottom layer: animated walk legs (only while moving) */}
             {bodyImage && (
               <Image
                 image={bodyImage}
@@ -1429,7 +1449,6 @@ export default function GameCanvas({ width, height }: Props) {
                 sampling={{ filter: FilterMode.Nearest, mipmap: MipmapMode.None }}
               />
             )}
-            {/* Top layer: weapon pose — dynamic from player.weaponPose */}
             {weaponImage && (
               <Image
                 image={weaponImage}
@@ -1442,7 +1461,6 @@ export default function GameCanvas({ width, height }: Props) {
             )}
           </Group>
 
-          </Group>
         </Canvas>
 
         {/* Debug weapon cycle button — top-left.
