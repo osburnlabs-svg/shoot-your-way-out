@@ -49,8 +49,6 @@
  *                HP/Score/XP/isDead for debug and overlay)
  */
 
-console.log('GESTURE-FIX VERSION: active');
-
 import React, { useCallback, useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import {
@@ -413,13 +411,6 @@ export default function GameCanvas({ width, height }: Props) {
   const fpsAccumMs = useSharedValue(0);
   const fpsFrameCount = useSharedValue(0);
 
-  // ─── Frame-skip diagnostic (UI thread → JS poll) ──────────────────────────
-  // diagFrameCount: total useFrameCallback invocations since session start.
-  // diagWallMs: performance.now() at last invocation.
-  // Read by 100ms setInterval; compare against expectedFrames to detect skipped vsyncs.
-  const diagFrameCount = useSharedValue(0);
-  const diagWallMs = useSharedValue(0);
-
   // ─── Debug display (React state, ~once/sec) ────────────────────────────────
   const [displayFps, setDisplayFps] = useState(0);
   const [displayElapsed, setDisplayElapsed] = useState(0);
@@ -492,12 +483,6 @@ export default function GameCanvas({ width, height }: Props) {
   useEffect(() => {
     const id = setInterval(() => {
       const state = gameState.value;
-
-      // Frame-skip diagnostic log — remove after hypothesis test.
-      const fc = diagFrameCount.value;
-      const wt = diagWallMs.value;
-      const expected = Math.floor(state.elapsedMs / 16.67);
-      console.log(`[FRAME-DIAG] frameCount=${fc} expectedFrames=${expected} delta=${fc - expected} wallMs=${Math.round(wt)}`);
 
       // Hero sprite state.
       const { player } = state;
@@ -1166,10 +1151,6 @@ export default function GameCanvas({ width, height }: Props) {
     // Cap at 50ms so a backgrounded-app resume doesn't produce a giant physics jump.
     state = updateGameState(state, Math.min(dtMs, 50));
     gameState.value = state;
-
-    // Frame-skip diagnostic — increment running counter and snapshot wall clock.
-    diagFrameCount.value += 1;
-    diagWallMs.value = performance.now();
 
     // FPS + debug counters — bridge to React once per second.
     fpsAccumMs.value += dtMs;
