@@ -120,7 +120,6 @@ import type { EnemyType } from '../data/enemies';
 import { createInitialGameState, updateGameState } from '../lib/gameEngine';
 import type { GameState } from '../lib/gameEngine';
 import { getCurrentFrame } from '../lib/animation';
-import { computeSteps, FIXED_STEP_MS } from '../lib/gameLoop';
 
 // Cycle order and display labels for the debug weapon button.
 const WEAPON_CYCLE: HeroWeaponPose[] = [
@@ -381,7 +380,6 @@ export default function GameCanvas({ width, height }: Props) {
 
   // ─── Game state ────────────────────────────────────────────────────────────
   const gameState = useSharedValue(createInitialGameState(width, height));
-  const accumulator = useSharedValue(0);
 
   // ─── Virtual joystick shared values (UI thread) ───────────────────────────
   const joystickOriginX = useSharedValue(0);
@@ -1053,8 +1051,7 @@ export default function GameCanvas({ width, height }: Props) {
 
   const handleRedeploy = useCallback(() => {
     gameState.value = createInitialGameState(width, height);
-    accumulator.value = 0;
-  }, [gameState, accumulator, width, height]);
+  }, [gameState, width, height]);
 
   // ─── Virtual joystick gesture ──────────────────────────────────────────────
   const panGesture = Gesture.Pan()
@@ -1117,13 +1114,8 @@ export default function GameCanvas({ width, height }: Props) {
       player: { ...gameState.value.player, inputVector: iv },
     };
 
-    accumulator.value += dtMs;
-    const { steps, remainingMs } = computeSteps(accumulator.value, FIXED_STEP_MS);
-    accumulator.value = remainingMs;
-
-    for (let i = 0; i < steps; i++) {
-      state = updateGameState(state, FIXED_STEP_MS);
-    }
+    // Cap at 50ms so a backgrounded-app resume doesn't produce a giant physics jump.
+    state = updateGameState(state, Math.min(dtMs, 50));
     gameState.value = state;
 
     // FPS + debug counters — bridge to React once per second.

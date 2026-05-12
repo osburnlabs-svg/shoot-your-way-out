@@ -536,7 +536,7 @@ export function createInitialGameState(canvasWidth: number, canvasHeight: number
 }
 
 /**
- * Advance game state by one fixed timestep (FIXED_STEP_MS).
+ * Advance game state by dtMs milliseconds (variable-dt, called once per frame).
  *
  * Returns state unchanged when isDead or pendingLevelUp — both conditions
  * freeze all simulation until the relevant flag is cleared (isDead: Phase 7
