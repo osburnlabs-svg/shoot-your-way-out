@@ -11,6 +11,23 @@
  *   Phase 5:  per-map settings
  */
 
+// ─── World / camera ───────────────────────────────────────────────────────────
+
+/**
+ * Arena dimensions in world pixels. Larger than the screen — the camera scrolls
+ * to follow the player. Phase 5 G2 (tile rendering) will validate these values;
+ * adjust here if the tile grid requires a different size.
+ */
+export const WORLD_WIDTH = 2000;
+export const WORLD_HEIGHT = 2000;
+
+/**
+ * Camera zoom factor. 1.0 = no zoom (screen shows SCREEN_SIZE world pixels at 1:1).
+ * Final value locked at end of Phase 5 once tiles + enemies + HUD are visible together.
+ * Do not tune this in G1 — just introduces the constant so all systems share one source.
+ */
+export const CAMERA_ZOOM = 1.0;
+
 // ─── Player movement ──────────────────────────────────────────────────────────
 
 /** How fast the hero moves in the input direction, in pixels per second. */

@@ -14,6 +14,7 @@ import {
   CRATE_SPAWN_INTERVAL_MS,
   CRATE_MAX_ACTIVE,
   CRATE_SPAWN_MARGIN_PX,
+  CAMERA_ZOOM,
 } from '../data/gameConstants';
 
 export function tickCrateSpawn(state: GameState, _dtMs: number): GameState {
@@ -40,10 +41,12 @@ export function tickCrateSpawn(state: GameState, _dtMs: number): GameState {
     return { ...state, nextCrateSpawnAtMs: nextSpawnAtMs };
   }
 
-  const minX = CRATE_SPAWN_MARGIN_PX;
-  const maxX = state.canvasWidth - CRATE_SPAWN_MARGIN_PX;
-  const minY = CRATE_SPAWN_MARGIN_PX;
-  const maxY = state.canvasHeight - CRATE_SPAWN_MARGIN_PX;
+  const viewHalfW = state.canvasWidth / (2 * CAMERA_ZOOM);
+  const viewHalfH = state.canvasHeight / (2 * CAMERA_ZOOM);
+  const minX = Math.max(state.player.x - viewHalfW + CRATE_SPAWN_MARGIN_PX, 0);
+  const maxX = Math.min(state.player.x + viewHalfW - CRATE_SPAWN_MARGIN_PX, state.worldWidth);
+  const minY = Math.max(state.player.y - viewHalfH + CRATE_SPAWN_MARGIN_PX, 0);
+  const maxY = Math.min(state.player.y + viewHalfH - CRATE_SPAWN_MARGIN_PX, state.worldHeight);
   const x = minX + Math.random() * (maxX - minX);
   const y = minY + Math.random() * (maxY - minY);
 

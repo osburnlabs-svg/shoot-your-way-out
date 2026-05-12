@@ -113,6 +113,7 @@ import {
   PROJECTILE_SLOT_COUNT,
   ROCKET_FRAME_COUNT,
   ROCKET_FRAME_DURATION_MS,
+  CAMERA_ZOOM,
 } from '../data/gameConstants';
 import type { CrateTier } from '../data/gameConstants';
 import type { EnemyType } from '../data/enemies';
@@ -933,17 +934,6 @@ export default function GameCanvas({ width, height }: Props) {
     };
   }, [gameState]);
 
-  // TEMPORARY FLAMETHROWER DEBUG BUTTON — remove before Phase 5.
-  // Directly equips the Flamethrower (rpo) so Mo can test flame zones without
-  // waiting to roll it from a crate. Sets both equippedWeaponId (combat stats)
-  // and weaponPose (animation) — same mutation as CrateRevealModal's handleEquip.
-  const equipFlamethrower = useCallback(() => {
-    gameState.value = {
-      ...gameState.value,
-      player: { ...gameState.value.player, equippedWeaponId: 'rpo', weaponPose: 'flamethrower' },
-    };
-  }, [gameState]);
-
   // ─── Crate reveal handlers ─────────────────────────────────────────────────
   // Both mutate gameState.value on the JS thread during the pendingCrateReveal
   // freeze window — same pattern as handleSkillSelect / handleFreeRevive.
@@ -1094,6 +1084,21 @@ export default function GameCanvas({ width, height }: Props) {
       inputVectorY.value = 0;
     });
 
+  // ─── Camera transform (UI thread → Skia) ──────────────────────────────────
+  // Centers the world on the player: translate so player maps to screen center,
+  // then scale by zoom. All world entities live inside this Group.
+  const cameraTransform = useDerivedValue(() => {
+    const px = gameState.value.player.x;
+    const py = gameState.value.player.y;
+    const w = gameState.value.canvasWidth;
+    const h = gameState.value.canvasHeight;
+    return [
+      { translateX: w / 2 - px * CAMERA_ZOOM },
+      { translateY: h / 2 - py * CAMERA_ZOOM },
+      { scale: CAMERA_ZOOM },
+    ];
+  });
+
   // ─── Hero group transform (UI thread → Skia) ───────────────────────────────
   const groupTransform = useDerivedValue(() => [
     { translateX: gameState.value.player.x },
@@ -1164,11 +1169,8 @@ export default function GameCanvas({ width, height }: Props) {
   return (
     <GestureDetector gesture={panGesture}>
       <View style={StyleSheet.absoluteFill}>
-        {/* TODO Phase 5: wrap world rendering in <Group> with camera transform.
-            scale = zoom level, translate = camera offset following player.
-            Visual sprite scale (currently 2×) will likely need tuning once
-            tiles + enemies + HUD are all visible together. */}
         <Canvas style={StyleSheet.absoluteFill}>
+          <Group transform={cameraTransform}>
 
           {/* ── Effect zones (below crates) ──────────────────────────────── */}
           {/* Z-order: zones < crates < pickups < projectiles < throwables < enemies. */}
@@ -1448,6 +1450,7 @@ export default function GameCanvas({ width, height }: Props) {
             )}
           </Group>
 
+          </Group>
         </Canvas>
 
         {/* Debug weapon cycle button — top-left.
@@ -1463,14 +1466,6 @@ export default function GameCanvas({ width, height }: Props) {
             Weapon: {WEAPON_LABELS[spriteState.weaponPose]}
           </Text>
           <Text style={[styles.debugText, styles.tapHint]}>tap to cycle</Text>
-        </Pressable>
-
-        {/* TEMPORARY FLAMETHROWER DEBUG BUTTON — remove before Phase 5. */}
-        <Pressable
-          style={[styles.debugOverlay, styles.weaponButton, { top: 115, left: 10 }]}
-          onPress={equipFlamethrower}
-        >
-          <Text style={[styles.debugText, { color: '#ff6600' }]}>FLAMETHROWER</Text>
         </Pressable>
 
         {/* Debug overlay — top-right. */}

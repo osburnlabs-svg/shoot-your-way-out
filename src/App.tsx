@@ -12,7 +12,7 @@ import GameScreen from './screens/GameScreen';
 
 // Screen state machine.
 // G2: boots directly into GameScreen.
-// Phase 7 adds full routing: Loading → MainMenu → MapSelect → Game ⇄ Pause → GameOver
+// Phase 7 adds full routing: Loading → MainMenu → PreRunModal → Game ⇄ Pause → GameOver
 type Screen = 'game'; // expand to union when Phase 7 adds other screens
 
 export default function App() {

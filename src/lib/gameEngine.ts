@@ -81,6 +81,8 @@ import {
   EFFECT_ZONE_SLOT_COUNT,
   CRATE_SLOT_COUNT,
   CRATE_SPAWN_INTERVAL_MS,
+  WORLD_WIDTH,
+  WORLD_HEIGHT,
 } from '../data/gameConstants';
 import type { CrateTier } from '../data/gameConstants';
 import type { SkillId } from '../data/skills';
@@ -440,9 +442,12 @@ export type GameState = {
   crateRevealWeaponId: string | null;
   /** Tier of the rolled weapon — drives tier color display in the modal. */
   crateRevealTier: CrateTier | null;
-  /** Canvas dimensions stored once at init — spawner uses them to place enemies at edges. */
+  /** Canvas (screen) dimensions — needed for camera offset math in GameCanvas. */
   canvasWidth: number;
   canvasHeight: number;
+  /** World (arena) dimensions — used by spawner and crate engine for placement bounds. */
+  worldWidth: number;
+  worldHeight: number;
   elapsedMs: number;  // total ms the game has been running
   frameCount: number; // total fixed-step frames processed
 };
@@ -453,8 +458,8 @@ export function createInitialGameState(canvasWidth: number, canvasHeight: number
   for (let i = 0; i < ENEMY_SOFT_CAP; i++) { emptyEnemies.push(null); }
   return {
     player: {
-      x: canvasWidth / 2,
-      y: canvasHeight / 2,
+      x: WORLD_WIDTH / 2,
+      y: WORLD_HEIGHT / 2,
       rotation: 0,
       targetRotation: 0,
       inputVector: null,
@@ -523,6 +528,8 @@ export function createInitialGameState(canvasWidth: number, canvasHeight: number
     crateRevealTier: null,
     canvasWidth,
     canvasHeight,
+    worldWidth: WORLD_WIDTH,
+    worldHeight: WORLD_HEIGHT,
     elapsedMs: 0,
     frameCount: 0,
   };

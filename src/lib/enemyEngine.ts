@@ -33,6 +33,7 @@ import {
   ENEMY_BASE_SPEED_PX_PER_SEC,
   SMOKE_RADIUS_PX,
   SMOKE_SLOW_MULT,
+  CAMERA_ZOOM,
 } from '../data/gameConstants';
 
 /** Linear interpolation — inlined here to avoid importing a non-worklet util. */
@@ -62,29 +63,49 @@ function rollEnemyType(elapsedMs: number): EnemyType {
 }
 
 /**
- * Pick a random position just outside one of the four screen edges.
- * Enemies always walk inward from their spawn point.
+ * Pick a random position just outside the visible viewport edge.
+ * Viewport is centered on the player — enemies spawn at the edge of what the
+ * player can see so they always walk in from off-screen.
+ * All positions are clamped to world bounds so enemies never spawn outside the arena.
  */
 function randomEdgePos(
-  canvasWidth: number,
-  canvasHeight: number,
+  playerX: number,
+  playerY: number,
+  viewHalfW: number,
+  viewHalfH: number,
+  worldWidth: number,
+  worldHeight: number,
 ): { x: number; y: number } {
   'worklet';
+  const clampX = (v: number) => Math.min(Math.max(v, 0), worldWidth);
+  const clampY = (v: number) => Math.min(Math.max(v, 0), worldHeight);
   const edge = Math.floor(Math.random() * 4);
   if (edge === 0) {
     // Top edge
-    return { x: Math.random() * canvasWidth, y: -SPAWN_MARGIN_PX };
+    return {
+      x: clampX(playerX - viewHalfW + Math.random() * viewHalfW * 2),
+      y: clampY(playerY - viewHalfH - SPAWN_MARGIN_PX),
+    };
   }
   if (edge === 1) {
     // Right edge
-    return { x: canvasWidth + SPAWN_MARGIN_PX, y: Math.random() * canvasHeight };
+    return {
+      x: clampX(playerX + viewHalfW + SPAWN_MARGIN_PX),
+      y: clampY(playerY - viewHalfH + Math.random() * viewHalfH * 2),
+    };
   }
   if (edge === 2) {
     // Bottom edge
-    return { x: Math.random() * canvasWidth, y: canvasHeight + SPAWN_MARGIN_PX };
+    return {
+      x: clampX(playerX - viewHalfW + Math.random() * viewHalfW * 2),
+      y: clampY(playerY + viewHalfH + SPAWN_MARGIN_PX),
+    };
   }
   // Left edge
-  return { x: -SPAWN_MARGIN_PX, y: Math.random() * canvasHeight };
+  return {
+    x: clampX(playerX - viewHalfW - SPAWN_MARGIN_PX),
+    y: clampY(playerY - viewHalfH + Math.random() * viewHalfH * 2),
+  };
 }
 
 /**
@@ -101,7 +122,9 @@ function randomEdgePos(
 export function tickEnemies(state: GameState, dtMs: number): GameState {
   'worklet';
 
-  const { canvasWidth, canvasHeight, elapsedMs } = state;
+  const { canvasWidth, canvasHeight, worldWidth, worldHeight, elapsedMs } = state;
+  const viewHalfW = canvasWidth / (2 * CAMERA_ZOOM);
+  const viewHalfH = canvasHeight / (2 * CAMERA_ZOOM);
   let enemies = state.enemies;
   let nextEnemyId = state.nextEnemyId;
   let spawnAccMs = state.spawnAccMs;
@@ -134,7 +157,7 @@ export function tickEnemies(state: GameState, dtMs: number): GameState {
         }
         if (freeSlot === -1) break; // all slots occupied — at soft cap
 
-        const pos = randomEdgePos(canvasWidth, canvasHeight);
+        const pos = randomEdgePos(state.player.x, state.player.y, viewHalfW, viewHalfH, worldWidth, worldHeight);
         const type = rollEnemyType(elapsedMs);
         next[freeSlot] = {
           id: nextEnemyId,
