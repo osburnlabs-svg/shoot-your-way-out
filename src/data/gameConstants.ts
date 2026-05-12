@@ -322,8 +322,15 @@ export const SHOTGUN_SPREAD_DEG = 30;
 
 // ─── Flamethrower weapon zones ────────────────────────────────────────────────
 
-/** Spread arc of the flamethrower cone in degrees. */
-export const FLAMETHROWER_CONE_DEG = 45;
+/** Spread arc of the flamethrower cone in degrees.
+ *  Narrowed from 45 → 15 so zones cluster tightly along the aim line,
+ *  overlapping heavily and reading as a dense stream rather than sparse sparks. */
+export const FLAMETHROWER_CONE_DEG = 15;
+
+/** Render scale for individual flame zone sprites (independent of EFFECT_SPRITE_SCALE).
+ *  At scale 3: 32×32 source → 96×96 rendered. Three overlapping 96px sprites at
+ *  15° spread create a dense fire mass vs the 64px sprites that read as sparks. */
+export const FLAME_ZONE_SPRITE_SCALE = 3;
 
 /** Number of flame zones spawned per trigger pull. */
 export const FLAMETHROWER_ZONE_COUNT = 3;
@@ -331,14 +338,24 @@ export const FLAMETHROWER_ZONE_COUNT = 3;
 /** Radius (px) of each individual flame zone. */
 export const FLAMETHROWER_ZONE_RADIUS_PX = 35;
 
-/** Duration (ms) each flame zone persists before despawning. */
-export const FLAMETHROWER_ZONE_DURATION_MS = 500;
+/** Duration (ms) each flame zone persists before despawning.
+ *  Matches the full 7-frame animation cycle exactly (7 × 120ms = 840ms).
+ *  Zone expires before the 900ms React timer tick so the animation never
+ *  loops — frames 0-6 play once cleanly. cooldownMs (1000ms) leaves a brief
+ *  ~160ms gap between bursts which also prevents multi-batch phase overlap. */
+export const FLAMETHROWER_ZONE_DURATION_MS = 840;
 
-/** DoT damage per second to enemies inside a flame zone. */
+/** DoT damage per second to enemies inside a flame zone.
+ *  Restored to 35 (from 17) now that duration is 840ms (3 ticks per zone at
+ *  250ms intervals). 3 zones × 35 × 0.25s = 26.25 HP first tick — one-shots
+ *  Scavs (20 HP) and kills Raiders (40 HP) within the second tick (~500ms). */
 export const FLAMETHROWER_ZONE_DAMAGE_PER_SEC = 35;
 
-/** Distance (px) from player center at which flame zones spawn along the cone. */
-export const FLAMETHROWER_SPAWN_DISTANCE_PX = 75;
+/** Distance (px) from player center at which flame zones spawn along the cone.
+ *  At 50px spawn with 35px radius, inner zone edge starts at 15px — catches
+ *  enemies at near-contact range. Was 95px: inner edge at 60px, missing close
+ *  enemies entirely. */
+export const FLAMETHROWER_SPAWN_DISTANCE_PX = 50;
 
 // ─── Rocket launcher ──────────────────────────────────────────────────────────
 

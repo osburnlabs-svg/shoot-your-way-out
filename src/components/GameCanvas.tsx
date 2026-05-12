@@ -109,6 +109,7 @@ import {
   SMOKE_DISSIPATE_DURATION_MS,
   MOLOTOV_FIRE_FRAME_COUNT,
   MOLOTOV_FIRE_FRAME_DURATION_MS,
+  FLAME_ZONE_SPRITE_SCALE,
   PROJECTILE_SLOT_COUNT,
   ROCKET_FRAME_COUNT,
   ROCKET_FRAME_DURATION_MS,
@@ -932,6 +933,17 @@ export default function GameCanvas({ width, height }: Props) {
     };
   }, [gameState]);
 
+  // TEMPORARY FLAMETHROWER DEBUG BUTTON — remove before Phase 5.
+  // Directly equips the Flamethrower (rpo) so Mo can test flame zones without
+  // waiting to roll it from a crate. Sets both equippedWeaponId (combat stats)
+  // and weaponPose (animation) — same mutation as CrateRevealModal's handleEquip.
+  const equipFlamethrower = useCallback(() => {
+    gameState.value = {
+      ...gameState.value,
+      player: { ...gameState.value.player, equippedWeaponId: 'rpo', weaponPose: 'flamethrower' },
+    };
+  }, [gameState]);
+
   // ─── Crate reveal handlers ─────────────────────────────────────────────────
   // Both mutate gameState.value on the JS thread during the pendingCrateReveal
   // freeze window — same pattern as handleSkillSelect / handleFreeRevive.
@@ -1187,8 +1199,8 @@ export default function GameCanvas({ width, height }: Props) {
               // Group centers on zone position, rotates to spawn angle, image offsets to center.
               const flameImg = flameImages[z.frame] ?? flameImages[0] ?? null;
               if (!flameImg) return null;
-              const fw = flameImg.width() * EFFECT_SPRITE_SCALE;
-              const fh = flameImg.height() * EFFECT_SPRITE_SCALE;
+              const fw = flameImg.width() * FLAME_ZONE_SPRITE_SCALE;
+              const fh = flameImg.height() * FLAME_ZONE_SPRITE_SCALE;
               return (
                 <Group
                   key={`zone-${i}`}
@@ -1451,6 +1463,14 @@ export default function GameCanvas({ width, height }: Props) {
             Weapon: {WEAPON_LABELS[spriteState.weaponPose]}
           </Text>
           <Text style={[styles.debugText, styles.tapHint]}>tap to cycle</Text>
+        </Pressable>
+
+        {/* TEMPORARY FLAMETHROWER DEBUG BUTTON — remove before Phase 5. */}
+        <Pressable
+          style={[styles.debugOverlay, styles.weaponButton, { top: 115, left: 10 }]}
+          onPress={equipFlamethrower}
+        >
+          <Text style={[styles.debugText, { color: '#ff6600' }]}>FLAMETHROWER</Text>
         </Pressable>
 
         {/* Debug overlay — top-right. */}
