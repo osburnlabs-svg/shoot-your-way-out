@@ -1091,8 +1091,8 @@ export default function GameCanvas({ width, height }: Props) {
     const px = gameState.value.player.x;
     const py = gameState.value.player.y;
     return [
-      { translateX: Math.round(width / 2 - px * CAMERA_ZOOM) },
-      { translateY: Math.round(height / 2 - py * CAMERA_ZOOM) },
+      { translateX: width / 2 - px * CAMERA_ZOOM },
+      { translateY: height / 2 - py * CAMERA_ZOOM },
       { scale: CAMERA_ZOOM },
     ];
   });
