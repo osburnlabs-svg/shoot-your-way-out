@@ -277,6 +277,7 @@ type Props = {
 };
 
 export default function GameCanvas({ width, height }: Props) {
+  console.log('FIX VERSION: pre-rewrite check — should appear once on app load');
   // ─── Hero sprite images (loaded once at mount) ────────────────────────────
   const walk0 = useImage(HeroSprites.walk[0]);
   const walk1 = useImage(HeroSprites.walk[1]);
