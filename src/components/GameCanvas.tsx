@@ -60,8 +60,8 @@ import {
   Image,
   MipmapMode,
   useImage,
+  useRSXformBuffer,
 } from '@shopify/react-native-skia';
-import type { SkRSXform } from '@shopify/react-native-skia';
 import {
   runOnJS,
   useDerivedValue,
@@ -488,63 +488,54 @@ export default function GameCanvas({ width, height }: Props) {
     });
   }, [dirtSprites, sandSprites, grassSprites, roadSprites]);
 
-  // Per-terrain-type Atlas transforms (UI thread, worklet).
-  // Each reads player.x/y from gameState once per frame and computes RSXforms
-  // for all tiles of that type. scos=CAMERA_ZOOM, ssin=0 = axis-aligned scale only.
-  // tx/ty place the tile top-left: world left edge is col*TILE_SIZE.
-  // SkRSXform is typed as a JSI class (set/dispose methods) but Atlas rendering
-  // only reads scos/ssin/tx/ty at runtime. Plain objects are cast here — the
-  // JSI class methods are not invoked by the Atlas renderer.
-  const dirtTransforms = useDerivedValue(() => {
+  // Per-terrain-type Atlas transforms (UI thread, worklet via useRSXformBuffer).
+  // useRSXformBuffer allocates FULL_TILE_COUNT real SkRSXform JSI HostObjects on
+  // the JS thread (Skia.RSXform factory — not worklet-safe), then calls the
+  // modifier worklet on each object every frame via Reanimated startMapper.
+  // Modifier calls rsxform.set() in-place — .set() IS worklet-safe on existing
+  // HostObjects. Active slots write correct tx/ty; inactive slots park at (-9999,-9999).
+  const dirtTransforms = useRSXformBuffer(FULL_TILE_COUNT, (rsxform, index) => {
+    'worklet';
+    if (index >= dirtTilePos.length) { rsxform.set(1, 0, -9999, -9999); return; }
     const px = gameState.value.player.x;
     const py = gameState.value.player.y;
-    const result: SkRSXform[] = [];
-    for (let i = 0; i < dirtTilePos.length; i++) {
-      result.push({ scos: CAMERA_ZOOM, ssin: 0,
-        tx: width / 2 + (dirtTilePos[i].col * TILE_SIZE - px) * CAMERA_ZOOM,
-        ty: height / 2 + (dirtTilePos[i].row * TILE_SIZE - py) * CAMERA_ZOOM,
-      } as unknown as SkRSXform);
-    }
-    return result;
+    rsxform.set(CAMERA_ZOOM, 0,
+      width / 2 + (dirtTilePos[index].col * TILE_SIZE - px) * CAMERA_ZOOM,
+      height / 2 + (dirtTilePos[index].row * TILE_SIZE - py) * CAMERA_ZOOM,
+    );
   });
 
-  const sandTransforms = useDerivedValue(() => {
+  const sandTransforms = useRSXformBuffer(FULL_TILE_COUNT, (rsxform, index) => {
+    'worklet';
+    if (index >= sandTilePos.length) { rsxform.set(1, 0, -9999, -9999); return; }
     const px = gameState.value.player.x;
     const py = gameState.value.player.y;
-    const result: SkRSXform[] = [];
-    for (let i = 0; i < sandTilePos.length; i++) {
-      result.push({ scos: CAMERA_ZOOM, ssin: 0,
-        tx: width / 2 + (sandTilePos[i].col * TILE_SIZE - px) * CAMERA_ZOOM,
-        ty: height / 2 + (sandTilePos[i].row * TILE_SIZE - py) * CAMERA_ZOOM,
-      } as unknown as SkRSXform);
-    }
-    return result;
+    rsxform.set(CAMERA_ZOOM, 0,
+      width / 2 + (sandTilePos[index].col * TILE_SIZE - px) * CAMERA_ZOOM,
+      height / 2 + (sandTilePos[index].row * TILE_SIZE - py) * CAMERA_ZOOM,
+    );
   });
 
-  const grassTransforms = useDerivedValue(() => {
+  const grassTransforms = useRSXformBuffer(FULL_TILE_COUNT, (rsxform, index) => {
+    'worklet';
+    if (index >= grassTilePos.length) { rsxform.set(1, 0, -9999, -9999); return; }
     const px = gameState.value.player.x;
     const py = gameState.value.player.y;
-    const result: SkRSXform[] = [];
-    for (let i = 0; i < grassTilePos.length; i++) {
-      result.push({ scos: CAMERA_ZOOM, ssin: 0,
-        tx: width / 2 + (grassTilePos[i].col * TILE_SIZE - px) * CAMERA_ZOOM,
-        ty: height / 2 + (grassTilePos[i].row * TILE_SIZE - py) * CAMERA_ZOOM,
-      } as unknown as SkRSXform);
-    }
-    return result;
+    rsxform.set(CAMERA_ZOOM, 0,
+      width / 2 + (grassTilePos[index].col * TILE_SIZE - px) * CAMERA_ZOOM,
+      height / 2 + (grassTilePos[index].row * TILE_SIZE - py) * CAMERA_ZOOM,
+    );
   });
 
-  const roadTransforms = useDerivedValue(() => {
+  const roadTransforms = useRSXformBuffer(FULL_TILE_COUNT, (rsxform, index) => {
+    'worklet';
+    if (index >= roadTilePos.length) { rsxform.set(1, 0, -9999, -9999); return; }
     const px = gameState.value.player.x;
     const py = gameState.value.player.y;
-    const result: SkRSXform[] = [];
-    for (let i = 0; i < roadTilePos.length; i++) {
-      result.push({ scos: CAMERA_ZOOM, ssin: 0,
-        tx: width / 2 + (roadTilePos[i].col * TILE_SIZE - px) * CAMERA_ZOOM,
-        ty: height / 2 + (roadTilePos[i].row * TILE_SIZE - py) * CAMERA_ZOOM,
-      } as unknown as SkRSXform);
-    }
-    return result;
+    rsxform.set(CAMERA_ZOOM, 0,
+      width / 2 + (roadTilePos[index].col * TILE_SIZE - px) * CAMERA_ZOOM,
+      height / 2 + (roadTilePos[index].row * TILE_SIZE - py) * CAMERA_ZOOM,
+    );
   });
 
   // ─── Virtual joystick shared values (UI thread) ───────────────────────────
