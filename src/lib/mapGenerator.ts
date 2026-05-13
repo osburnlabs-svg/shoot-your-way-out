@@ -10,11 +10,11 @@
  *     the returned function is deterministic (no further PRNG consumption).
  *   - Each tile cell samples noise2D(col * NOISE_SCALE, row * NOISE_SCALE).
  *     NOISE_SCALE = 0.05 produces 2–3 biome transitions across 32 tiles.
- *   - Noise output mapped to terrain type via fixed thresholds:
+ *   - Noise output mapped to 3 terrain types (road excluded — helipad sheet is
+ *     not a terrain texture; real road tiles exist in kit but are Step 3):
  *       n < -0.3  → sand
- *       -0.3–0.1  → grass
- *       0.1–0.5   → dirt
- *       > 0.5     → road
+ *       -0.3–0.2  → grass
+ *       > 0.2     → dirt
  *   - Variant (0–24) sampled from the remaining mulberry32 stream.
  *
  * Entity arrays (buildings, obstacles, vehicleWrecks, vegetation) are generated
@@ -60,9 +60,8 @@ function buildTileGrid(rng: () => number): TileCell[][] {
       const n = noise2D(col * NOISE_SCALE, row * NOISE_SCALE);
       let type: TileType;
       if      (n < -0.3) type = 'sand';
-      else if (n <  0.1) type = 'grass';
-      else if (n <  0.5) type = 'dirt';
-      else               type = 'road';
+      else if (n <  0.2) type = 'grass';
+      else               type = 'dirt';
       rowArr.push({ type, variantIndex: Math.floor(rng() * 25) });
     }
     grid.push(rowArr);
