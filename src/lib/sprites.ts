@@ -209,6 +209,22 @@ export const EffectSprites = {
   ],
 } as const;
 
+/**
+ * Terrain tilesheet registry — Phase 5 G2.
+ *
+ * Each PNG is a 320×320 sprite sheet of 25 tile variants arranged in a 5×5 grid.
+ * Individual tiles are 64×64px. Use Atlas component for sub-rectangle rendering.
+ *
+ * Variant index → sheet position: col = index % 5, row = floor(index / 5).
+ * Source rect: { x: col*64, y: row*64, width: 64, height: 64 }.
+ */
+export const TileSprites = {
+  dirt:  require('../../assets/sprites/environment/tilesets/dirt.png'),
+  sand:  require('../../assets/sprites/environment/tilesets/sand.png'),
+  grass: require('../../assets/sprites/environment/tilesets/grass.png'),
+  road:  require('../../assets/sprites/environment/tilesets/road.png'),
+} as const;
+
 export const GuiSprites = {
   upgrade: {
     bg: require('../../assets/ui/upgrade/BG.png'),
