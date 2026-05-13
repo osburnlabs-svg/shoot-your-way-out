@@ -309,12 +309,12 @@ This is a conscious tradeoff. Unique legendary modifiers would be more memorable
 
 Two visual treatments per rarity:
 
-1. **Color-tinted text** for the weapon name in crate reveal modal and HUD (existing pattern).
-2. **Glow / drop shadow effect** behind the weapon icon in the rarity color. Uniform size across all rarities — color is the only differentiator, no escalating glow intensity. Keeps visual treatment simple and consistent.
+1. **Color-tinted rarity label** ("Common", "Uncommon", "Rare", "Legendary") in the rarity color. Explicit read — player knows exactly what tier they got.
+2. **Colored border on the weapon icon card** in the rarity color. Instant visual signal before the player reads the label — same pattern used by Diablo, Borderlands, and most ARPGs. Implemented as `borderWidth` + `borderColor` style props on the existing `<View>` card in `CrateRevealModal`. No Skia, no canvas work required.
 
-Glow appears in:
+Both treatments appear in:
 - Crate reveal modal (when weapon is revealed)
-- HUD weapon icon (when weapon is equipped)
+- HUD weapon icon strip (when weapon is equipped — Phase 7)
 - Flea market purchase screen (Phase 10) if/when weapons appear there with rarity
 
 ### 11.6 Inventory interaction with rarity
