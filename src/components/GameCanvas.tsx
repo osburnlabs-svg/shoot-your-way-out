@@ -59,8 +59,8 @@ import {
   Group,
   Image,
   MipmapMode,
+  Skia,
   useImage,
-  useRSXformBuffer,
 } from '@shopify/react-native-skia';
 import {
   runOnJS,
@@ -373,10 +373,9 @@ export default function GameCanvas({ width, height }: Props) {
   const dirtTileImage  = useImage(TileSprites.dirt);
   const sandTileImage  = useImage(TileSprites.sand);
   const grassTileImage = useImage(TileSprites.grass);
-  const roadTileImage  = useImage(TileSprites.road);
-  // All 4 must be non-null before any Atlas renders — a single null image
+  // All 3 must be non-null before any Atlas renders — a single null image
   // crashes Skia's JSI layer on first render before the loaded images arrive.
-  const tilesReady = !!(dirtTileImage && sandTileImage && grassTileImage && roadTileImage);
+  const tilesReady = !!(dirtTileImage && sandTileImage && grassTileImage);
 
   // ─── Pickup sprite image ──────────────────────────────────────────────────
   const moneySmallImage = useImage(PickupSprites.money.small);
@@ -425,118 +424,54 @@ export default function GameCanvas({ width, height }: Props) {
 
   // ─── Tile Atlas pre-computation (static, computed once from initialMapData) ───
   // Tile positions (col/row) are captured by the useRSXformBuffer modifier worklet
-  // closure. Sprite arrays are padded to FULL_TILE_COUNT (1024) to match the fixed
-  // RSXform buffer size — inactive slots use a zero-size source rect so they sample
-  // nothing from the tilesheet regardless of where the transform parks them.
-  const FULL_TILE_COUNT = TILE_COLS * TILE_ROWS; // 1024 — fixed buffer size every run
-  const EMPTY_SRC = { x: 0, y: 0, width: 0, height: 0 };
-  const { dirtTilePos, sandTilePos, grassTilePos, roadTilePos,
-          dirtSprites, sandSprites, grassSprites, roadSprites } = useMemo(() => {
-    const dirtPos:  { col: number; row: number }[] = [];
-    const sandPos:  { col: number; row: number }[] = [];
-    const grassPos: { col: number; row: number }[] = [];
-    const roadPos:  { col: number; row: number }[] = [];
-    const dirtSrc:  { x: number; y: number; width: number; height: number }[] = [];
-    const sandSrc:  { x: number; y: number; width: number; height: number }[] = [];
-    const grassSrc: { x: number; y: number; width: number; height: number }[] = [];
-    const roadSrc:  { x: number; y: number; width: number; height: number }[] = [];
+  // Tile sprites (source rects into the 320×320 tilesheet, 5×5 grid of 64×64) and
+  // world-space RSXforms computed once per run. The camera Group's cameraTransform
+  // handles all scrolling — no per-frame RSXform update needed.
+  const { dirtSprites, sandSprites, grassSprites,
+          dirtTransforms, sandTransforms, grassTransforms } = useMemo(() => {
+    const dirtSrc:   { x: number; y: number; width: number; height: number }[] = [];
+    const sandSrc:   { x: number; y: number; width: number; height: number }[] = [];
+    const grassSrc:  { x: number; y: number; width: number; height: number }[] = [];
+    const dirtXform: ReturnType<typeof Skia.RSXform>[] = [];
+    const sandXform: ReturnType<typeof Skia.RSXform>[] = [];
+    const grassXform: ReturnType<typeof Skia.RSXform>[] = [];
 
     for (let row = 0; row < TILE_ROWS; row++) {
       for (let col = 0; col < TILE_COLS; col++) {
         const cell = initialMapData.tileGrid[row][col];
         const srcX = (cell.variantIndex % 5) * TILE_SIZE;
         const srcY = Math.floor(cell.variantIndex / 5) * TILE_SIZE;
-        const src = { x: srcX, y: srcY, width: TILE_SIZE, height: TILE_SIZE };
-        const pos = { col, row };
+        const src  = { x: srcX, y: srcY, width: TILE_SIZE, height: TILE_SIZE };
+        const xform = Skia.RSXform(1, 0, col * TILE_SIZE, row * TILE_SIZE);
         switch (cell.type) {
-          case 'dirt':  dirtPos.push(pos);  dirtSrc.push(src);  break;
-          case 'sand':  sandPos.push(pos);  sandSrc.push(src);  break;
-          case 'grass': grassPos.push(pos); grassSrc.push(src); break;
-          case 'road':  roadPos.push(pos);  roadSrc.push(src);  break;
+          case 'dirt':  dirtSrc.push(src);  dirtXform.push(xform);  break;
+          case 'sand':  sandSrc.push(src);  sandXform.push(xform);  break;
+          case 'grass': grassSrc.push(src); grassXform.push(xform); break;
         }
       }
     }
-    // Pad each sprite array to FULL_TILE_COUNT so it matches the RSXform buffer length.
-    const pad = (arr: typeof dirtSrc) => {
-      while (arr.length < FULL_TILE_COUNT) arr.push(EMPTY_SRC);
-      return arr;
-    };
     return {
-      dirtTilePos:  dirtPos,  sandTilePos:  sandPos,
-      grassTilePos: grassPos, roadTilePos:  roadPos,
-      dirtSprites:  pad(dirtSrc),  sandSprites:  pad(sandSrc),
-      grassSprites: pad(grassSrc), roadSprites:  pad(roadSrc),
+      dirtSprites:    dirtSrc,   sandSprites:    sandSrc,   grassSprites:    grassSrc,
+      dirtTransforms: dirtXform, sandTransforms: sandXform, grassTransforms: grassXform,
     };
   }, [initialMapData]);
 
-  // ─── Diagnostic logging (G2-ATLAS, remove after crash is confirmed) ────────
+  // ─── Diagnostic logging (G2-ATLAS, remove after blank-tile issue confirmed) ─
   useEffect(() => {
     console.log('G2-ATLAS TILE_IMAGES:', {
       dirt:  dirtTileImage  ? 'ok' : 'NULL',
       sand:  sandTileImage  ? 'ok' : 'NULL',
       grass: grassTileImage ? 'ok' : 'NULL',
-      road:  roadTileImage  ? 'ok' : 'NULL',
     });
-  }, [dirtTileImage, sandTileImage, grassTileImage, roadTileImage]);
+  }, [dirtTileImage, sandTileImage, grassTileImage]);
 
   useEffect(() => {
     console.log('G2-ATLAS SPRITES:', {
       dirt:  { count: dirtSprites.length,  sample: dirtSprites[0] },
       sand:  { count: sandSprites.length,  sample: sandSprites[0] },
       grass: { count: grassSprites.length, sample: grassSprites[0] },
-      road:  { count: roadSprites.length,  sample: roadSprites[0] },
     });
-  }, [dirtSprites, sandSprites, grassSprites, roadSprites]);
-
-  // Per-terrain-type Atlas transforms (UI thread, worklet via useRSXformBuffer).
-  // useRSXformBuffer allocates FULL_TILE_COUNT real SkRSXform JSI HostObjects on
-  // the JS thread (Skia.RSXform factory — not worklet-safe), then calls the
-  // modifier worklet on each object every frame via Reanimated startMapper.
-  // Modifier calls rsxform.set() in-place — .set() IS worklet-safe on existing
-  // HostObjects. Active slots write correct tx/ty; inactive slots park at (-9999,-9999).
-  const dirtTransforms = useRSXformBuffer(FULL_TILE_COUNT, (rsxform, index) => {
-    'worklet';
-    if (index >= dirtTilePos.length) { rsxform.set(1, 0, -9999, -9999); return; }
-    const px = gameState.value.player.x;
-    const py = gameState.value.player.y;
-    rsxform.set(CAMERA_ZOOM, 0,
-      width / 2 + (dirtTilePos[index].col * TILE_SIZE - px) * CAMERA_ZOOM,
-      height / 2 + (dirtTilePos[index].row * TILE_SIZE - py) * CAMERA_ZOOM,
-    );
-  });
-
-  const sandTransforms = useRSXformBuffer(FULL_TILE_COUNT, (rsxform, index) => {
-    'worklet';
-    if (index >= sandTilePos.length) { rsxform.set(1, 0, -9999, -9999); return; }
-    const px = gameState.value.player.x;
-    const py = gameState.value.player.y;
-    rsxform.set(CAMERA_ZOOM, 0,
-      width / 2 + (sandTilePos[index].col * TILE_SIZE - px) * CAMERA_ZOOM,
-      height / 2 + (sandTilePos[index].row * TILE_SIZE - py) * CAMERA_ZOOM,
-    );
-  });
-
-  const grassTransforms = useRSXformBuffer(FULL_TILE_COUNT, (rsxform, index) => {
-    'worklet';
-    if (index >= grassTilePos.length) { rsxform.set(1, 0, -9999, -9999); return; }
-    const px = gameState.value.player.x;
-    const py = gameState.value.player.y;
-    rsxform.set(CAMERA_ZOOM, 0,
-      width / 2 + (grassTilePos[index].col * TILE_SIZE - px) * CAMERA_ZOOM,
-      height / 2 + (grassTilePos[index].row * TILE_SIZE - py) * CAMERA_ZOOM,
-    );
-  });
-
-  const roadTransforms = useRSXformBuffer(FULL_TILE_COUNT, (rsxform, index) => {
-    'worklet';
-    if (index >= roadTilePos.length) { rsxform.set(1, 0, -9999, -9999); return; }
-    const px = gameState.value.player.x;
-    const py = gameState.value.player.y;
-    rsxform.set(CAMERA_ZOOM, 0,
-      width / 2 + (roadTilePos[index].col * TILE_SIZE - px) * CAMERA_ZOOM,
-      height / 2 + (roadTilePos[index].row * TILE_SIZE - py) * CAMERA_ZOOM,
-    );
-  });
+  }, [dirtSprites, sandSprites, grassSprites]);
 
   // ─── Virtual joystick shared values (UI thread) ───────────────────────────
   const joystickOriginX = useSharedValue(0);
@@ -1335,11 +1270,18 @@ export default function GameCanvas({ width, height }: Props) {
       <View style={StyleSheet.absoluteFill}>
         <Canvas style={StyleSheet.absoluteFill}>
 
-          {/* ── Tile ground layer (z=0, drawn first, outside camera Group) ── */}
-          {/* Each Atlas renders all tiles of one terrain type. transforms is a  */}
-          {/* SharedValue<SkRSXform[]> updated every frame on the UI thread via  */}
-          {/* useDerivedValue — no runOnJS, no React state, pure 60fps worklet. */}
-          {/* sprites is a static SkRect[] — source rects never change per run.  */}
+          {/*
+           * Camera Group: world-space coordinate system scrolled by cameraTransform.
+           * Tiles use static world-space RSXforms (col*TILE_SIZE, row*TILE_SIZE) — the
+           * Group's cameraTransform handles all camera scrolling, no per-frame RSXform
+           * update needed. React-state entities (effects, buildings) also live here.
+           * Animated-derived-value entities (enemies, projectiles, pickups) remain
+           * outside to avoid nested animated Skia Group stutter.
+           */}
+          <Group transform={cameraTransform}>
+
+          {/* ── Tile ground layer (z=0, drawn first inside camera Group) ────── */}
+          {/* RSXforms are world-space (col*64, row*64). Camera Group scrolls them. */}
           {tilesReady && (
             <>
               <Atlas
@@ -1360,21 +1302,8 @@ export default function GameCanvas({ width, height }: Props) {
                 transforms={grassTransforms}
                 sampling={{ filter: FilterMode.Nearest, mipmap: MipmapMode.None }}
               />
-              <Atlas
-                image={roadTileImage!}
-                sprites={roadSprites}
-                transforms={roadTransforms}
-                sampling={{ filter: FilterMode.Nearest, mipmap: MipmapMode.None }}
-              />
             </>
           )}
-
-          {/*
-           * Camera Group contains ONLY React-state-positioned elements (static inner
-           * transforms). All animated-derived-value entities live outside this Group
-           * so there are no nested animated Skia Groups — the root cause of stutter.
-           */}
-          <Group transform={cameraTransform}>
 
           {/* ── Effect zones (React state positions, static transforms) ──── */}
           {/* Smoke: 7-frame LightSmoke animation (dissipation loop, 150ms/frame). */}
