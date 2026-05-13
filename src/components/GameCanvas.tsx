@@ -49,9 +49,10 @@
  *                HP/Score/XP/isDead for debug and overlay)
  */
 
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import {
+  Atlas,
   Canvas,
   Circle,
   FilterMode,
@@ -60,6 +61,7 @@ import {
   MipmapMode,
   useImage,
 } from '@shopify/react-native-skia';
+import type { SkRSXform } from '@shopify/react-native-skia';
 import {
   runOnJS,
   useDerivedValue,
@@ -69,8 +71,9 @@ import {
 } from 'react-native-reanimated';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 
-import { HeroSprites, EnemySprites, PickupSprites, EffectSprites } from '../lib/sprites';
+import { HeroSprites, EnemySprites, PickupSprites, EffectSprites, TileSprites } from '../lib/sprites';
 import type { HeroWeaponPose } from '../lib/sprites';
+import { loadMap } from '../lib/mapLoader';
 import { SKILLS, SKILL_IDS, getEffectiveStats } from '../data/skills';
 import type { SkillId } from '../data/skills';
 import { WEAPON_PROFILES } from '../data/weapons';
@@ -114,6 +117,9 @@ import {
   ROCKET_FRAME_COUNT,
   ROCKET_FRAME_DURATION_MS,
   CAMERA_ZOOM,
+  TILE_SIZE,
+  TILE_COLS,
+  TILE_ROWS,
 } from '../data/gameConstants';
 import type { CrateTier } from '../data/gameConstants';
 import type { EnemyType } from '../data/enemies';
@@ -359,6 +365,14 @@ export default function GameCanvas({ width, height }: Props) {
   const raiderDie3 = useImage(EnemySprites.raider.die[3]);
   const raiderDieImages = [raiderDie0, raiderDie1, raiderDie2, raiderDie3];
 
+  // ─── Terrain tilesheet images (loaded once at mount) ─────────────────────
+  // Each is a 320×320 sprite sheet of 25 tile variants (5×5 grid of 64×64px).
+  // Atlas clipping isolates individual tiles via source rect in the sprites array.
+  const dirtTileImage  = useImage(TileSprites.dirt);
+  const sandTileImage  = useImage(TileSprites.sand);
+  const grassTileImage = useImage(TileSprites.grass);
+  const roadTileImage  = useImage(TileSprites.road);
+
   // ─── Pickup sprite image ──────────────────────────────────────────────────
   const moneySmallImage = useImage(PickupSprites.money.small);
   const crateImage = useImage(PickupSprites.crate);
@@ -397,8 +411,109 @@ export default function GameCanvas({ width, height }: Props) {
   const rocket1 = useImage(EffectSprites.rocket[1]);
   const rocketImages = [rocket0, rocket1];
 
+  // ─── Map data (generated once per mount; reused on redeploy in Phase 5) ──────
+  // Phase 7 will generate a fresh map on each run restart via the menu flow.
+  const [initialMapData] = useState(() => loadMap(Date.now()));
+
   // ─── Game state ────────────────────────────────────────────────────────────
-  const gameState = useSharedValue(createInitialGameState(width, height));
+  const gameState = useSharedValue(createInitialGameState(width, height, initialMapData));
+
+  // ─── Tile Atlas pre-computation (static, computed once from initialMapData) ───
+  // Separates per-terrain-type tiles into source rects (sprites, static) and
+  // world-grid positions (col/row, used per-frame to compute screen RSXforms).
+  // Closed over by useDerivedValue worklets — serialized to UI thread once at mount.
+  const { dirtTilePos, sandTilePos, grassTilePos, roadTilePos,
+          dirtSprites, sandSprites, grassSprites, roadSprites } = useMemo(() => {
+    const dirtPos:  { col: number; row: number }[] = [];
+    const sandPos:  { col: number; row: number }[] = [];
+    const grassPos: { col: number; row: number }[] = [];
+    const roadPos:  { col: number; row: number }[] = [];
+    const dirtSrc:  { x: number; y: number; width: number; height: number }[] = [];
+    const sandSrc:  { x: number; y: number; width: number; height: number }[] = [];
+    const grassSrc: { x: number; y: number; width: number; height: number }[] = [];
+    const roadSrc:  { x: number; y: number; width: number; height: number }[] = [];
+
+    for (let row = 0; row < TILE_ROWS; row++) {
+      for (let col = 0; col < TILE_COLS; col++) {
+        const cell = initialMapData.tileGrid[row][col];
+        const srcX = (cell.variantIndex % 5) * TILE_SIZE;
+        const srcY = Math.floor(cell.variantIndex / 5) * TILE_SIZE;
+        const src = { x: srcX, y: srcY, width: TILE_SIZE, height: TILE_SIZE };
+        const pos = { col, row };
+        switch (cell.type) {
+          case 'dirt':  dirtPos.push(pos);  dirtSrc.push(src);  break;
+          case 'sand':  sandPos.push(pos);  sandSrc.push(src);  break;
+          case 'grass': grassPos.push(pos); grassSrc.push(src); break;
+          case 'road':  roadPos.push(pos);  roadSrc.push(src);  break;
+        }
+      }
+    }
+    return {
+      dirtTilePos:  dirtPos,  sandTilePos:  sandPos,
+      grassTilePos: grassPos, roadTilePos:  roadPos,
+      dirtSprites:  dirtSrc,  sandSprites:  sandSrc,
+      grassSprites: grassSrc, roadSprites:  roadSrc,
+    };
+  }, [initialMapData]);
+
+  // Per-terrain-type Atlas transforms (UI thread, worklet).
+  // Each reads player.x/y from gameState once per frame and computes RSXforms
+  // for all tiles of that type. scos=CAMERA_ZOOM, ssin=0 = axis-aligned scale only.
+  // tx/ty place the tile top-left: world left edge is col*TILE_SIZE.
+  // SkRSXform is typed as a JSI class (set/dispose methods) but Atlas rendering
+  // only reads scos/ssin/tx/ty at runtime. Plain objects are cast here — the
+  // JSI class methods are not invoked by the Atlas renderer.
+  const dirtTransforms = useDerivedValue(() => {
+    const px = gameState.value.player.x;
+    const py = gameState.value.player.y;
+    const result: SkRSXform[] = [];
+    for (let i = 0; i < dirtTilePos.length; i++) {
+      result.push({ scos: CAMERA_ZOOM, ssin: 0,
+        tx: width / 2 + (dirtTilePos[i].col * TILE_SIZE - px) * CAMERA_ZOOM,
+        ty: height / 2 + (dirtTilePos[i].row * TILE_SIZE - py) * CAMERA_ZOOM,
+      } as unknown as SkRSXform);
+    }
+    return result;
+  });
+
+  const sandTransforms = useDerivedValue(() => {
+    const px = gameState.value.player.x;
+    const py = gameState.value.player.y;
+    const result: SkRSXform[] = [];
+    for (let i = 0; i < sandTilePos.length; i++) {
+      result.push({ scos: CAMERA_ZOOM, ssin: 0,
+        tx: width / 2 + (sandTilePos[i].col * TILE_SIZE - px) * CAMERA_ZOOM,
+        ty: height / 2 + (sandTilePos[i].row * TILE_SIZE - py) * CAMERA_ZOOM,
+      } as unknown as SkRSXform);
+    }
+    return result;
+  });
+
+  const grassTransforms = useDerivedValue(() => {
+    const px = gameState.value.player.x;
+    const py = gameState.value.player.y;
+    const result: SkRSXform[] = [];
+    for (let i = 0; i < grassTilePos.length; i++) {
+      result.push({ scos: CAMERA_ZOOM, ssin: 0,
+        tx: width / 2 + (grassTilePos[i].col * TILE_SIZE - px) * CAMERA_ZOOM,
+        ty: height / 2 + (grassTilePos[i].row * TILE_SIZE - py) * CAMERA_ZOOM,
+      } as unknown as SkRSXform);
+    }
+    return result;
+  });
+
+  const roadTransforms = useDerivedValue(() => {
+    const px = gameState.value.player.x;
+    const py = gameState.value.player.y;
+    const result: SkRSXform[] = [];
+    for (let i = 0; i < roadTilePos.length; i++) {
+      result.push({ scos: CAMERA_ZOOM, ssin: 0,
+        tx: width / 2 + (roadTilePos[i].col * TILE_SIZE - px) * CAMERA_ZOOM,
+        ty: height / 2 + (roadTilePos[i].row * TILE_SIZE - py) * CAMERA_ZOOM,
+      } as unknown as SkRSXform);
+    }
+    return result;
+  });
 
   // ─── Virtual joystick shared values (UI thread) ───────────────────────────
   const joystickOriginX = useSharedValue(0);
@@ -1082,8 +1197,10 @@ export default function GameCanvas({ width, height }: Props) {
   }, [gameState]);
 
   const handleRedeploy = useCallback(() => {
-    gameState.value = createInitialGameState(width, height);
-  }, [gameState, width, height]);
+    // Reuses the same map data — Phase 7 will generate a fresh map per restart
+    // via the proper menu flow.
+    gameState.value = createInitialGameState(width, height, initialMapData);
+  }, [gameState, width, height, initialMapData]);
 
   // ─── Virtual joystick gesture ──────────────────────────────────────────────
   const panGesture = Gesture.Pan()
@@ -1194,6 +1311,45 @@ export default function GameCanvas({ width, height }: Props) {
     <GestureDetector gesture={panGesture}>
       <View style={StyleSheet.absoluteFill}>
         <Canvas style={StyleSheet.absoluteFill}>
+
+          {/* ── Tile ground layer (z=0, drawn first, outside camera Group) ── */}
+          {/* Each Atlas renders all tiles of one terrain type. transforms is a  */}
+          {/* SharedValue<SkRSXform[]> updated every frame on the UI thread via  */}
+          {/* useDerivedValue — no runOnJS, no React state, pure 60fps worklet. */}
+          {/* sprites is a static SkRect[] — source rects never change per run.  */}
+          {dirtTileImage && dirtSprites.length > 0 && (
+            <Atlas
+              image={dirtTileImage}
+              sprites={dirtSprites}
+              transforms={dirtTransforms}
+              sampling={{ filter: FilterMode.Nearest, mipmap: MipmapMode.None }}
+            />
+          )}
+          {sandTileImage && sandSprites.length > 0 && (
+            <Atlas
+              image={sandTileImage}
+              sprites={sandSprites}
+              transforms={sandTransforms}
+              sampling={{ filter: FilterMode.Nearest, mipmap: MipmapMode.None }}
+            />
+          )}
+          {grassTileImage && grassSprites.length > 0 && (
+            <Atlas
+              image={grassTileImage}
+              sprites={grassSprites}
+              transforms={grassTransforms}
+              sampling={{ filter: FilterMode.Nearest, mipmap: MipmapMode.None }}
+            />
+          )}
+          {roadTileImage && roadSprites.length > 0 && (
+            <Atlas
+              image={roadTileImage}
+              sprites={roadSprites}
+              transforms={roadTransforms}
+              sampling={{ filter: FilterMode.Nearest, mipmap: MipmapMode.None }}
+            />
+          )}
+
           {/*
            * Camera Group contains ONLY React-state-positioned elements (static inner
            * transforms). All animated-derived-value entities live outside this Group
