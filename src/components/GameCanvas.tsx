@@ -424,9 +424,12 @@ export default function GameCanvas({ width, height }: Props) {
   const gameState = useSharedValue(createInitialGameState(width, height, initialMapData));
 
   // ─── Tile Atlas pre-computation (static, computed once from initialMapData) ───
-  // Separates per-terrain-type tiles into source rects (sprites, static) and
-  // world-grid positions (col/row, used per-frame to compute screen RSXforms).
-  // Closed over by useDerivedValue worklets — serialized to UI thread once at mount.
+  // Tile positions (col/row) are captured by the useRSXformBuffer modifier worklet
+  // closure. Sprite arrays are padded to FULL_TILE_COUNT (1024) to match the fixed
+  // RSXform buffer size — inactive slots use a zero-size source rect so they sample
+  // nothing from the tilesheet regardless of where the transform parks them.
+  const FULL_TILE_COUNT = TILE_COLS * TILE_ROWS; // 1024 — fixed buffer size every run
+  const EMPTY_SRC = { x: 0, y: 0, width: 0, height: 0 };
   const { dirtTilePos, sandTilePos, grassTilePos, roadTilePos,
           dirtSprites, sandSprites, grassSprites, roadSprites } = useMemo(() => {
     const dirtPos:  { col: number; row: number }[] = [];
@@ -453,11 +456,16 @@ export default function GameCanvas({ width, height }: Props) {
         }
       }
     }
+    // Pad each sprite array to FULL_TILE_COUNT so it matches the RSXform buffer length.
+    const pad = (arr: typeof dirtSrc) => {
+      while (arr.length < FULL_TILE_COUNT) arr.push(EMPTY_SRC);
+      return arr;
+    };
     return {
       dirtTilePos:  dirtPos,  sandTilePos:  sandPos,
       grassTilePos: grassPos, roadTilePos:  roadPos,
-      dirtSprites:  dirtSrc,  sandSprites:  sandSrc,
-      grassSprites: grassSrc, roadSprites:  roadSrc,
+      dirtSprites:  pad(dirtSrc),  sandSprites:  pad(sandSrc),
+      grassSprites: pad(grassSrc), roadSprites:  pad(roadSrc),
     };
   }, [initialMapData]);
 
