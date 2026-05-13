@@ -1,14 +1,21 @@
 /**
- * Procedural map generator — Phase 5 G2.
+ * Procedural map generator — Phase 5 G2 (noise biome update).
  *
  * generateMap(seed) returns a complete MapData for one run. Called once at game
  * start from mapLoader.ts; the result is stored in GameState.mapData.
  *
- * Tile layout strategy:
- *   - Roll a primary biome (dirt / sand / grass) for the run.
- *   - Overlay one horizontal and one vertical road strip, each 2 tiles wide.
- *   - Remaining cells: 80% primary biome, 10% each of the two non-primary types.
- *   - Each cell picks a random variant (0–24) independently for visual variety.
+ * Tile layout strategy (noise-based, replaces per-cell PRNG):
+ *   - createNoise2D is seeded by passing mulberry32(seed) as the random source.
+ *     simplex-noise consumes 256 PRNG calls during permutation table init, then
+ *     the returned function is deterministic (no further PRNG consumption).
+ *   - Each tile cell samples noise2D(col * NOISE_SCALE, row * NOISE_SCALE).
+ *     NOISE_SCALE = 0.05 produces 2–3 biome transitions across 32 tiles.
+ *   - Noise output mapped to terrain type via fixed thresholds:
+ *       n < -0.3  → sand
+ *       -0.3–0.1  → grass
+ *       0.1–0.5   → dirt
+ *       > 0.5     → road
+ *   - Variant (0–24) sampled from the remaining mulberry32 stream.
  *
  * Entity arrays (buildings, obstacles, vehicleWrecks, vegetation) are generated
  * with correct world-space positions but empty assetKeys — G3 fills those in
@@ -19,6 +26,7 @@
  * Two runs with the same seed produce identical maps.
  */
 
+import { createNoise2D } from 'simplex-noise';
 import type { MapData, TileCell, TileType, WeatherType, PlacedEntity } from '../data/mapTypes';
 import { TILE_SIZE, TILE_COLS, TILE_ROWS, WORLD_WIDTH, WORLD_HEIGHT } from '../data/gameConstants';
 
@@ -37,46 +45,28 @@ function mulberry32(seed: number) {
 
 // ─── Tile grid ────────────────────────────────────────────────────────────────
 
-const NON_ROAD_BIOMES: TileType[] = ['dirt', 'sand', 'grass'];
+// Noise frequency: smaller = larger biome regions. 0.05 → ~2–3 transitions per 32-tile axis.
+const NOISE_SCALE = 0.05;
 
 function buildTileGrid(rng: () => number): TileCell[][] {
-  // Roll primary biome for this run
-  const primaryBiome = NON_ROAD_BIOMES[Math.floor(rng() * 3)] as TileType;
-  // The other two biomes used as minority tiles
-  const others = NON_ROAD_BIOMES.filter(b => b !== primaryBiome) as TileType[];
-
-  // Road strips: one horizontal (rows roadRow and roadRow+1), one vertical
-  const roadRow = 8 + Math.floor(rng() * 16);   // rows 8–23
-  const roadCol = 8 + Math.floor(rng() * 16);   // cols 8–23
+  // Seed the noise function from the run PRNG. createNoise2D consumes 256 calls
+  // from rng to build a permutation table, then the function itself is deterministic.
+  const noise2D = createNoise2D(rng);
 
   const grid: TileCell[][] = [];
-
   for (let row = 0; row < TILE_ROWS; row++) {
     const rowArr: TileCell[] = [];
     for (let col = 0; col < TILE_COLS; col++) {
+      const n = noise2D(col * NOISE_SCALE, row * NOISE_SCALE);
       let type: TileType;
-
-      const onHRoad = row === roadRow || row === roadRow + 1;
-      const onVRoad = col === roadCol || col === roadCol + 1;
-
-      if (onHRoad || onVRoad) {
-        type = 'road';
-      } else {
-        const roll = rng();
-        if (roll < 0.80) {
-          type = primaryBiome;
-        } else if (roll < 0.90) {
-          type = others[0];
-        } else {
-          type = others[1];
-        }
-      }
-
+      if      (n < -0.3) type = 'sand';
+      else if (n <  0.1) type = 'grass';
+      else if (n <  0.5) type = 'dirt';
+      else               type = 'road';
       rowArr.push({ type, variantIndex: Math.floor(rng() * 25) });
     }
     grid.push(rowArr);
   }
-
   return grid;
 }
 
