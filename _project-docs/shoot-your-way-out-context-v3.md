@@ -481,12 +481,15 @@ Every run generates a unique map at game start. There are no pre-authored map fi
   arenaWidth: number,             // world units
   arenaHeight: number,
   baseTilePool: string[],         // e.g. ['road', 'dirt', 'sand'] — mix weighted by roll
-  buildingBudget: { min: 1, max: 3 },
+  buildingBudget: { min: 2, max: 3 },       // min 2: snipers must have a rooftop every run; max 3 matches distinct building sprite count (House01, House02, WatchTower)
   obstacleBudget: { min: 20, max: 40 },
-  vehicleWreckBudget: { min: 5, max: 15 },
-  vegetationBudget: { min: 0, max: 20 },  // trees/bushes when rolled
+  vehicleWreckBudget: {
+    bus: { min: 0, max: 1 },              // 256×256 centerpiece — use sparingly; 3 variants in pool
+    scatter: { min: 4, max: 14 },         // 128×128 standalones from Broken_assets — 25 in pool (excludes bus + 7 component parts)
+  },
+  vegetationBudget: { min: 0, max: 20 },  // 0 when weather === 'rain'; all 10 tree/bush sprites eligible
   sniperCountPerBuilding: { min: 0, max: 1 },
-  weather: 'rain' | 'dust' | 'leaves' | 'clear',  // rolled at generation time
+  weather: 'clear' | 'rain',             // two values only — rolled at generation time; dust and leaves dropped
 }
 ```
 
@@ -517,7 +520,13 @@ Per-map tints layer on top via Skia color matrix.
 **Atmospheric effects:**
 - Dynamic fog-of-war — dark mask softens around player with breathing animation, warm amber torch tint
 - Corner vignette — permanent dark edges
-- Weather: randomly assigned per run — generator rolls one of: rain / dust / leaves / clear. Lightning is a sub-effect of rain rolls.
+- Weather: randomly assigned per run — generator rolls one of: **clear** or **rain**. No other weather types. Dust and leaves are permanently removed from the model.
+
+**Rain atmospheric components (Phase 6 implementation work):**
+- Rain particle visual — falling rain rendered over the scene
+- Lightning flash — full-screen white overlay, ~100ms duration, fires at random intervals every 5–30 seconds during rain runs
+- Thunder SFX — plays paired with each flash, 0.5–2 second delay after the flash to simulate distance
+- No additional fields needed in `MapData` — Phase 6 reads `weather === 'rain'` directly from the existing field
 
 ---
 
@@ -856,6 +865,24 @@ The right end-state is a texture atlas system: pack all sprites into one or a sm
 
 *Note:* Line ~705 of this doc references `sprites.ts — sprite loading and atlas management`. Atlas management was always planned; the implementation just hasn't landed yet. This entry codifies the deferral.
 
+**World size placeholder — WORLD_WIDTH/HEIGHT = 2000 is too small**
+
+`WORLD_WIDTH = WORLD_HEIGHT = 2000` (in `gameConstants.ts`) was a G1 placeholder value, chosen before tile rendering existed. On device with Phase 5 G2 tile rendering active, the playable area feels cramped — the map boundary is reached quickly. Mo confirmed this on device.
+
+Target: 4000×4000 or 6000×6000 world units. Final value to be locked by feel during Step 2, tested alongside FPS optimization work (larger world = more tiles to Atlas-draw = potential GPU cost increase that must be profiled).
+
+*Trigger:* Step 2 of Phase 5 G2. Fix alongside FPS profiling — the two interact. The tile Atlas currently renders all 1024 tiles on every frame regardless of camera viewport; a larger world increases tile count, making viewport culling more important. Address culling and world size together.
+
+*Dependencies:* Player spawn position (`canvasWidth/2, canvasHeight/2`) stays at world center. Enemy spawn logic uses world bounds — validate that spawn positions remain within the new bounds after the change. Crate spawn logic also needs review (see next entry).
+
+**Crate spawn bounds — crates spawn outside the playable area**
+
+Crates are spawning at positions the player cannot reach, either at the world boundary or beyond it. Mo confirmed this on device. Likely cause: crate spawn logic uses `WORLD_WIDTH`/`WORLD_HEIGHT` directly as bounds without a margin, OR camera clamping means the world edges aren't reachable and spawn didn't account for that. A second possible cause: the camera Group offset means world coordinates near (0,0) or (WORLD_WIDTH, WORLD_HEIGHT) are off-screen and unreachable, but crate spawner doesn't exclude them.
+
+*Trigger:* Step 2 of Phase 5 G2, when spawn logic is revisited alongside the world size change. Fix the bounds used for crate spawning at the same time as the world size bump — the two constants are coupled (changing world size changes what "playable area" means).
+
+*Fix approach when triggered:* Define a `PLAYABLE_MARGIN` constant (e.g. 300 world units from each edge) and use `margin + rng() * (WORLD_SIZE - 2*margin)` for all random spawn positions. Applies to crates, obstacles, vehicle wrecks, and vegetation — audit all spawners when fixing.
+
 **Object pooling for short-lived entities (projectiles, pickups, damage numbers, hit effects)**
 
 Currently when a projectile is fired, an object is allocated. When it hits or expires, it's garbage-collected. Same for pickup spawns, damage numbers, and hit-flash effects later. On modern devices this is fine. On lower-end Android devices with 50 enemies and 20 projectiles in flight, garbage collection can cause frame stutters.
@@ -897,6 +924,8 @@ Adding many (50+) `useDerivedValue` instances all reading from the same shared v
 Wrapping animated entity Groups inside an animated camera Group creates two layers of Skia subscriptions. Skia can render a frame where the outer (camera) transform has updated but the inner (entity) transforms haven't fired yet — producing a frame where the camera moved but entities didn't. Symptom: every entity stutters in sync with camera movement; enemies appear to rubber-band toward the player on each frame.
 
 *Fix pattern:* Never nest animated Groups. Instead, compute each entity's screen position inline in its own `useDerivedValue` as `width/2 + (entity.x - player.x) * CAMERA_ZOOM`. The entity is always at the correct screen position relative to the current player position in a single transform. Used in `GameCanvas.tsx` for all entity slot transforms (commit 02acfad).
+
+*G1 refinement (Phase 5 G2, confirmed on device):* The prohibition is specifically animated-wrapping-animated. An animated Group wrapping **static** children is the correct pattern for camera-driven world rendering (tile atlases, static prop layers, etc.) and does not produce the stutter artifact. The G1 stutter was caused by both the outer Group transform and the inner entity transforms updating per-frame, with Skia flushing intermediate states between the two layers. Static children have no independent animated transform — the outer Group moves them cleanly in a single GPU pass. Worth monitoring for performance impact when wrapping a high child count, but no timing artifact. Tile atlases use this pattern in Phase 5 G2 (commit 67cdf12) and are visually correct on device.*
 
 **Per-frame input via .runOnJS(true) causes variable camera lag**
 
