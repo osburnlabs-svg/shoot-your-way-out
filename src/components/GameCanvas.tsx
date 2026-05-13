@@ -374,6 +374,9 @@ export default function GameCanvas({ width, height }: Props) {
   const sandTileImage  = useImage(TileSprites.sand);
   const grassTileImage = useImage(TileSprites.grass);
   const roadTileImage  = useImage(TileSprites.road);
+  // All 4 must be non-null before any Atlas renders — a single null image
+  // crashes Skia's JSI layer on first render before the loaded images arrive.
+  const tilesReady = !!(dirtTileImage && sandTileImage && grassTileImage && roadTileImage);
 
   // ─── Pickup sprite image ──────────────────────────────────────────────────
   const moneySmallImage = useImage(PickupSprites.money.small);
@@ -1338,37 +1341,33 @@ export default function GameCanvas({ width, height }: Props) {
           {/* SharedValue<SkRSXform[]> updated every frame on the UI thread via  */}
           {/* useDerivedValue — no runOnJS, no React state, pure 60fps worklet. */}
           {/* sprites is a static SkRect[] — source rects never change per run.  */}
-          {dirtTileImage && dirtSprites.length > 0 && (
-            <Atlas
-              image={dirtTileImage}
-              sprites={dirtSprites}
-              transforms={dirtTransforms}
-              sampling={{ filter: FilterMode.Nearest, mipmap: MipmapMode.None }}
-            />
-          )}
-          {sandTileImage && sandSprites.length > 0 && (
-            <Atlas
-              image={sandTileImage}
-              sprites={sandSprites}
-              transforms={sandTransforms}
-              sampling={{ filter: FilterMode.Nearest, mipmap: MipmapMode.None }}
-            />
-          )}
-          {grassTileImage && grassSprites.length > 0 && (
-            <Atlas
-              image={grassTileImage}
-              sprites={grassSprites}
-              transforms={grassTransforms}
-              sampling={{ filter: FilterMode.Nearest, mipmap: MipmapMode.None }}
-            />
-          )}
-          {roadTileImage && roadSprites.length > 0 && (
-            <Atlas
-              image={roadTileImage}
-              sprites={roadSprites}
-              transforms={roadTransforms}
-              sampling={{ filter: FilterMode.Nearest, mipmap: MipmapMode.None }}
-            />
+          {tilesReady && (
+            <>
+              <Atlas
+                image={dirtTileImage!}
+                sprites={dirtSprites}
+                transforms={dirtTransforms}
+                sampling={{ filter: FilterMode.Nearest, mipmap: MipmapMode.None }}
+              />
+              <Atlas
+                image={sandTileImage!}
+                sprites={sandSprites}
+                transforms={sandTransforms}
+                sampling={{ filter: FilterMode.Nearest, mipmap: MipmapMode.None }}
+              />
+              <Atlas
+                image={grassTileImage!}
+                sprites={grassSprites}
+                transforms={grassTransforms}
+                sampling={{ filter: FilterMode.Nearest, mipmap: MipmapMode.None }}
+              />
+              <Atlas
+                image={roadTileImage!}
+                sprites={roadSprites}
+                transforms={roadTransforms}
+                sampling={{ filter: FilterMode.Nearest, mipmap: MipmapMode.None }}
+              />
+            </>
           )}
 
           {/*
