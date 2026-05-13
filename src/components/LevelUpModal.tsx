@@ -83,7 +83,7 @@ export default function LevelUpModal({
                 onPress={() => onSelect(id)}
                 activeOpacity={0.7}
               >
-                <Image source={icon} style={styles.icon} resizeMode="contain" />
+                <Image source={icon} style={styles.icon} resizeMode="contain" filterQuality="none" />
                 <Text style={styles.name} numberOfLines={2}>
                   {skill.displayName}
                 </Text>
