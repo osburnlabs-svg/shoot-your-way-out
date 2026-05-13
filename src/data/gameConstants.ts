@@ -15,8 +15,7 @@
 
 /**
  * Arena dimensions in world pixels. Larger than the screen — the camera scrolls
- * to follow the player. Phase 5 G2 (tile rendering) will validate these values;
- * adjust here if the tile grid requires a different size.
+ * to follow the player.
  */
 export const WORLD_WIDTH = 2000;
 export const WORLD_HEIGHT = 2000;
@@ -24,9 +23,21 @@ export const WORLD_HEIGHT = 2000;
 /**
  * Camera zoom factor. 1.0 = no zoom (screen shows SCREEN_SIZE world pixels at 1:1).
  * Final value locked at end of Phase 5 once tiles + enemies + HUD are visible together.
- * Do not tune this in G1 — just introduces the constant so all systems share one source.
  */
 export const CAMERA_ZOOM = 1.0;
+
+/**
+ * Size of one tile cell in world units. Matches the source tile pixel size (64×64px)
+ * so that at CAMERA_ZOOM=1.0 each tile renders at exactly its native resolution.
+ * Confirmed from tilesheet dimensions: 320×320 sheets / 5 cols = 64px per tile.
+ */
+export const TILE_SIZE = 64;
+
+/** Number of tile columns in the world grid. WORLD_WIDTH / TILE_SIZE = 2000 / 64 = 31.25 → 32. */
+export const TILE_COLS = Math.ceil(WORLD_WIDTH / TILE_SIZE);
+
+/** Number of tile rows in the world grid. WORLD_HEIGHT / TILE_SIZE = 2000 / 64 = 31.25 → 32. */
+export const TILE_ROWS = Math.ceil(WORLD_HEIGHT / TILE_SIZE);
 
 // ─── Player movement ──────────────────────────────────────────────────────────
 
