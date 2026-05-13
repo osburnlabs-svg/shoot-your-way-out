@@ -48,6 +48,13 @@ function mulberry32(seed: number) {
 // Noise frequency: smaller = larger biome regions. 0.05 → ~2–3 transitions per 32-tile axis.
 const NOISE_SCALE = 0.05;
 
+// Each 320×320 tilesheet is a 5×5 grid of 64×64 variants.
+// The outer ring (16 tiles) are edge/transition tiles with feathered transparent edges —
+// intended for biome boundaries, not scatter fill. The inner 3×3 (9 tiles) are solid
+// fill tiles safe to use anywhere. Picking from only these keeps the map gap-free.
+// Outer ring reserved for future transition-tile logic (Step 3).
+const FILL_VARIANTS = [6, 7, 8, 11, 12, 13, 16, 17, 18] as const;
+
 function buildTileGrid(rng: () => number): TileCell[][] {
   // Seed the noise function from the run PRNG. createNoise2D consumes 256 calls
   // from rng to build a permutation table, then the function itself is deterministic.
@@ -62,7 +69,8 @@ function buildTileGrid(rng: () => number): TileCell[][] {
       if      (n < -0.3) type = 'sand';
       else if (n <  0.2) type = 'grass';
       else               type = 'dirt';
-      rowArr.push({ type, variantIndex: Math.floor(rng() * 25) });
+      const variantIndex = FILL_VARIANTS[Math.floor(rng() * FILL_VARIANTS.length)];
+      rowArr.push({ type, variantIndex });
     }
     grid.push(rowArr);
   }
