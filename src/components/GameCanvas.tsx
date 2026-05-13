@@ -296,6 +296,8 @@ const THROWABLE_COLORS = {
   molotov: '#e06020', // orange-red
 };
 
+console.log('G2-ATLAS VERSION: render attempt v1');
+
 type Props = {
   width: number;
   height: number;
@@ -455,6 +457,25 @@ export default function GameCanvas({ width, height }: Props) {
       grassSprites: grassSrc, roadSprites:  roadSrc,
     };
   }, [initialMapData]);
+
+  // ─── Diagnostic logging (G2-ATLAS, remove after crash is confirmed) ────────
+  useEffect(() => {
+    console.log('G2-ATLAS TILE_IMAGES:', {
+      dirt:  dirtTileImage  ? 'ok' : 'NULL',
+      sand:  sandTileImage  ? 'ok' : 'NULL',
+      grass: grassTileImage ? 'ok' : 'NULL',
+      road:  roadTileImage  ? 'ok' : 'NULL',
+    });
+  }, [dirtTileImage, sandTileImage, grassTileImage, roadTileImage]);
+
+  useEffect(() => {
+    console.log('G2-ATLAS SPRITES:', {
+      dirt:  { count: dirtSprites.length,  sample: dirtSprites[0] },
+      sand:  { count: sandSprites.length,  sample: sandSprites[0] },
+      grass: { count: grassSprites.length, sample: grassSprites[0] },
+      road:  { count: roadSprites.length,  sample: roadSprites[0] },
+    });
+  }, [dirtSprites, sandSprites, grassSprites, roadSprites]);
 
   // Per-terrain-type Atlas transforms (UI thread, worklet).
   // Each reads player.x/y from gameState once per frame and computes RSXforms
