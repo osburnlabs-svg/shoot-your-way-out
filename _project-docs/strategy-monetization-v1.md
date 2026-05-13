@@ -263,7 +263,101 @@ Honest rough estimate. Phase 5+ context (longer runs, more enemy types) changes 
 
 ---
 
-## 10. What this document is NOT
+## 11. Weapon Rarity Tiers
+
+**Status:** Graduated from brainstorm session (date: 2026-05-12). Locked design. Not yet scheduled for implementation — target post-Phase 5 once weapon system is stable in the procedural map context.
+
+### 11.1 Concept
+
+Every crate-droppable weapon has 4 rarity tiers. Each tier applies a flat damage multiplier and a visual color treatment. Drop rates weighted so legendary feels rare and exciting. Solves the post-Phase 4c gameplay observation that crates become uninteresting once the player obtains a desired weapon (e.g. Shotgun) — rarity gives the player a reason to keep opening crates even after they have a weapon they like.
+
+This is genre-standard for survivor-likes, roguelikes, and ARPGs (Vampire Survivors evolutions, Brotato item tiers, Hades boon rarities, Diablo loot tiers). The pattern is recognized instantly by any player who has touched the genre — no tutorial needed.
+
+### 11.2 Tier definitions
+
+| Tier | Color | Damage multiplier |
+|---|---|---|
+| Common | Green | 1.00x (base) |
+| Uncommon | Blue | 1.10x |
+| Rare | Purple | 1.20x |
+| Legendary | Gold | 1.30x |
+
+Multiplier is **additive from base**, not compounding. A Legendary Shotgun deals 30% more damage than a Common Shotgun, period.
+
+Color order matches genre convention (Green → Blue → Purple → Gold ascending). Players have 20+ years of trained intuition reading these colors at a glance.
+
+### 11.3 Drop rate target
+
+Target feeling: **1 legendary per 5-7 minutes of play.** Placeholder weighting:
+
+| Tier | Weight |
+|---|---|
+| Common | 50% |
+| Uncommon | 30% |
+| Rare | 15% |
+| Legendary | 5% |
+
+These weights are placeholders. Exact percentages tune against actual Phase 5+ gameplay once crate spawn rate, run length, and player kill cadence are observable.
+
+### 11.4 Stat-only design (no unique modifiers)
+
+Legendaries differ from commons by stat multipliers only. No unique behavioral effects per legendary weapon (no "Legendary Shotgun ignites enemies" or similar). This keeps engine work minimal — the weapon system already supports stat profiles; rarity is just a multiplier on top.
+
+This is a conscious tradeoff. Unique legendary modifiers would be more memorable per-weapon but would require per-weapon engine code, balance complexity, and visual differentiation. Stat-only legendaries are 95% of the engagement at 10% of the work. Revisit if v1 ships well and post-launch content updates want to add deeper rarity mechanics.
+
+### 11.5 Visual differentiation
+
+Two visual treatments per rarity:
+
+1. **Color-tinted text** for the weapon name in crate reveal modal and HUD (existing pattern).
+2. **Glow / drop shadow effect** behind the weapon icon in the rarity color. Uniform size across all rarities — color is the only differentiator, no escalating glow intensity. Keeps visual treatment simple and consistent.
+
+Glow appears in:
+- Crate reveal modal (when weapon is revealed)
+- HUD weapon icon (when weapon is equipped)
+- Flea market purchase screen (Phase 10) if/when weapons appear there with rarity
+
+### 11.6 Inventory interaction with rarity
+
+Phase 7's weapon inventory design specifies "if EQUIPing a weapon you already own, switch active without adding a duplicate." Rarity adds one rule:
+
+- **If rolled rarity > owned rarity for the same weapon type:** replace the owned copy with the new higher-tier version.
+- **If rolled rarity ≤ owned rarity for the same weapon type:** discard the new copy. Optionally convert to score or money pickup (design choice for Phase 7+).
+
+Player never has two of the same weapon at different tiers. Always the best version they've found.
+
+### 11.7 Skills are NOT affected
+
+Rarity is a weapons-only mechanic. Skills retain their existing stacking-based progression (1-5 stacks per skill). Adding rarity to skills would dilute both systems — different progression mechanics for different entity types is the right separation.
+
+The existing skill clones design (Section 7 of this document) remains unchanged. Clones differ by percentage adjustments on the same engine field. No rarity tiers on clones either.
+
+### 11.8 Implementation scope estimate
+
+Roughly half a phase of work. Smaller than Phase 4c (crate weapons). Engine already supports stat profiles; rarity is additive.
+
+Work required:
+- Rarity tier data definitions (data/rarities.ts or extend data/weapons.ts)
+- Crate roll logic: pick weapon + pick rarity weighted by table
+- Weapon equip logic: handle rarity comparison on duplicate
+- Visual: glow effect on weapon icons (CrateRevealModal, HUD)
+- Visual: color-tinted text (existing pattern, extend to crate reveal)
+- Tuning pass: drop rate weights against actual Phase 5+ playtests
+
+### 11.9 Open questions deferred to implementation phase
+
+1. **What happens to a discarded duplicate?** Silent discard, convert to score, convert to flea-market currency? Phase 10 if currency exists.
+2. **Does the flea market sell weapons with selectable rarity, or fixed at Common only?** Selectable rarity adds another monetization hook but complicates the flea market UI. Defer to Phase 10 planning.
+3. **Do rarity tiers also apply to the starter Pistol?** Probably not — starter is fixed Common. Tested against playtest feel.
+4. **Are quest payouts tied to rarity tier kills?** "Kill 10 enemies with a Legendary weapon" type quests. Possible Phase 10 quest template extension; not in initial 28-template pool.
+
+### 11.10 Origin
+
+Concept emerged during a brainstorm session 2026-05-12 after Mo played the game post-Phase 4c and noted: "If they get a shotgun, they may never care about a crate again. But if they have a rare shotgun (blue), they may want to hit more crates to hold out for a legendary (gold)." This is a player-felt design gap, identified through actual playtesting, not theoretical design. That makes it high-confidence for inclusion. One commit, doc-only. Commit message: "Strategy doc: add weapon rarity tier design (Section 11), graduated from brainstorm session."
+
+---
+
+## 12. What this document is NOT
 
 - A commitment to build any of this. The design is reasoned and locked, but Phases 9/10 are far from current development.
 - A pricing study. Numbers here are placeholders for design conversation, not market-tested values.
