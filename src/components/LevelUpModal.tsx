@@ -142,8 +142,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   icon: {
-    width: 53,
-    height: 53,
+    width: 64,
+    height: 64,
   },
   name: {
     color: '#ffffff',
