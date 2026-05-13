@@ -118,8 +118,8 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   weaponIcon: {
-    width: 120,
-    height: 120,
+    width: 132,
+    height: 132,
     marginBottom: 4,
   },
   weaponName: {
