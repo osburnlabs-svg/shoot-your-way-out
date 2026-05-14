@@ -21,7 +21,7 @@
  *     have real assetKeys from sprites.ts EnvSprites and native pixel dimensions.
  *   - Player spawn point (WORLD_WIDTH/2, WORLD_HEIGHT/2) = (3000, 3000) is
  *     excluded via PLAYER_SPAWN_CLEAR_RADIUS (200px) for all prop placement.
- *   - Barrels cluster near buildings (2–5 per structure). If no buildings were
+ *   - Barrels cluster near buildings (3–5 per structure). If no buildings were
  *     placed, barrels array is empty.
  *
  * PRNG: mulberry32 — fast, seedable, reproducible across platforms.
@@ -96,10 +96,12 @@ function isNearSpawn(x: number, y: number): boolean {
 
 // ─── Entity pools ─────────────────────────────────────────────────────────────
 
-const BUILDING_POOL = [
-  { assetKey: 'env_house01',    width: 132, height: 132 },
-  { assetKey: 'env_house02',    width: 263, height: 139 },
-  { assetKey: 'env_watchtower', width: 72,  height: 72  },
+const HOUSE_POOL = [
+  { assetKey: 'env_house01', width: 132, height: 132 },
+  { assetKey: 'env_house02', width: 263, height: 139 },
+];
+const WATCHTOWER_POOL = [
+  { assetKey: 'env_watchtower', width: 72, height: 72 },
 ];
 
 const ROCK_POOL = [
@@ -165,32 +167,56 @@ function tooClose(a: PlacedEntity, b: PlacedEntity, minDist: number): boolean {
 
 // ─── Entity builders ──────────────────────────────────────────────────────────
 
-function buildBuildings(rng: () => number): PlacedEntity[] {
-  const count = 2 + Math.floor(rng() * 2); // 2 or 3
-  const placed: PlacedEntity[] = [];
-  let attempts = 0;
+// Houses min 2/max 3, cycle pool to guarantee both variants.
+// Watchtowers min 2/max 3, spacing checked cross-category against all placed structures.
+function buildStructures(rng: () => number): PlacedEntity[] {
+  const houseCount = 2 + Math.floor(rng() * 2);  // 2 or 3
+  const towerCount = 2 + Math.floor(rng() * 2);  // 2 or 3
+  const allPlaced: PlacedEntity[] = [];
 
-  while (placed.length < count && attempts < 200) {
-    attempts++;
+  const houses: PlacedEntity[] = [];
+  let houseAttempts = 0;
+  while (houses.length < houseCount && houseAttempts < 200) {
+    houseAttempts++;
     const pos = randomWorldPos(rng, BUILDING_EDGE_MARGIN);
-    const def = BUILDING_POOL[Math.floor(rng() * BUILDING_POOL.length)]!;
+    const slotIndex = houses.length;
+    const def = slotIndex < HOUSE_POOL.length
+      ? HOUSE_POOL[slotIndex]!
+      : HOUSE_POOL[Math.floor(rng() * HOUSE_POOL.length)]!;
     const candidate: PlacedEntity = { ...pos, ...def };
     if (
-      placed.every(p => !tooClose(p, candidate, BUILDING_MIN_SPACING)) &&
+      allPlaced.every(p => !tooClose(p, candidate, BUILDING_MIN_SPACING)) &&
       !isNearSpawn(candidate.x, candidate.y)
     ) {
-      placed.push(candidate);
+      houses.push(candidate);
+      allPlaced.push(candidate);
+    }
+  }
+
+  const towers: PlacedEntity[] = [];
+  let towerAttempts = 0;
+  while (towers.length < towerCount && towerAttempts < 200) {
+    towerAttempts++;
+    const pos = randomWorldPos(rng, BUILDING_EDGE_MARGIN);
+    const candidate: PlacedEntity = { ...pos, ...WATCHTOWER_POOL[0]! };
+    if (
+      allPlaced.every(p => !tooClose(p, candidate, BUILDING_MIN_SPACING)) &&
+      !isNearSpawn(candidate.x, candidate.y)
+    ) {
+      towers.push(candidate);
+      allPlaced.push(candidate);
     }
   }
 
   // [DIAG-B2] budget vs placed — remove after blocker 2 resolved
-  console.log('[DIAG-B2] buildings: budget', count, '/ placed', placed.length);
-  return placed;
+  console.log('[DIAG-B2] houses: budget', houseCount, '/ placed', houses.length);
+  console.log('[DIAG-B2] watchtowers: budget', towerCount, '/ placed', towers.length);
+  return allPlaced;
 }
 
-// 20–40 rocks (no sandbags — those need G4 orientation logic; deferred to G4).
+// 25–50 rocks (no sandbags — those need G4 orientation logic; deferred to G4).
 function buildObstacles(rng: () => number, buildings: PlacedEntity[]): PlacedEntity[] {
-  const count = 20 + Math.floor(rng() * 21); // 20–40
+  const count = 25 + Math.floor(rng() * 26); // 25–50
   const placed: PlacedEntity[] = [];
   let attempts = 0;
 
@@ -213,10 +239,10 @@ function buildObstacles(rng: () => number, buildings: PlacedEntity[]): PlacedEnt
   return placed;
 }
 
-// 0–1 bus centerpiece + 4–14 scatter car/truck wrecks.
+// 0–1 bus centerpiece + 6–16 scatter car/truck wrecks.
 function buildVehicleWrecks(rng: () => number, buildings: PlacedEntity[]): PlacedEntity[] {
   const hasBus = rng() > 0.5;
-  const scatterCount = 4 + Math.floor(rng() * 11); // 4–14
+  const scatterCount = 6 + Math.floor(rng() * 11); // 6–16
   const placed: PlacedEntity[] = [];
 
   if (hasBus) {
@@ -248,7 +274,7 @@ function buildVehicleWrecks(rng: () => number, buildings: PlacedEntity[]): Place
   return placed;
 }
 
-// 0–20 trees/bushes — skipped entirely when raining (visual + thematic).
+// 12–20 trees/bushes — skipped entirely when raining (visual + thematic).
 function buildVegetation(rng: () => number, weather: WeatherType, buildings: PlacedEntity[]): PlacedEntity[] {
   if (weather === 'rain') {
     // [DIAG-B2] skipped — remove after blocker 2 resolved
@@ -256,7 +282,7 @@ function buildVegetation(rng: () => number, weather: WeatherType, buildings: Pla
     return [];
   }
 
-  const count = Math.floor(rng() * 21); // 0–20
+  const count = 12 + Math.floor(rng() * 9); // 12–20
   const placed: PlacedEntity[] = [];
   let attempts = 0;
 
@@ -279,7 +305,7 @@ function buildVegetation(rng: () => number, weather: WeatherType, buildings: Pla
   return placed;
 }
 
-// 2–5 barrels/boxes per building, clustered within 50–150px of each structure.
+// 3–5 barrels/boxes per building, clustered within 50–150px of each structure.
 // If no buildings were placed (rare, <1% of seeds), returns empty — no isolated
 // barrels without a logical reason to be there.
 const BARREL_CLUSTER_RADIUS = 150;
@@ -291,7 +317,7 @@ function buildBarrels(rng: () => number, buildings: PlacedEntity[]): PlacedEntit
   const placed: PlacedEntity[] = [];
   let barrelBudget = 0;
   for (const building of buildings) {
-    const clusterCount = 2 + Math.floor(rng() * 4); // 2–5 per building
+    const clusterCount = 3 + Math.floor(rng() * 3); // 3–5 per building
     barrelBudget += clusterCount;
     let barrelPlaced = 0;
     let attempts = 0;
@@ -321,7 +347,7 @@ export function generateMap(seed: number): MapData {
   const weather: WeatherType = rng() > 0.35 ? 'clear' : 'rain';
   const isDesert = rng() > 0.5; // true → desert (sand only); false → vegetation (grass + dirt)
   const tileGrid = buildTileGrid(rng, isDesert);
-  const buildings = buildBuildings(rng);
+  const buildings = buildStructures(rng);
   const obstacles = buildObstacles(rng, buildings);
   const vehicleWrecks = buildVehicleWrecks(rng, buildings);
   const vegetation = buildVegetation(rng, weather, buildings);
