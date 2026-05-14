@@ -99,10 +99,8 @@ function isNearSpawn(x: number, y: number): boolean {
 
 // ─── Entity pools ─────────────────────────────────────────────────────────────
 
-const HOUSE_POOL = [
-  { assetKey: 'env_house01', width: 132, height: 132 },
-  { assetKey: 'env_house02', width: 263, height: 139 },
-];
+const HOUSE01_DEF = { assetKey: 'env_house01', width: 132, height: 132 };
+const HOUSE02_DEF = { assetKey: 'env_house02', width: 263, height: 139 };
 const WATCHTOWER_POOL = [
   { assetKey: 'env_watchtower', width: 72, height: 72 },
 ];
@@ -159,8 +157,6 @@ const BARREL_POOL = [
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-// Minimum spacing between building centers (world units).
-const BUILDING_MIN_SPACING = 300;
 // Margin from world edge where buildings won't spawn.
 const BUILDING_EDGE_MARGIN = 200;
 
@@ -169,12 +165,6 @@ function randomWorldPos(rng: () => number, margin: number): { x: number; y: numb
     x: margin + Math.floor(rng() * (WORLD_WIDTH - margin * 2)),
     y: margin + Math.floor(rng() * (WORLD_HEIGHT - margin * 2)),
   };
-}
-
-function tooClose(a: PlacedEntity, b: PlacedEntity, minDist: number): boolean {
-  const dx = a.x - b.x;
-  const dy = a.y - b.y;
-  return dx * dx + dy * dy < minDist * minDist;
 }
 
 // Asset keys that use STRUCTURE_SPRITE_SCALE — mirrors the STRUCTURE_ASSETS set in
@@ -197,32 +187,48 @@ function tooCloseScaled(a: PlacedEntity, b: PlacedEntity, gap: number = 20): boo
 
 // ─── Entity builders ──────────────────────────────────────────────────────────
 
-// Houses min 4/max 6, cycle pool for first 2 slots to guarantee both variants.
-// Watchtowers min 4/max 6, spacing checked cross-category against all placed structures.
+// House02: exactly 1, placed first. House01: 3–5, placed second.
+// Watchtowers: 4–6, placed last. All building-to-building spacing via tooCloseScaled
+// so each pair's exclusion distance reflects rendered footprints (replaces the old
+// flat BUILDING_MIN_SPACING=300 constant that allowed scaled-footprint overlaps).
 function buildStructures(rng: () => number): PlacedEntity[] {
-  const houseCount = 4 + Math.floor(rng() * 3);  // 4–6
-  const towerCount = 4 + Math.floor(rng() * 3);  // 4–6
+  const house01Count = 3 + Math.floor(rng() * 3);  // 3–5
+  const towerCount   = 4 + Math.floor(rng() * 3);  // 4–6
   const allPlaced: PlacedEntity[] = [];
 
-  const houses: PlacedEntity[] = [];
-  let houseAttempts = 0;
-  while (houses.length < houseCount && houseAttempts < 200) {
-    houseAttempts++;
+  // House02 — exactly 1. Placed first so it gets first pick of available space.
+  const house02: PlacedEntity[] = [];
+  let house02Attempts = 0;
+  while (house02.length < 1 && house02Attempts < 100) {
+    house02Attempts++;
     const pos = randomWorldPos(rng, BUILDING_EDGE_MARGIN);
-    const slotIndex = houses.length;
-    const def = slotIndex < HOUSE_POOL.length
-      ? HOUSE_POOL[slotIndex]!
-      : HOUSE_POOL[Math.floor(rng() * HOUSE_POOL.length)]!;
-    const candidate: PlacedEntity = { ...pos, ...def };
+    const candidate: PlacedEntity = { ...pos, ...HOUSE02_DEF };
     if (
-      allPlaced.every(p => !tooClose(p, candidate, BUILDING_MIN_SPACING)) &&
-      !isNearSpawn(candidate.x, candidate.y)
+      !isNearSpawn(candidate.x, candidate.y) &&
+      allPlaced.every(p => !tooCloseScaled(p, candidate))
     ) {
-      houses.push(candidate);
+      house02.push(candidate);
       allPlaced.push(candidate);
     }
   }
 
+  // House01 — 3–5. Checks against placed house02 and other house01s.
+  const house01: PlacedEntity[] = [];
+  let house01Attempts = 0;
+  while (house01.length < house01Count && house01Attempts < 200) {
+    house01Attempts++;
+    const pos = randomWorldPos(rng, BUILDING_EDGE_MARGIN);
+    const candidate: PlacedEntity = { ...pos, ...HOUSE01_DEF };
+    if (
+      !isNearSpawn(candidate.x, candidate.y) &&
+      allPlaced.every(p => !tooCloseScaled(p, candidate))
+    ) {
+      house01.push(candidate);
+      allPlaced.push(candidate);
+    }
+  }
+
+  // Watchtowers — 4–6. Checks against all previously placed structures.
   const towers: PlacedEntity[] = [];
   let towerAttempts = 0;
   while (towers.length < towerCount && towerAttempts < 200) {
@@ -230,8 +236,8 @@ function buildStructures(rng: () => number): PlacedEntity[] {
     const pos = randomWorldPos(rng, BUILDING_EDGE_MARGIN);
     const candidate: PlacedEntity = { ...pos, ...WATCHTOWER_POOL[0]! };
     if (
-      allPlaced.every(p => !tooClose(p, candidate, BUILDING_MIN_SPACING)) &&
-      !isNearSpawn(candidate.x, candidate.y)
+      !isNearSpawn(candidate.x, candidate.y) &&
+      allPlaced.every(p => !tooCloseScaled(p, candidate))
     ) {
       towers.push(candidate);
       allPlaced.push(candidate);
@@ -239,8 +245,9 @@ function buildStructures(rng: () => number): PlacedEntity[] {
   }
 
   // [DIAG-B2] budget vs placed — remove after blocker 2 resolved
-  console.log('[DIAG-B2] houses: budget', houseCount, '/ placed', houses.length);
-  console.log('[DIAG-B2] watchtowers: budget', towerCount, '/ placed', towers.length);
+  console.log('[DIAG-B2] house02: placed', house02.length, '/ attempts', house02Attempts);
+  console.log('[DIAG-B2] house01: budget', house01Count, '/ placed', house01.length, '/ attempts', house01Attempts);
+  console.log('[DIAG-B2] watchtowers: budget', towerCount, '/ placed', towers.length, '/ attempts', towerAttempts);
   return allPlaced;
 }
 
