@@ -61,6 +61,8 @@ Status legend:
 | ~~**`App.tsx` routing comment stale**~~ — **Resolved.** Comment already reads `PreRunModal` not `MapSelect`. No action needed. | Docs update 2026-05-12 | n/a | ✅ Closed Phase 5 G1 |
 | **`useFrameCallback` spurious zero-dt invocations** — frame callback fires extra times (~every 100ms) with `timeSincePreviousFrame=0`, correlated with the 100ms `setInterval` used for sprite-frame polling. Cause: JS-thread timer activity appears to trigger spurious UI-thread frame callbacks in Reanimated. Worked around by skipping `dtMs <= 0` frames at the top of `useFrameCallback`. Functional impact: none after workaround. Worth revisiting if Reanimated is upgraded or if a future feature needs the sprite-frame polling to run at a different cadence. | Phase 5 G1 stutter investigation 2026-05-12 | None after guard; without it, player movement stutters ~10×/sec | Keep guard in place; investigate root cause if Reanimated major version bump |
 | **RN `<Image>` filtering — pattern established** — RN `<Image>` defaults to bilinear filtering, which blurs pixel-art and AI-sourced sprite icons. All Skia `<Image>` sprites in `GameCanvas.tsx` already use `sampling={{ filter: FilterMode.Nearest, mipmap: MipmapMode.None }}`. RN modal components must mirror this with `filterQuality="none"`. Applied to `LevelUpModal` and `CrateRevealModal` (commit 48be14b). **Pattern:** any future modal or screen using RN `<Image>` to render a sprite icon must include `filterQuality="none"`. | 2026-05-12 | `filterQuality="none"` on both affected components | ✅ Fixed — pattern to follow for all future RN `<Image>` sprite renders |
+| **Rocket projectile sprite oversize** — `assets/effects/rocket/1.png` and `2.png` are sourced from the kit at approximately 18×69px. At current render scale they appear oversize relative to the player and enemy sprites. Two fix paths: (a) one-time resize via Node/Sharp script to output at ~6×23px (permanent fix — no runtime cost); (b) add `ROCKET_SPRITE_SCALE` multiplier constant to `gameConstants.ts` applied to the RSXform in the projectile renderer (simpler, runtime scale). Mo's image editor cannot output at the target dimensions, so option (a) requires CC-side script. Must resolve before Phase 6 muzzle flash + bullet origin correction work, since both touch the same projectile render path. | Phase 4c G3 (identified 2026-05-13) | Rendered oversize; functional, flight and AOE correct | Phase 6 — bundle with muzzle flash + bullet origin correction |
+| **Phase 5 G2 Step 3 — three device-test blockers** — Commit f12a73d shipped scatter props (31 assets, Atlas render pipeline) but device test found three issues blocking G2 close: (1) stutter regression during player movement — most likely cause: 31 `useImage` hooks + `propAtlasData` useMemo overhead reintroducing inter-thread timing issue from G1; (2) houses and most vehicle wrecks not appearing on device — candidate causes: placement retry loops giving up early (spacing/clearance too tight) OR assetKey mismatch between generator pool and EnvSprites; (3) prop sprites render near-native size (72px WatchTower, 30px crates) — need `PROP_SPRITE_SCALE` constant in propAtlasData useMemo. **Diagnose in order: stutter first, then missing categories, then scale.** | Phase 5 G2 Step 3 (2026-05-13) | Game remains playable; props partially visible | Phase 5 G2 close-out — must resolve all three before G3 |
 
 ---
 
@@ -1006,9 +1008,34 @@ After all three fixed and device test passes: G2 close-out (log, context doc, te
 
 ---
 
+---
+
+## Scope Cuts — May 13 2026
+
+**Status:** Locked decisions, effective immediately. These are not pending changes — they are formal scope changes. Authoritative documentation lives in:
+- `strategy-monetization-v1.md` — Sections 13 (cuts) and 14 (enemy/hazard redesigns)
+- `shoot-your-way-out-context-v3.md` — v1 Scope Summary (updated) and Build Phase Plan (updated through Phase 10)
+
+| Feature | Decision | Replacement / Notes |
+|---|---|---|
+| Daily quest system | CUT from v1 | Daily login bonus: free $50/day, paid $300/day, single timestamp check on launch (strategy §5.2) |
+| Lightning flash + thunder SFX | CUT from v1 | Rain ships with particles + drifting clouds only. Deferred to v1.1. |
+| Helicopter boss (phased attacks) | CUT from v1 | Ambient flyby — no health, no attacks, straight-line pass every 60–90s (strategy §14) |
+| Bomber strafe hazard event | CUT from v1 | Static "crashed bomber" map prop, 0–1 per run, no mechanics (strategy §14) |
+| Gas bomb hazard | CUT entirely | No replacement planned for v1 or v1.1 |
+| Tank as mobile enemy class | CUT from v1 | Stationary turret — 3 visual variants (Humvee/BTR/Panzer), reuses Sniper turret engine (strategy §14) |
+
+**Confirmed for v1 (not cuts):**
+- Skill clones — 5 clones confirmed alongside base 20 skills (strategy §7)
+- Weapon rarity tiers — Common/Uncommon/Rare/Legendary confirmed (strategy §11)
+- Flea market — unchanged (strategy §4)
+- Custom UI — already the established pattern since Phase 4b
+
+---
+
 ## Phase 6 — Audio + atmospheric effects
 
-**Goal:** Audio engine fully implemented (music + SFX channels), all 25 SFX wired and playing, 4 music tracks looping correctly, fog-of-war, weather per map, vignette, explosion and smoke effects rendering.
+**Goal:** Audio engine fully implemented (music + SFX channels), all 25 SFX wired and playing, 4 music tracks looping correctly, fog-of-war, rain particles + drifting clouds (rain runs only — no lightning, no thunder), vignette, muzzle flashes, bullet origin correction, explosion and smoke effects rendering.
 
 **Status:** Not started
 
