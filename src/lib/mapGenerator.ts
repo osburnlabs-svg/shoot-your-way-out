@@ -286,18 +286,45 @@ function buildVehicleWrecks(
 
   // Helicopter — exactly 1. Checks buildings only (no buses placed yet).
   const helicopter: PlacedEntity[] = [];
+  const HELI_RETRY_CEILING = 100;
   let heliAttempts = 0;
-  while (helicopter.length < 1 && heliAttempts < 100) {
+  let heliFailSpawn = 0;
+  let heliFailBuilding = 0;
+  while (helicopter.length < 1 && heliAttempts < HELI_RETRY_CEILING) {
     heliAttempts++;
     const pos = randomWorldPos(rng, 150);
     const rotation = 0.1 + rng() * (Math.PI * 2 - 0.2);
     const candidate: PlacedEntity = { ...pos, ...WRECK_HELICOPTER, rotation };
-    if (
-      !isNearSpawn(pos.x, pos.y) &&
-      buildings.every(b => !tooCloseScaled(b, candidate))
-    ) {
-      helicopter.push(candidate);
+    if (isNearSpawn(pos.x, pos.y)) {
+      heliFailSpawn++;
+    } else {
+      const blocker = buildings.find(b => tooCloseScaled(b, candidate));
+      if (blocker) {
+        heliFailBuilding++;
+      } else {
+        helicopter.push(candidate);
+      }
     }
+  }
+  // [DIAG-HELI] — strip at G2 close-out alongside [DIAG-B2]
+  console.log(
+    '[DIAG-HELI] ceiling:', HELI_RETRY_CEILING,
+    '/ attempts:', heliAttempts,
+    '/ placed:', helicopter.length,
+    '/ fail-spawn:', heliFailSpawn,
+    '/ fail-building:', heliFailBuilding,
+  );
+  if (helicopter.length > 0) {
+    console.log('[DIAG-HELI] placed at', helicopter[0]!.x.toFixed(0), helicopter[0]!.y.toFixed(0));
+  } else {
+    // Log each building's key and its exclusion radius vs helicopter to help triage
+    console.log('[DIAG-HELI] PLACEMENT FAILED — building exclusion zones:',
+      buildings.map(b => ({
+        key: b.assetKey,
+        bHalf: scaledHalfSize(b).toFixed(1),
+        minDist: (scaledHalfSize(b) + scaledHalfSize({ ...b, assetKey: 'env_helicopter_wreck', width: 288, height: 288 }) + 20).toFixed(1),
+      })),
+    );
   }
 
   const buses: PlacedEntity[] = [];
