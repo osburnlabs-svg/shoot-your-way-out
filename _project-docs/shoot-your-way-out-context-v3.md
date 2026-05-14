@@ -926,7 +926,7 @@ Wrapping animated entity Groups inside an animated camera Group creates two laye
 
 *Fix pattern:* Never nest animated Groups. Instead, compute each entity's screen position inline in its own `useDerivedValue` as `width/2 + (entity.x - player.x) * CAMERA_ZOOM`. The entity is always at the correct screen position relative to the current player position in a single transform. Used in `GameCanvas.tsx` for all entity slot transforms (commit 02acfad).
 
-*G1 refinement (Phase 5 G2, confirmed on device):* The prohibition is specifically animated-wrapping-animated. An animated Group wrapping **static** children is the correct pattern for camera-driven world rendering (tile atlases, static prop layers, etc.) and does not produce the stutter artifact. The G1 stutter was caused by both the outer Group transform and the inner entity transforms updating per-frame, with Skia flushing intermediate states between the two layers. Static children have no independent animated transform — the outer Group moves them cleanly in a single GPU pass. Worth monitoring for performance impact when wrapping a high child count, but no timing artifact. Tile atlases use this pattern in Phase 5 G2 (commit 67cdf12) and are visually correct on device.*
+*G1 refinement (Phase 5 G2, confirmed on device):* The prohibition is specifically animated-wrapping-animated. An animated Group wrapping **static** children is the correct pattern for camera-driven world rendering (tile atlases, static prop layers, etc.) and does not produce the stutter artifact. The G1 stutter was caused by both the outer Group transform and the inner entity transforms updating per-frame, with Skia flushing intermediate states between the two layers. Static children have no independent animated transform — the outer Group moves them cleanly in a single GPU pass. Animated-wrapping-static is therefore a softer constraint than animated-wrapping-animated: it works correctly at low child counts and is the right pattern for camera-driven world layers, but may require optimization or child distribution if the count grows significantly (empirical threshold appears around 25+ Atlas children). Tile atlases use this pattern in Phase 5 G2 (commit 67cdf12) with 28 total Atlas children (25 prop + 3 tile) and are visually correct on device.*
 
 **Per-frame input via .runOnJS(true) causes variable camera lag**
 
@@ -938,9 +938,27 @@ Routing gesture callbacks through `.runOnJS(true)` writes input SharedValues fro
 
 Reanimated's `SharedValue.value = x` deep-copies the entire object tree through JSI to the C++ worklet runtime on every write. `gameState.value = updateGameState(...)` runs every frame at 60fps — so every field in `GameState`, however deeply nested, is serialized 60 times per second. Fields that worklets never read are pure serialization overhead.
 
-Symptom: adding a large data structure (e.g. an 8,836-element tile grid) to GameState that no worklet reads produces 9× JSI serialization cost per frame and a multi-minute initial SharedValue allocation. The performance cliff is invisible at small sizes (32×32 = 1,024 cells tolerable; 94×94 = 8,836 cells fatal at 60fps).
+Symptom: adding a large data structure (e.g. an 8,836-element tile grid) to GameState that no worklet reads produces 9× JSI serialization cost per frame and a multi-minute initial SharedValue allocation. The performance cliff is invisible at small sizes (32×32 = 1,024 cells tolerable; 94×94 = 8,836 cells fatal at 60fps). Discovered in Phase 5 G2: tileGrid in GameState caused 3-minute initial load times and 1 FPS during gameplay at 6000×6000. Putting non-worklet data in the SharedValue forces per-frame JSI serialization for no benefit and breaks at scale.
 
 *Binding rule:* Any data that only the JS thread reads (tile grids, map metadata, weather, static entity lists, any future pre-computed lookup tables) must live in regular React `useState` or `useRef`, NOT in `GameState`. Conceptual ownership ("this is game data") does not override this rule. The criterion is: **does a UI-thread worklet read it?** If no, it stays out of `GameState`. Applied in Phase 5 G2 (commit d91b4ce): `MapData` (including `tileGrid: TileCell[][]`) removed from `GameState`; lives as `initialMapData` in `GameCanvas` React state. Tile rendering reads `initialMapData.tileGrid` directly, never through `gameState.value`.
+
+**useImage results must be null-guarded before use in Skia components**
+
+Skia's `useImage()` hook returns `null` on first render and resolves the asset asynchronously. Passing a null result to `<Atlas>`, `<Image>`, or any Skia component that expects a non-null `SkImage` causes a silent render skip or a runtime error depending on the component. Every `useImage` result in the render path needs a null guard.
+
+*Fix pattern:* Gate each Atlas or Image on `if (!img) return null;` — the layer simply renders nothing for the 1–2 frames before the asset resolves. Acceptable cost: a brief empty-layer flash on initial mount, invisible in practice. Applied in `GameCanvas.tsx` for all `propImageLookup` entries via the per-assetKey `if (!img) return null` check in the Atlas map. Used in Phase 5 G2 for the 31-asset prop render pipeline.
+
+**Spacing and exclusion checks must use scaled (rendered) footprint dimensions**
+
+With `PROP_SPRITE_SCALE = 2` and `STRUCTURE_SPRITE_SCALE = 3`, the rendered footprint of a prop is multiple times its native PNG size. A 263×139px PNG renders at 789×417px on screen. Using native dimensions in placement exclusion checks allows visually overlapping props: two entities whose native bounds don't overlap can completely overlap each other once their scale is applied.
+
+*Fix pattern:* Any spacing or exclusion check involving scaled entities must compute `max(width, height) × scale / 2` as the effective exclusion radius. Applied in Phase 5 G2 via `scaledHalfSize()` in `mapGenerator.ts` — looks up the appropriate scale (STRUCTURE vs PROP) by assetKey, computes the rendered half-size, and feeds it into `tooCloseScaled()` for all cross-category placement checks. Keep `scaledHalfSize()` and the `STRUCTURE_ASSET_KEYS` set in sync with the renderer's scale logic (`scaleFor()` in `propAtlasData` useMemo) — if a new structure type is added, both sets must be updated together.
+
+**useImage diagnostic instrumentation must account for async load timing**
+
+`useImage()` returns `null` synchronously on first render. A `console.log` that fires at component mount will always report `null` for every image, even when all images are loading correctly and will resolve 1–2 frames later. The null log is a false negative — it looks like an image load failure but the image is fine. Discovered in Phase 5 G2 when `[DIAG-HELI]` logged `imgEnvHelicopterWreck: null` during a session where the helicopter was visually rendering correctly on device.
+
+*Fix pattern:* Wrap `useImage` diagnostics in a `useEffect` that fires when the value transitions from null → non-null (`useEffect(() => { if (img) { console.log(...); } }, [img])`), or use a ref-guarded `setTimeout` (~500ms) to log after the async load window. As an alternative, confirm placement by counting entity records in `initialMapData` directly (e.g., `vehicleWrecks.filter(e => e.assetKey === 'env_helicopter_wreck').length`) — this verifies the generator produced the entity without touching image load state at all.
 
 ---
 
