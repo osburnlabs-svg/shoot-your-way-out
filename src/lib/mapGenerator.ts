@@ -183,6 +183,8 @@ function buildBuildings(rng: () => number): PlacedEntity[] {
     }
   }
 
+  // [DIAG-B2] budget vs placed — remove after blocker 2 resolved
+  console.log('[DIAG-B2] buildings: budget', count, '/ placed', placed.length);
   return placed;
 }
 
@@ -206,6 +208,8 @@ function buildObstacles(rng: () => number, buildings: PlacedEntity[]): PlacedEnt
     }
   }
 
+  // [DIAG-B2] budget vs placed — remove after blocker 2 resolved
+  console.log('[DIAG-B2] obstacles: budget', count, '/ placed', placed.length);
   return placed;
 }
 
@@ -239,12 +243,18 @@ function buildVehicleWrecks(rng: () => number, buildings: PlacedEntity[]): Place
     }
   }
 
+  // [DIAG-B2] budget vs placed — remove after blocker 2 resolved
+  console.log('[DIAG-B2] wrecks: bus-budget', hasBus ? 1 : 0, '/ scatter-budget', scatterCount, '/ placed', placed.length);
   return placed;
 }
 
 // 0–20 trees/bushes — skipped entirely when raining (visual + thematic).
 function buildVegetation(rng: () => number, weather: WeatherType, buildings: PlacedEntity[]): PlacedEntity[] {
-  if (weather === 'rain') return [];
+  if (weather === 'rain') {
+    // [DIAG-B2] skipped — remove after blocker 2 resolved
+    console.log('[DIAG-B2] vegetation: skipped (rain weather)');
+    return [];
+  }
 
   const count = Math.floor(rng() * 21); // 0–20
   const placed: PlacedEntity[] = [];
@@ -264,6 +274,8 @@ function buildVegetation(rng: () => number, weather: WeatherType, buildings: Pla
     }
   }
 
+  // [DIAG-B2] budget vs placed — remove after blocker 2 resolved
+  console.log('[DIAG-B2] vegetation: budget', count, '/ placed', placed.length);
   return placed;
 }
 
@@ -277,8 +289,10 @@ function buildBarrels(rng: () => number, buildings: PlacedEntity[]): PlacedEntit
   if (buildings.length === 0) return [];
 
   const placed: PlacedEntity[] = [];
+  let barrelBudget = 0;
   for (const building of buildings) {
     const clusterCount = 2 + Math.floor(rng() * 4); // 2–5 per building
+    barrelBudget += clusterCount;
     let barrelPlaced = 0;
     let attempts = 0;
     while (barrelPlaced < clusterCount && attempts < 80) {
@@ -294,6 +308,8 @@ function buildBarrels(rng: () => number, buildings: PlacedEntity[]): PlacedEntit
       }
     }
   }
+  // [DIAG-B2] budget vs placed — remove after blocker 2 resolved
+  console.log('[DIAG-B2] barrels: budget', barrelBudget, '/ placed', placed.length);
   return placed;
 }
 
@@ -310,6 +326,15 @@ export function generateMap(seed: number): MapData {
   const vehicleWrecks = buildVehicleWrecks(rng, buildings);
   const vegetation = buildVegetation(rng, weather, buildings);
   const barrels = buildBarrels(rng, buildings);
+
+  // [DIAG-B2] assetKeys written to MapData — remove after blocker 2 resolved
+  console.log('[DIAG-B2] assetKeys in MapData:', {
+    buildings:  buildings.map(e => e.assetKey),
+    wrecks:     vehicleWrecks.map(e => e.assetKey),
+    vegetation: vegetation.map(e => e.assetKey),
+    obstacles:  [...new Set(obstacles.map(e => e.assetKey))],  // unique — 20-40 total
+    barrels:    [...new Set(barrels.map(e => e.assetKey))],    // unique — varies
+  });
 
   return { seed, weather, tileGrid, buildings, obstacles, vehicleWrecks, vegetation, barrels };
 }
