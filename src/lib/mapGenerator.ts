@@ -11,11 +11,9 @@
  *     the returned function is deterministic (no further PRNG consumption).
  *   - Each tile cell samples noise2D(col * NOISE_SCALE, row * NOISE_SCALE).
  *     NOISE_SCALE = 0.05 produces 2–3 biome transitions across 94 tiles.
- *   - Noise output mapped to 3 terrain types (road excluded — helipad sheet is
- *     not a terrain texture; real road tiles exist in kit but are Step 3):
- *       n < -0.3  → sand
- *       -0.3–0.2  → grass
- *       > 0.2     → dirt
+ *   - Theme roll (50/50 after weather): picks one of two terrain mappings:
+ *       Desert  (isDesert=true):  all tiles → sand
+ *       Vegetation (isDesert=false): n < 0.1 → grass, n ≥ 0.1 → dirt
  *   - Variant (0–24) sampled from the remaining mulberry32 stream.
  *
  * Scatter props (G3):
@@ -59,7 +57,7 @@ const NOISE_SCALE = 0.05;
 // Outer ring reserved for future transition-tile logic (Step 3).
 const FILL_VARIANTS = [6, 7, 8, 11, 12, 13, 16, 17, 18] as const;
 
-function buildTileGrid(rng: () => number): TileCell[][] {
+function buildTileGrid(rng: () => number, isDesert: boolean): TileCell[][] {
   // Seed the noise function from the run PRNG. createNoise2D consumes 256 calls
   // from rng to build a permutation table, then the function itself is deterministic.
   const noise2D = createNoise2D(rng);
@@ -70,9 +68,11 @@ function buildTileGrid(rng: () => number): TileCell[][] {
     for (let col = 0; col < TILE_COLS; col++) {
       const n = noise2D(col * NOISE_SCALE, row * NOISE_SCALE);
       let type: TileType;
-      if      (n < -0.3) type = 'sand';
-      else if (n <  0.2) type = 'grass';
-      else               type = 'dirt';
+      if (isDesert) {
+        type = 'sand';
+      } else {
+        type = n < 0.1 ? 'grass' : 'dirt';
+      }
       const variantIndex = FILL_VARIANTS[Math.floor(rng() * FILL_VARIANTS.length)];
       rowArr.push({ type, variantIndex });
     }
@@ -303,7 +303,8 @@ export function generateMap(seed: number): MapData {
   const rng = mulberry32(seed);
 
   const weather: WeatherType = rng() > 0.35 ? 'clear' : 'rain';
-  const tileGrid = buildTileGrid(rng);
+  const isDesert = rng() > 0.5; // true → desert (sand only); false → vegetation (grass + dirt)
+  const tileGrid = buildTileGrid(rng, isDesert);
   const buildings = buildBuildings(rng);
   const obstacles = buildObstacles(rng, buildings);
   const vehicleWrecks = buildVehicleWrecks(rng, buildings);
