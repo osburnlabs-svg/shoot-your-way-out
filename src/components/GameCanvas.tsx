@@ -411,6 +411,14 @@ export default function GameCanvas({ width, height }: Props) {
   const imgEnvAmbulanceWreck   = useImage(EnvSprites.env_ambulance_wreck);
   const imgEnvPoliceWreck      = useImage(EnvSprites.env_police_wreck);
   const imgEnvBusWreck         = useImage(EnvSprites.env_bus_wreck);
+  const imgEnvHelicopterWreck  = useImage(EnvSprites.env_helicopter_wreck);
+  const imgEnvHumveeWreck1     = useImage(EnvSprites.env_humvee_wreck_1);
+  const imgEnvHumveeWreck2     = useImage(EnvSprites.env_humvee_wreck_2);
+  const imgEnvHumveeWreck3     = useImage(EnvSprites.env_humvee_wreck_3);
+  const imgEnvHumveeWreck4     = useImage(EnvSprites.env_humvee_wreck_4);
+  const imgEnvHumveeWreck5     = useImage(EnvSprites.env_humvee_wreck_5);
+  const imgEnvHumveeWreck6     = useImage(EnvSprites.env_humvee_wreck_6);
+  const imgEnvAcsWreck         = useImage(EnvSprites.env_acs_wreck);
 
   // Flat lookup: assetKey string → loaded SkImage (or null during load).
   const propImageLookup: Record<string, ReturnType<typeof useImage>> = {
@@ -445,6 +453,14 @@ export default function GameCanvas({ width, height }: Props) {
     env_ambulance_wreck:  imgEnvAmbulanceWreck,
     env_police_wreck:     imgEnvPoliceWreck,
     env_bus_wreck:        imgEnvBusWreck,
+    env_helicopter_wreck: imgEnvHelicopterWreck,
+    env_humvee_wreck_1:   imgEnvHumveeWreck1,
+    env_humvee_wreck_2:   imgEnvHumveeWreck2,
+    env_humvee_wreck_3:   imgEnvHumveeWreck3,
+    env_humvee_wreck_4:   imgEnvHumveeWreck4,
+    env_humvee_wreck_5:   imgEnvHumveeWreck5,
+    env_humvee_wreck_6:   imgEnvHumveeWreck6,
+    env_acs_wreck:        imgEnvAcsWreck,
   };
 
   // ─── Pickup sprite image ──────────────────────────────────────────────────

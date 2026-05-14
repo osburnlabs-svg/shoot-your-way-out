@@ -135,9 +135,17 @@ const WRECK_SCATTER_POOL = [
   { assetKey: 'env_small_truck_wreck', width: 128, height: 128 },
   { assetKey: 'env_ambulance_wreck',   width: 128, height: 128 },
   { assetKey: 'env_police_wreck',      width: 128, height: 128 },
+  { assetKey: 'env_humvee_wreck_1',    width: 128, height: 128 },
+  { assetKey: 'env_humvee_wreck_2',    width: 128, height: 128 },
+  { assetKey: 'env_humvee_wreck_3',    width: 128, height: 128 },
+  { assetKey: 'env_humvee_wreck_4',    width: 128, height: 128 },
+  { assetKey: 'env_humvee_wreck_5',    width: 128, height: 128 },
+  { assetKey: 'env_humvee_wreck_6',    width: 128, height: 128 },
+  { assetKey: 'env_acs_wreck',         width: 192, height: 192 },
 ];
 
-const WRECK_BUS = { assetKey: 'env_bus_wreck', width: 256, height: 256 };
+const WRECK_BUS        = { assetKey: 'env_bus_wreck',        width: 256, height: 256 };
+const WRECK_HELICOPTER = { assetKey: 'env_helicopter_wreck', width: 288, height: 288 };
 
 const BARREL_POOL = [
   { assetKey: 'env_box_wood',           width: 30, height: 31 },
@@ -266,14 +274,30 @@ function buildObstacles(
   return placed;
 }
 
-// 2–3 buses + 12–32 scatter wrecks. Returns { buses, scatter } so callers can thread
-// the arrays into later builders (obstacles, vegetation) for cross-category spacing.
+// 1 helicopter centerpiece + 2–3 buses + 12–32 scatter wrecks.
+// Returns { helicopter, buses, scatter } so callers can thread into later builders.
 function buildVehicleWrecks(
   rng: () => number,
   buildings: PlacedEntity[],
-): { buses: PlacedEntity[]; scatter: PlacedEntity[] } {
+): { helicopter: PlacedEntity[]; buses: PlacedEntity[]; scatter: PlacedEntity[] } {
   const busCount = 2 + Math.floor(rng() * 2);       // 2 or 3
   const scatterCount = 12 + Math.floor(rng() * 21); // 12–32
+
+  // Helicopter — exactly 1. Checks buildings only (no buses placed yet).
+  const helicopter: PlacedEntity[] = [];
+  let heliAttempts = 0;
+  while (helicopter.length < 1 && heliAttempts < 100) {
+    heliAttempts++;
+    const pos = randomWorldPos(rng, 150);
+    const rotation = 0.1 + rng() * (Math.PI * 2 - 0.2);
+    const candidate: PlacedEntity = { ...pos, ...WRECK_HELICOPTER, rotation };
+    if (
+      !isNearSpawn(pos.x, pos.y) &&
+      buildings.every(b => !tooCloseScaled(b, candidate))
+    ) {
+      helicopter.push(candidate);
+    }
+  }
 
   const buses: PlacedEntity[] = [];
   let busAttempts = 0;
@@ -284,6 +308,7 @@ function buildVehicleWrecks(
     const candidate: PlacedEntity = { ...pos, ...WRECK_BUS, rotation };
     if (
       !isNearSpawn(pos.x, pos.y) &&
+      helicopter.every(h => !tooCloseScaled(h, candidate)) &&
       buses.every(b => !tooCloseScaled(b, candidate)) &&
       buildings.every(b => !tooCloseScaled(b, candidate))
     ) {
@@ -302,6 +327,7 @@ function buildVehicleWrecks(
     if (
       !isNearSpawn(pos.x, pos.y) &&
       buildings.every(b => !tooCloseScaled(b, candidate)) &&
+      helicopter.every(h => !tooCloseScaled(h, candidate)) &&
       buses.every(b => !tooCloseScaled(b, candidate)) &&
       scatter.every(w => !tooCloseScaled(w, candidate))
     ) {
@@ -310,8 +336,8 @@ function buildVehicleWrecks(
   }
 
   // [DIAG-B2] budget vs placed — remove after blocker 2 resolved
-  console.log('[DIAG-B2] wrecks: bus-budget', busCount, '/ placed', buses.length, '/ scatter-budget', scatterCount, '/ placed', scatter.length);
-  return { buses, scatter };
+  console.log('[DIAG-B2] wrecks: heli', helicopter.length, '/ bus-budget', busCount, '/ placed', buses.length, '/ scatter-budget', scatterCount, '/ placed', scatter.length);
+  return { helicopter, buses, scatter };
 }
 
 // 50–80 trees/bushes on every run (rain no longer suppresses vegetation).
@@ -398,8 +424,8 @@ export function generateMap(seed: number): MapData {
   const tileGrid = buildTileGrid(rng, isDesert);
   const buildings = buildStructures(rng);
   // Wrecks placed before rocks/vegetation so smaller props can exclude wreck footprints.
-  const { buses, scatter } = buildVehicleWrecks(rng, buildings);
-  const vehicleWrecks = [...buses, ...scatter];
+  const { helicopter, buses, scatter } = buildVehicleWrecks(rng, buildings);
+  const vehicleWrecks = [...helicopter, ...buses, ...scatter];
   const obstacles = buildObstacles(rng, buildings, vehicleWrecks);
   const vegetation = buildVegetation(rng, buildings, vehicleWrecks, obstacles);
   const barrels = buildBarrels(rng, buildings);
@@ -407,7 +433,7 @@ export function generateMap(seed: number): MapData {
   // [DIAG-B2] assetKeys written to MapData — remove after blocker 2 resolved
   console.log('[DIAG-B2] assetKeys in MapData:', {
     buildings:  buildings.map(e => e.assetKey),
-    wrecks:     vehicleWrecks.map(e => e.assetKey),
+    wrecks:     vehicleWrecks.map(e => e.assetKey),  // helicopter + buses + scatter
     vegetation: vegetation.map(e => e.assetKey),
     obstacles:  [...new Set(obstacles.map(e => e.assetKey))],  // unique — 30-60 total
     barrels:    [...new Set(barrels.map(e => e.assetKey))],    // unique — varies

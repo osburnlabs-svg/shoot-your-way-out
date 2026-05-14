@@ -272,6 +272,14 @@ export const EnvSprites = {
   env_ambulance_wreck:   require('../../assets/sprites/environment/vehicles/wrecks/ambulance_wreck.png'),
   env_police_wreck:      require('../../assets/sprites/environment/vehicles/wrecks/police_wreck.png'),
   env_bus_wreck:         require('../../assets/sprites/environment/vehicles/wrecks/bus_wreck.png'),
+  env_helicopter_wreck:  require('../../assets/sprites/environment/vehicles/wrecks/helicopter_wreck.png'),
+  env_humvee_wreck_1:    require('../../assets/sprites/environment/vehicles/wrecks/humvee_wreck_1.png'),
+  env_humvee_wreck_2:    require('../../assets/sprites/environment/vehicles/wrecks/humvee_wreck_2.png'),
+  env_humvee_wreck_3:    require('../../assets/sprites/environment/vehicles/wrecks/humvee_wreck_3.png'),
+  env_humvee_wreck_4:    require('../../assets/sprites/environment/vehicles/wrecks/humvee_wreck_4.png'),
+  env_humvee_wreck_5:    require('../../assets/sprites/environment/vehicles/wrecks/humvee_wreck_5.png'),
+  env_humvee_wreck_6:    require('../../assets/sprites/environment/vehicles/wrecks/humvee_wreck_6.png'),
+  env_acs_wreck:         require('../../assets/sprites/environment/vehicles/wrecks/acs_wreck.png'),
 } as const;
 
 export const GuiSprites = {
