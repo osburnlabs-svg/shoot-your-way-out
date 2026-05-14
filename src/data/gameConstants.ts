@@ -17,8 +17,8 @@
  * Arena dimensions in world pixels. Larger than the screen — the camera scrolls
  * to follow the player.
  */
-export const WORLD_WIDTH = 2000;
-export const WORLD_HEIGHT = 2000;
+export const WORLD_WIDTH = 6000;
+export const WORLD_HEIGHT = 6000;
 
 /**
  * Camera zoom factor. 1.0 = no zoom (screen shows SCREEN_SIZE world pixels at 1:1).
@@ -33,10 +33,10 @@ export const CAMERA_ZOOM = 1.0;
  */
 export const TILE_SIZE = 64;
 
-/** Number of tile columns in the world grid. WORLD_WIDTH / TILE_SIZE = 2000 / 64 = 31.25 → 32. */
+/** Number of tile columns in the world grid. WORLD_WIDTH / TILE_SIZE = 6000 / 64 = 93.75 → 94. */
 export const TILE_COLS = Math.ceil(WORLD_WIDTH / TILE_SIZE);
 
-/** Number of tile rows in the world grid. WORLD_HEIGHT / TILE_SIZE = 2000 / 64 = 31.25 → 32. */
+/** Number of tile rows in the world grid. WORLD_HEIGHT / TILE_SIZE = 6000 / 64 = 93.75 → 94. */
 export const TILE_ROWS = Math.ceil(WORLD_HEIGHT / TILE_SIZE);
 
 // ─── Player movement ──────────────────────────────────────────────────────────
