@@ -831,21 +831,22 @@ Each phase = one focused CC session. Commit to GitHub after each phase. Test on 
 | 3 | Enemy spawning (Scav + Raider only), wave scaling, auto-fire targeting, basic AI, projectile system, kill/XP | Survive a 60-second basic wave |
 | 4a | Money pickups (XP source), level-up modal (kit Upgrade Preset), 10 stat-modifier skills, weapon progression unlocks (level 4/8/12/16) | Full progression for stat skills works |
 | 4b | 10 ability skills (grenades, molotovs, smoke), throwable system, crate drop system + reveal animation | All 20 skills functional, crates working |
-| 5 | Procedural map generator, tile rendering, obstacle placement + collision, all remaining enemy types (Spec Ops / Sniper / Tank variants), world camera system | Single dynamic map generates each run; full 6-type enemy roster active; camera/zoom locked |
-| 6 | Audio engine full implementation, all SFX wired, music tracks playing, atmospheric effects (fog, weather, vignette), explosions, smoke | Game feels and sounds complete |
-| 7 | Full UI — main menu, pre-run modal polish, settings, pause, game over, persistence (high score, stats), minimap, analytics integration | Production-ready menu flow |
-| 8 | Helicopter boss (both phases), Gas Bomb hazard, Bomber strafe events, hero death animation polish | Boss encounters working |
-| 9 | Monetization implementation (AdMob + IAP), Support Dev button, rewarded ad integration, App Store and Google Play submission prep | Ready to submit |
+| 5 | Procedural map generator (in progress) + 3 new enemy types: Spec Ops (mobile), Sniper turret (stationary rooftop), Tank turret (stationary, 3 visual variants) + enemy ranged fire + camera zoom lock | Single dynamic map generates each run; full 5-type enemy roster active; camera/zoom locked |
+| 6 | Audio + simplified atmospheric effects (rain particles + drifting clouds only — no lightning/thunder) + muzzle flashes + bullet origin correction + impact effects | Game feels and sounds complete |
+| 7 | Custom UI rebuild (all screens, Phase 4b direction) + persistence layer (high score, stats, flea_currency, last_claim_date) + analytics + loading screen | Production-ready menu flow |
+| 8 | Helicopter ambient flyby + late-discovery polish items (small scope — may fold into Phase 7 or 9 depending on timing) | Helicopter flyby working |
+| 9 | IAP SDK + Ad SDK integration + entitlement caching + App Store and Google Play submission prep | Ready to submit |
+| 10 | Flea market UI + daily login bonus logic (free: $50/day, paid: $300/day) + balance pass | Monetization meta-game live |
 
 **Audio is added incrementally** — stubbed in Phase 1, called by all phases, fully wired in Phase 6.
 
-**Vehicle enemies (Tank class — Light/Medium/Heavy variants)** are introduced in Phase 5 alongside the map system because they need obstacle collision systems.
+**Tank turret class (3 visual variants: Humvee/BTR/Panzer)** is introduced in Phase 5. Stationary — no pathfinding. Shares the same engine architecture as the Sniper turret (stationary-fire AI, no movement). ACS is cut from v1.
 
 **Phase 5 ships two new specialist enemy classes alongside the vehicle roster:** Spec Ops (mobile, stationary fire bursts; formerly "Gunner") and the Sniper (stationary rooftop turret). Both use kit 1b sprites. Spec Ops follows the standard wave-spawner path. Sniper uses a rooftop spawn system separate from the wave spawner — spawns at run start at building positions tracked in the procedural generator's building metadata (a `rooftopPositions` array per placed building). Count per run is set in the generator's parameter budget. No pathfinding required for Sniper — AI is: find player in range → telegraph (~1s) → fire.
 
 **Phase 5 G1 shipped the entity follow camera.** All entities compute screen position inline as `width/2 + (entity.x - player.x) * CAMERA_ZOOM`. `CAMERA_ZOOM = 1.0` is a placeholder — final zoom level cannot be locked until tiles + enemies + HUD are visible together. **Remaining Phase 5 camera work:** integrate tile rendering into the same coordinate system, replace per-sprite scale hardcoding (`HERO_SPRITE_SCALE` and equivalents) with a unified zoom constant, lock zoom by feel once the full visual context exists.
 
-**Boss is Phase 8** — late, intentionally. Boss needs all other systems (audio, hazards, projectile system, multiple enemy AI) already working.
+**Helicopter ambient flyby is Phase 8** — small scope (~1 day), may fold into Phase 7 or 9. No health pool, no phased attacks, no boss mechanics. The helicopter boss design is cut from v1 — see `strategy-monetization-v1.md` Section 14 for the locked flyby design.
 
 ---
 
@@ -1057,40 +1058,42 @@ syo_install_date: string                  // for analytics cohort
 ## v1 Scope Summary (what ships day one)
 
 **Locked in v1:**
-- Single procedural map (dynamically generated per run)
-- 8 weapons across 5 visual tiers (incl. crate-only GP-25 + Flamethrower)
-- 20 skills across 5 categories
-- 6 enemy types: Scav, Raider (Phase 3); Spec Ops, Sniper, Tank (Phase 5); Helicopter boss (Phase 8). Tank has 3 visual variants sharing one mechanical class.
-- Helicopter boss (2 phases) every 2 minutes
-- Bomber strafe hazard event
-- Gas Bomb hazard
+- Single procedurally-generated map (6000×6000, biome-based tile terrain, seeded at run start)
+- 8 weapons across 5 visual tiers (including crate-only Grenade Launcher + Flamethrower)
+- 25 skills across 5 categories (20 base + 5 confirmed clones — see `strategy-monetization-v1.md` Section 7)
+- 5 enemy types: Scav, Raider (Phase 3); Spec Ops (mobile), Sniper turret (stationary rooftop), Tank turret (Phase 5). Tank turret has 3 visual variants (Humvee/BTR/Panzer) sharing one mechanical class.
+- Helicopter ambient flyby (no attacks — see `strategy-monetization-v1.md` Section 14)
+- Weapon rarity tiers (Common/Uncommon/Rare/Legendary — see `strategy-monetization-v1.md` Section 11)
 - Crate drop system
 - Three-tier pickup system (HP, Armor, Speed, Ammo, Money + Weapon Crate)
-- Full menu flow with pre-run modal, settings, pause, game over
+- Custom UI throughout (kit UI direction abandoned — locked Phase 4b; all screens built as custom `<View>` layouts with kit color palette)
+- Full menu flow: main menu, pre-run modal, settings, pause, game over
 - Minimap
-- Atmospheric effects (fog of war, weather per map, vignette)
+- Atmospheric effects: fog of war + corner vignette (always-on); rain particles + drifting clouds (rain runs only). No lightning, no thunder.
 - 4 music tracks + ~25 SFX
-- Monetization: Support IAP + Run Modifier rewarded ad + Revive rewarded ad + menu banner
+- Monetization: Support IAP + daily login bonus differential (free: $50/day; paid: $300/day) + Revive rewarded ad + Pre-run buff rewarded ad + menu banner
 - Analytics: 9 events
-- Persistence: full meta-stats and settings
+- Persistence: full meta-stats + settings + flea_currency + last_claim_date
 - Hero death animation on game over
 - App store icons (pre-made)
 - iOS + Android via EAS Build/Submit
+- Loading screen during map generation (covers generation time at 6000×6000 world scale)
 
 **Deferred to v1.1:**
-- Bomber as full second boss type
-- Daily/weekly contracts
-- Soft currency / Unlock Tokens
+- Lightning flash + thunder SFX for rain runs
+- Streak counters / calendar bonuses for daily login bonus
+- Daily/weekly quest system (design preserved in `strategy-monetization-v1.md` Section 3)
+- Soft currency / Unlock Tokens (if distinct from flea-market currency)
 - "Overcharge revive" tier
-- Sound effects beyond core SFX (ambient variety)
-- Additional map biome expansion (e.g. water/bridge tiles, additional asset pools)
+- Additional weather types (dust, leaves)
+- Additional map biome expansion (water/bridge tiles, additional asset pools)
 
 **Deferred to v2.0+:**
-- Multiplayer/leaderboards
+- Multiplayer / leaderboards
 - Meta-progression between runs
 - Cosmetic skin packs
-- Additional weapon/enemy/boss types
-- Haptic feedback (could be moved up if quick)
+- Additional weapon / enemy / boss types
+- Haptic feedback
 
 ---
 
