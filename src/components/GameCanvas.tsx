@@ -296,7 +296,7 @@ const THROWABLE_COLORS = {
   molotov: '#e06020', // orange-red
 };
 
-console.log('G2-ATLAS VERSION: half-dist test v2 (obstacles+wrecks distributed)');
+console.log('G2-ATLAS VERSION: gc-fix v3 (timer buffers, half-dist retained)');
 
 type Props = {
   width: number;
@@ -665,6 +665,29 @@ export default function GameCanvas({ width, height }: Props) {
   const [displayCrateWeaponId, setDisplayCrateWeaponId] = useState<string | null>(null);
   const [displayCrateTier, setDisplayCrateTier] = useState<CrateTier | null>(null);
 
+  // ─── Preallocated slot buffers for 100ms timer ──────────────────────────────
+  // Avoids Array.from() per-tick GC pressure (confirmed spike source via [DIAG-PROPS]).
+  // Each buffer is mutated in place; setState receives .slice() for re-render trigger.
+  // Remove this block only if the entire timer is refactored away.
+  const timerBuffers = useRef({
+    enemyTypes:   new Array<EnemyType | null>(ENEMY_SOFT_CAP).fill(null),
+    enemyStatus:  new Array<'alive' | 'dying' | null>(ENEMY_SOFT_CAP).fill(null),
+    enemyFrames:  new Array<number>(ENEMY_SOFT_CAP).fill(0),
+    pickupActive: new Array<boolean>(PICKUP_SLOT_COUNT).fill(false),
+    rockets:      new Array<boolean>(PROJECTILE_SLOT_COUNT).fill(false),
+    tSlots: Array.from({ length: THROWABLE_SLOT_COUNT }, () => ({
+      type:    null as 'frag' | 'smoke' | 'molotov' | null,
+      status:  null as 'flying' | 'detonating' | null,
+      frame:   0,
+      targetX: 0,
+      targetY: 0,
+    })),
+    zSlots: Array.from({ length: EFFECT_ZONE_SLOT_COUNT }, () => ({
+      type:     null as 'smoke' | 'molotov' | 'flame' | 'explosion' | null,
+      x: 0, y: 0, frame: 0, rotation: 0,
+    })),
+  });
+
   // Fixed-rate timer — reads gameState.value directly on the JS thread every
   // 100ms. Completely decoupled from useFrameCallback; zero runOnJS calls
   // for sprite selection. Hero + enemy sprite state + player vitals computed together.
@@ -722,27 +745,22 @@ export default function GameCanvas({ width, height }: Props) {
       setDisplayPendingLevelUp(state.pendingLevelUp);
       setDisplayPlayerSkillStacks({ ...player.skillStacks });
 
-      // Enemy slot sprite state.
-      const types = Array.from({ length: ENEMY_SOFT_CAP }, () => null as EnemyType | null);
-      const statuses = Array.from({ length: ENEMY_SOFT_CAP }, () => null as 'alive' | 'dying' | null);
-      const frames = Array.from({ length: ENEMY_SOFT_CAP }, () => 0);
-
+      // Enemy slot sprite state — buffer pattern (no Array.from per tick).
+      const { enemyTypes: et, enemyStatus: es, enemyFrames: ef } = timerBuffers.current;
+      for (let i = 0; i < ENEMY_SOFT_CAP; i++) { et[i] = null; es[i] = null; ef[i] = 0; }
       for (let i = 0; i < state.enemies.length; i++) {
         const enemy = state.enemies[i];
-        if (!enemy) continue; // null slot — types[i] stays null (already initialized)
-        types[i] = enemy.type;
-        statuses[i] = enemy.status;
-
+        if (!enemy) continue;
+        et[i] = enemy.type;
+        es[i] = enemy.status;
         if (enemy.status === 'dying') {
-          // Die animation: 4 frames, non-looping, holds on last frame.
-          frames[i] = getCurrentFrame(
+          ef[i] = getCurrentFrame(
             { frameCount: ENEMY_DIE_FRAME_COUNT, frameDurationMs: ENEMY_DIE_FRAME_DURATION_MS, loop: false },
             state.elapsedMs - enemy.dyingStartedAtMs,
           );
         } else {
-          // Walk animation: looping, offset by walkStartedAtMs so each enemy cycles independently.
           const isScav = enemy.type === 'scav';
-          frames[i] = getCurrentFrame(
+          ef[i] = getCurrentFrame(
             {
               frameCount: isScav ? SCAV_WALK_FRAME_COUNT : RAIDER_WALK_FRAME_COUNT,
               frameDurationMs: isScav ? SCAV_WALK_FRAME_DURATION_MS : RAIDER_WALK_FRAME_DURATION_MS,
@@ -752,60 +770,54 @@ export default function GameCanvas({ width, height }: Props) {
           );
         }
       }
+      setEnemySlotTypes(et.slice());
+      setEnemySlotStatuses(es.slice());
+      setEnemySlotFrames(ef.slice());
 
-      setEnemySlotTypes(types);
-      setEnemySlotStatuses(statuses);
-      setEnemySlotFrames(frames);
+      // Pickup slot active flags — buffer pattern.
+      const pa = timerBuffers.current.pickupActive;
+      for (let i = 0; i < PICKUP_SLOT_COUNT; i++) { pa[i] = !!state.pickups[i]; }
+      setPickupSlotActive(pa.slice());
 
-      // Pickup slot active flags.
-      const pickupActive = Array.from({ length: PICKUP_SLOT_COUNT }, (_, i) => !!state.pickups[i]);
-      setPickupSlotActive(pickupActive);
-
-      // Throwable slot state.
-      const tSlots = Array.from({ length: THROWABLE_SLOT_COUNT }, () => ({
-        type: null as 'frag' | 'smoke' | 'molotov' | null,
-        status: null as 'flying' | 'detonating' | null,
-        frame: 0,
-        targetX: 0,
-        targetY: 0,
-      }));
+      // Throwable slot state — buffer pattern.
+      const tBuf = timerBuffers.current.tSlots;
+      for (let i = 0; i < THROWABLE_SLOT_COUNT; i++) {
+        const s = tBuf[i]!; s.type = null; s.status = null; s.frame = 0; s.targetX = 0; s.targetY = 0;
+      }
       for (let i = 0; i < state.throwables.length; i++) {
         const t = state.throwables[i];
         if (!t) continue;
-        let frame = 0;
-        if (t.status === 'detonating') {
-          frame = getCurrentFrame(
-            { frameCount: FRAG_EXPLODE_FRAME_COUNT, frameDurationMs: FRAG_EXPLODE_FRAME_DURATION_MS, loop: false },
-            state.elapsedMs - t.detonationStartedAtMs,
-          );
-        }
-        tSlots[i] = { type: t.type, status: t.status, frame, targetX: t.targetX, targetY: t.targetY };
+        const s = tBuf[i]!;
+        s.type = t.type;
+        s.status = t.status;
+        s.frame = t.status === 'detonating'
+          ? getCurrentFrame(
+              { frameCount: FRAG_EXPLODE_FRAME_COUNT, frameDurationMs: FRAG_EXPLODE_FRAME_DURATION_MS, loop: false },
+              state.elapsedMs - t.detonationStartedAtMs,
+            )
+          : 0;
+        s.targetX = t.targetX;
+        s.targetY = t.targetY;
       }
-      setThrowableSlotData(tSlots);
+      setThrowableSlotData(tBuf.slice());
 
-      // Effect zone slot state.
-      const zSlots = Array.from({ length: EFFECT_ZONE_SLOT_COUNT }, () => ({
-        type: null as 'smoke' | 'molotov' | 'flame' | 'explosion' | null,
-        x: 0,
-        y: 0,
-        frame: 0,
-        rotation: 0,
-      }));
+      // Effect zone slot state — buffer pattern.
+      const zBuf = timerBuffers.current.zSlots;
+      for (let i = 0; i < EFFECT_ZONE_SLOT_COUNT; i++) {
+        const s = zBuf[i]!; s.type = null; s.x = 0; s.y = 0; s.frame = 0; s.rotation = 0;
+      }
       for (let i = 0; i < state.effectZones.length; i++) {
         const z = state.effectZones[i];
         if (!z) continue;
         let zFrame = 0;
         if (z.type === 'smoke') {
           const elapsed = state.elapsedMs - z.spawnedAtMs;
-          const LAST = SMOKE_ANIM_FRAME_COUNT - 1; // 6 = smallest wisp; 0 = full cloud
+          const LAST = SMOKE_ANIM_FRAME_COUNT - 1;
           if (elapsed < SMOKE_BLOOM_DURATION_MS) {
-            // Bloom: 6 → 0 (wisp → full cloud)
             zFrame = LAST - Math.floor((elapsed / SMOKE_BLOOM_DURATION_MS) * SMOKE_ANIM_FRAME_COUNT);
           } else if (elapsed < SMOKE_DURATION_MS - SMOKE_DISSIPATE_DURATION_MS) {
-            // Hold: full cloud
             zFrame = 0;
           } else {
-            // Dissipate: 0 → 6 (full cloud → gone)
             const dissElapsed = elapsed - (SMOKE_DURATION_MS - SMOKE_DISSIPATE_DURATION_MS);
             zFrame = Math.floor((dissElapsed / SMOKE_DISSIPATE_DURATION_MS) * SMOKE_ANIM_FRAME_COUNT);
           }
@@ -821,17 +833,15 @@ export default function GameCanvas({ width, height }: Props) {
             state.elapsedMs - z.spawnedAtMs,
           );
         }
-        // Molotov zone uses a static explode frame — no frame cycling needed (zFrame stays 0).
-        zSlots[i] = { type: z.type, x: z.x, y: z.y, frame: zFrame, rotation: z.rotation };
+        const s = zBuf[i]!;
+        s.type = z.type; s.x = z.x; s.y = z.y; s.frame = zFrame; s.rotation = z.rotation;
       }
-      setZoneSlotData(zSlots);
+      setZoneSlotData(zBuf.slice());
 
-      // Projectile rocket flags + animation frame.
-      const rockets = Array.from({ length: PROJECTILE_SLOT_COUNT }, (_, i) => {
-        const p = state.projectiles[i];
-        return !!(p && p.isRocket);
-      });
-      setProjIsRocket(rockets);
+      // Projectile rocket flags — buffer pattern.
+      const rb = timerBuffers.current.rockets;
+      for (let i = 0; i < PROJECTILE_SLOT_COUNT; i++) { rb[i] = !!(state.projectiles[i]?.isRocket); }
+      setProjIsRocket(rb.slice());
       setRocketFrame(Math.floor(state.elapsedMs / ROCKET_FRAME_DURATION_MS) % ROCKET_FRAME_COUNT);
 
       // Crate reveal modal bridge.
