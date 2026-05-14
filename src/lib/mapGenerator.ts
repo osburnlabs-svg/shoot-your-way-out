@@ -30,7 +30,10 @@
 
 import { createNoise2D } from 'simplex-noise';
 import type { MapData, TileCell, TileType, WeatherType, PlacedEntity } from '../data/mapTypes';
-import { TILE_SIZE, TILE_COLS, TILE_ROWS, WORLD_WIDTH, WORLD_HEIGHT } from '../data/gameConstants';
+import {
+  TILE_SIZE, TILE_COLS, TILE_ROWS, WORLD_WIDTH, WORLD_HEIGHT,
+  PROP_SPRITE_SCALE, STRUCTURE_SPRITE_SCALE,
+} from '../data/gameConstants';
 
 // ─── PRNG ─────────────────────────────────────────────────────────────────────
 
@@ -165,6 +168,24 @@ function tooClose(a: PlacedEntity, b: PlacedEntity, minDist: number): boolean {
   return dx * dx + dy * dy < minDist * minDist;
 }
 
+// Asset keys that use STRUCTURE_SPRITE_SCALE — mirrors the STRUCTURE_ASSETS set in
+// propAtlasData. Must stay in sync if new structures are added.
+const STRUCTURE_ASSET_KEYS = new Set(['env_house01', 'env_house02', 'env_watchtower']);
+
+function scaledHalfSize(ent: PlacedEntity): number {
+  const scale = STRUCTURE_ASSET_KEYS.has(ent.assetKey) ? STRUCTURE_SPRITE_SCALE : PROP_SPRITE_SCALE;
+  return Math.max(ent.width, ent.height) * scale / 2;
+}
+
+// Exclusion check using rendered (scaled) footprint. Two entities are "too close" when
+// their scaled half-sizes plus a gap would overlap on screen. Gap defaults to 20 world px.
+function tooCloseScaled(a: PlacedEntity, b: PlacedEntity, gap: number = 20): boolean {
+  const minDist = scaledHalfSize(a) + scaledHalfSize(b) + gap;
+  const dx = a.x - b.x;
+  const dy = a.y - b.y;
+  return dx * dx + dy * dy < minDist * minDist;
+}
+
 // ─── Entity builders ──────────────────────────────────────────────────────────
 
 // Houses min 4/max 6, cycle pool for first 2 slots to guarantee both variants.
@@ -214,23 +235,29 @@ function buildStructures(rng: () => number): PlacedEntity[] {
   return allPlaced;
 }
 
-// 50–100 rocks (no sandbags — those need G4 orientation logic; deferred to G4).
-function buildObstacles(rng: () => number, buildings: PlacedEntity[]): PlacedEntity[] {
-  const count = 50 + Math.floor(rng() * 51); // 50–100
+// 30–60 rocks (no sandbags — those need G4 orientation logic; deferred to G4).
+// Placed after wrecks so rocks can exclude wreck footprints.
+function buildObstacles(
+  rng: () => number,
+  buildings: PlacedEntity[],
+  allWrecks: PlacedEntity[],
+): PlacedEntity[] {
+  const count = 30 + Math.floor(rng() * 31); // 30–60
   const placed: PlacedEntity[] = [];
   let attempts = 0;
 
   while (placed.length < count && attempts < 600) {
     attempts++;
     const pos = randomWorldPos(rng, 100);
-    const nearBuilding = buildings.some(b => {
-      const dx = b.x - pos.x;
-      const dy = b.y - pos.y;
-      return dx * dx + dy * dy < 150 * 150;
-    });
-    if (!nearBuilding && !isNearSpawn(pos.x, pos.y)) {
-      const def = ROCK_POOL[Math.floor(rng() * ROCK_POOL.length)]!;
-      placed.push({ ...pos, ...def });
+    const def = ROCK_POOL[Math.floor(rng() * ROCK_POOL.length)]!;
+    const candidate: PlacedEntity = { ...pos, ...def };
+    if (
+      !isNearSpawn(pos.x, pos.y) &&
+      buildings.every(b => !tooCloseScaled(b, candidate)) &&
+      allWrecks.every(w => !tooCloseScaled(w, candidate)) &&
+      placed.every(r => !tooCloseScaled(r, candidate))
+    ) {
+      placed.push(candidate);
     }
   }
 
@@ -239,12 +266,14 @@ function buildObstacles(rng: () => number, buildings: PlacedEntity[]): PlacedEnt
   return placed;
 }
 
-// 2–3 buses (400px bus-to-bus spacing) + 12–32 scatter wrecks (150px bus exclusion).
-function buildVehicleWrecks(rng: () => number, buildings: PlacedEntity[]): PlacedEntity[] {
-  const busCount = 2 + Math.floor(rng() * 2);    // 2 or 3
+// 2–3 buses + 12–32 scatter wrecks. Returns { buses, scatter } so callers can thread
+// the arrays into later builders (obstacles, vegetation) for cross-category spacing.
+function buildVehicleWrecks(
+  rng: () => number,
+  buildings: PlacedEntity[],
+): { buses: PlacedEntity[]; scatter: PlacedEntity[] } {
+  const busCount = 2 + Math.floor(rng() * 2);       // 2 or 3
   const scatterCount = 12 + Math.floor(rng() * 21); // 12–32
-  const BUS_MIN_SPACING = 400;
-  const placed: PlacedEntity[] = [];
 
   const buses: PlacedEntity[] = [];
   let busAttempts = 0;
@@ -254,42 +283,43 @@ function buildVehicleWrecks(rng: () => number, buildings: PlacedEntity[]): Place
     const candidate: PlacedEntity = { ...pos, ...WRECK_BUS };
     if (
       !isNearSpawn(pos.x, pos.y) &&
-      buses.every(b => !tooClose(b, candidate, BUS_MIN_SPACING))
+      buses.every(b => !tooCloseScaled(b, candidate)) &&
+      buildings.every(b => !tooCloseScaled(b, candidate))
     ) {
       buses.push(candidate);
-      placed.push(candidate);
     }
   }
 
-  let scatterPlaced = 0;
+  const scatter: PlacedEntity[] = [];
   let scatterAttempts = 0;
-  while (scatterPlaced < scatterCount && scatterAttempts < 400) {
+  while (scatter.length < scatterCount && scatterAttempts < 400) {
     scatterAttempts++;
     const pos = randomWorldPos(rng, 100);
-    const nearBuilding = buildings.some(b => {
-      const dx = b.x - pos.x;
-      const dy = b.y - pos.y;
-      return dx * dx + dy * dy < 120 * 120;
-    });
-    const nearBus = buses.some(b => {
-      const dx = b.x - pos.x;
-      const dy = b.y - pos.y;
-      return dx * dx + dy * dy < 150 * 150;
-    });
-    if (!nearBuilding && !nearBus && !isNearSpawn(pos.x, pos.y)) {
-      const def = WRECK_SCATTER_POOL[Math.floor(rng() * WRECK_SCATTER_POOL.length)]!;
-      placed.push({ ...pos, ...def });
-      scatterPlaced++;
+    const def = WRECK_SCATTER_POOL[Math.floor(rng() * WRECK_SCATTER_POOL.length)]!;
+    const candidate: PlacedEntity = { ...pos, ...def };
+    if (
+      !isNearSpawn(pos.x, pos.y) &&
+      buildings.every(b => !tooCloseScaled(b, candidate)) &&
+      buses.every(b => !tooCloseScaled(b, candidate)) &&
+      scatter.every(w => !tooCloseScaled(w, candidate))
+    ) {
+      scatter.push(candidate);
     }
   }
 
   // [DIAG-B2] budget vs placed — remove after blocker 2 resolved
-  console.log('[DIAG-B2] wrecks: bus-budget', busCount, '/ scatter-budget', scatterCount, '/ placed', placed.length);
-  return placed;
+  console.log('[DIAG-B2] wrecks: bus-budget', busCount, '/ placed', buses.length, '/ scatter-budget', scatterCount, '/ placed', scatter.length);
+  return { buses, scatter };
 }
 
 // 50–80 trees/bushes on every run (rain no longer suppresses vegetation).
-function buildVegetation(rng: () => number, buildings: PlacedEntity[]): PlacedEntity[] {
+// Placed last among scatter props so it can exclude structures, wrecks, and rocks.
+function buildVegetation(
+  rng: () => number,
+  buildings: PlacedEntity[],
+  allWrecks: PlacedEntity[],
+  obstacles: PlacedEntity[],
+): PlacedEntity[] {
   const count = 50 + Math.floor(rng() * 31); // 50–80
   const placed: PlacedEntity[] = [];
   let attempts = 0;
@@ -297,14 +327,16 @@ function buildVegetation(rng: () => number, buildings: PlacedEntity[]): PlacedEn
   while (placed.length < count && attempts < 400) {
     attempts++;
     const pos = randomWorldPos(rng, 80);
-    const nearBuilding = buildings.some(b => {
-      const dx = b.x - pos.x;
-      const dy = b.y - pos.y;
-      return dx * dx + dy * dy < 100 * 100;
-    });
-    if (!nearBuilding && !isNearSpawn(pos.x, pos.y)) {
-      const def = VEGETATION_POOL[Math.floor(rng() * VEGETATION_POOL.length)]!;
-      placed.push({ ...pos, ...def });
+    const def = VEGETATION_POOL[Math.floor(rng() * VEGETATION_POOL.length)]!;
+    const candidate: PlacedEntity = { ...pos, ...def };
+    if (
+      !isNearSpawn(pos.x, pos.y) &&
+      buildings.every(b => !tooCloseScaled(b, candidate)) &&
+      allWrecks.every(w => !tooCloseScaled(w, candidate)) &&
+      obstacles.every(r => !tooCloseScaled(r, candidate)) &&
+      placed.every(v => !tooCloseScaled(v, candidate))
+    ) {
+      placed.push(candidate);
     }
   }
 
@@ -335,7 +367,14 @@ function buildBarrels(rng: () => number, buildings: PlacedEntity[]): PlacedEntit
       const dist = BARREL_BUILDING_MIN_DIST + rng() * (BARREL_CLUSTER_RADIUS - BARREL_BUILDING_MIN_DIST);
       const x = Math.round(building.x + Math.cos(angle) * dist);
       const y = Math.round(building.y + Math.sin(angle) * dist);
-      if (!isNearSpawn(x, y)) {
+      const inOtherBuilding = buildings.some(other => {
+        if (other.x === building.x && other.y === building.y) return false;
+        const halfSize = scaledHalfSize(other);
+        const dx = x - other.x;
+        const dy = y - other.y;
+        return dx * dx + dy * dy < halfSize * halfSize;
+      });
+      if (!isNearSpawn(x, y) && !inOtherBuilding) {
         const def = BARREL_POOL[Math.floor(rng() * BARREL_POOL.length)]!;
         placed.push({ x, y, ...def });
         barrelPlaced++;
@@ -356,9 +395,11 @@ export function generateMap(seed: number): MapData {
   const isDesert = rng() > 0.5; // true → desert (sand only); false → vegetation (grass + dirt)
   const tileGrid = buildTileGrid(rng, isDesert);
   const buildings = buildStructures(rng);
-  const obstacles = buildObstacles(rng, buildings);
-  const vehicleWrecks = buildVehicleWrecks(rng, buildings);
-  const vegetation = buildVegetation(rng, buildings);
+  // Wrecks placed before rocks/vegetation so smaller props can exclude wreck footprints.
+  const { buses, scatter } = buildVehicleWrecks(rng, buildings);
+  const vehicleWrecks = [...buses, ...scatter];
+  const obstacles = buildObstacles(rng, buildings, vehicleWrecks);
+  const vegetation = buildVegetation(rng, buildings, vehicleWrecks, obstacles);
   const barrels = buildBarrels(rng, buildings);
 
   // [DIAG-B2] assetKeys written to MapData — remove after blocker 2 resolved
@@ -366,7 +407,7 @@ export function generateMap(seed: number): MapData {
     buildings:  buildings.map(e => e.assetKey),
     wrecks:     vehicleWrecks.map(e => e.assetKey),
     vegetation: vegetation.map(e => e.assetKey),
-    obstacles:  [...new Set(obstacles.map(e => e.assetKey))],  // unique — 20-40 total
+    obstacles:  [...new Set(obstacles.map(e => e.assetKey))],  // unique — 30-60 total
     barrels:    [...new Set(barrels.map(e => e.assetKey))],    // unique — varies
   });
 
