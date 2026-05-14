@@ -237,6 +237,21 @@ export const HIT_FLASH_DURATION_MS = 80;
 export const PICKUP_SPRITE_SCALE = 2;
 
 /**
+ * Default upscale factor for all scatter props (rocks, barrels, vegetation, wrecks).
+ * Matches entity convention so props read at the same visual scale as the hero/enemies.
+ * Phase 5 placeholder — final value locked after device verification.
+ */
+export const PROP_SPRITE_SCALE = 2;
+
+/**
+ * Upscale factor for large structures (houses, watchtower).
+ * 3× vs entity 2× so structures read as clearly larger than characters.
+ * Per-asset overrides in propAtlasData handle individual exceptions (e.g. env_house02
+ * drops back to PROP_SPRITE_SCALE because its native 263px already reads as large).
+ */
+export const STRUCTURE_SPRITE_SCALE = 3;
+
+/**
  * Radius (px) of the red hit-flash Circle rendered on enemy impact.
  * ~1/3 of ENEMY_COLLISION_RADIUS_PX (20px) so the flash reads as an impact
  * splash rather than enveloping the whole sprite. Tune on device.

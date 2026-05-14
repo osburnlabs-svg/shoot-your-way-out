@@ -96,6 +96,8 @@ import {
   ENEMY_DIE_FRAME_DURATION_MS,
   PICKUP_SLOT_COUNT,
   PICKUP_SPRITE_SCALE,
+  PROP_SPRITE_SCALE,
+  STRUCTURE_SPRITE_SCALE,
   HIT_FLASH_RADIUS_PX,
   INVULNERABLE_DURATION_MS,
   THROWABLE_SLOT_COUNT,
@@ -541,6 +543,19 @@ export default function GameCanvas({ width, height }: Props) {
   // Rendered in z-order: vegetation → obstacles → barrels → wrecks → buildings.
   // RSXforms are world-space (centered on entity); camera Group handles scrolling.
   const propAtlasData = useMemo(() => {
+    // Structure assets use STRUCTURE_SPRITE_SCALE; per-asset map handles individual
+    // exceptions where a native size is already large enough at the category default.
+    const STRUCTURE_ASSETS = new Set(['env_house01', 'env_watchtower']);
+    const PROP_SCALE_OVERRIDES: Record<string, number> = {
+      'env_house02': PROP_SPRITE_SCALE, // native 263px × 3 = 789px (too wide); 2× keeps landmark feel
+    };
+
+    function scaleFor(assetKey: string): number {
+      if (STRUCTURE_ASSETS.has(assetKey)) return STRUCTURE_SPRITE_SCALE;
+      if (Object.prototype.hasOwnProperty.call(PROP_SCALE_OVERRIDES, assetKey)) return PROP_SCALE_OVERRIDES[assetKey]!;
+      return PROP_SPRITE_SCALE;
+    }
+
     function groupByAssetKey(entities: typeof initialMapData.buildings) {
       const groups: Record<string, { sprites: { x: number; y: number; width: number; height: number }[]; transforms: ReturnType<typeof Skia.RSXform>[] }> = {};
       for (const ent of entities) {
@@ -548,9 +563,10 @@ export default function GameCanvas({ width, height }: Props) {
         if (!groups[ent.assetKey]) {
           groups[ent.assetKey] = { sprites: [], transforms: [] };
         }
+        const s = scaleFor(ent.assetKey);
         groups[ent.assetKey]!.sprites.push({ x: 0, y: 0, width: ent.width, height: ent.height });
         groups[ent.assetKey]!.transforms.push(
-          Skia.RSXform(1, 0, ent.x - ent.width / 2, ent.y - ent.height / 2),
+          Skia.RSXform(s, 0, ent.x - ent.width * s / 2, ent.y - ent.height * s / 2),
         );
       }
       return groups;
