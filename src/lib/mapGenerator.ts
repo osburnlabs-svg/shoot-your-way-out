@@ -2,7 +2,8 @@
  * Procedural map generator — Phase 5 G2 (noise biome update).
  *
  * generateMap(seed) returns a complete MapData for one run. Called once at game
- * start from mapLoader.ts; the result is stored in GameState.mapData.
+ * start from mapLoader.ts; the result is stored as initialMapData in React state
+ * in GameCanvas. It does NOT go into the Reanimated SharedValue (GameState).
  *
  * Tile layout strategy (noise-based, replaces per-cell PRNG):
  *   - createNoise2D is seeded by passing mulberry32(seed) as the random source.

@@ -63,8 +63,7 @@
  *   - tickPickups extended to roll tier + weapon on crate pickup, set pendingCrateReveal
  *
  * Phase 5 G2 additions:
- *   - MapData type imported; GameState gains mapData: MapData
- *   - createInitialGameState signature adds mapData parameter (passed from GameCanvas)
+ *   - createInitialGameState grows worldWidth/worldHeight for bounds clamping
  *   - updateGameState clamps player to world bounds (camera never shows void past tile edges)
  *     halfVW = canvasWidth/(2*CAMERA_ZOOM), halfVH = canvasHeight/(2*CAMERA_ZOOM)
  *
@@ -93,7 +92,6 @@ import {
   CAMERA_ZOOM,
 } from '../data/gameConstants';
 import type { CrateTier } from '../data/gameConstants';
-import type { MapData } from '../data/mapTypes';
 import type { SkillId } from '../data/skills';
 import { getEffectiveStats } from '../data/skills';
 import { tickEnemies } from './enemyEngine';
@@ -462,19 +460,9 @@ export type GameState = {
   worldHeight: number;
   elapsedMs: number;  // total ms the game has been running
   frameCount: number; // total fixed-step frames processed
-  /**
-   * Generated map for this run. Produced by mapGenerator.ts, stored here so
-   * all game systems (G3 collision, G4 sniper spawning, G6 weather effects) can
-   * read it without re-generating.
-   *
-   * Note: the tile rendering worklet in GameCanvas closes over pre-computed
-   * tile position data rather than reading tileGrid through gameState.value —
-   * this keeps per-frame UI-thread reads to just player.x and player.y.
-   */
-  mapData: MapData;
 };
 
-export function createInitialGameState(canvasWidth: number, canvasHeight: number, mapData: MapData): GameState {
+export function createInitialGameState(canvasWidth: number, canvasHeight: number): GameState {
   'worklet';
   const emptyEnemies: Array<EnemyState | null> = [];
   for (let i = 0; i < ENEMY_SOFT_CAP; i++) { emptyEnemies.push(null); }
@@ -558,7 +546,6 @@ export function createInitialGameState(canvasWidth: number, canvasHeight: number
     worldHeight: WORLD_HEIGHT,
     elapsedMs: 0,
     frameCount: 0,
-    mapData,
   };
 }
 

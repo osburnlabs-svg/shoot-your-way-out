@@ -420,7 +420,7 @@ export default function GameCanvas({ width, height }: Props) {
   const [initialMapData] = useState(() => loadMap(Date.now()));
 
   // ─── Game state ────────────────────────────────────────────────────────────
-  const gameState = useSharedValue(createInitialGameState(width, height, initialMapData));
+  const gameState = useSharedValue(createInitialGameState(width, height));
 
   // ─── Tile viewport culling state ──────────────────────────────────────────────
   // Tracks which tile the player is currently on. The 100ms timer updates these
@@ -1157,7 +1157,7 @@ export default function GameCanvas({ width, height }: Props) {
   const handleRedeploy = useCallback(() => {
     // Reuses the same map data — Phase 7 will generate a fresh map per restart
     // via the proper menu flow.
-    gameState.value = createInitialGameState(width, height, initialMapData);
+    gameState.value = createInitialGameState(width, height);
   }, [gameState, width, height, initialMapData]);
 
   // ─── Virtual joystick gesture ──────────────────────────────────────────────
