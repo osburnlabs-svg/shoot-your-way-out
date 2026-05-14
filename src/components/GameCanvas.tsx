@@ -545,14 +545,15 @@ export default function GameCanvas({ width, height }: Props) {
   const propAtlasData = useMemo(() => {
     // Structure assets use STRUCTURE_SPRITE_SCALE; per-asset map handles individual
     // exceptions where a native size is already large enough at the category default.
-    const STRUCTURE_ASSETS = new Set(['env_house01', 'env_watchtower']);
-    const PROP_SCALE_OVERRIDES: Record<string, number> = {
-      'env_house02': PROP_SPRITE_SCALE, // native 263px × 3 = 789px (too wide); 2× keeps landmark feel
-    };
+    const STRUCTURE_ASSETS = new Set(['env_house01', 'env_house02', 'env_watchtower']);
+    // Per-asset overrides: add entries here when an individual asset needs a scale
+    // different from its category default. Currently empty — all structures use
+    // STRUCTURE_SPRITE_SCALE, all other props use PROP_SPRITE_SCALE.
+    const PROP_SCALE_OVERRIDES: Record<string, number> = {};
 
     function scaleFor(assetKey: string): number {
-      if (STRUCTURE_ASSETS.has(assetKey)) return STRUCTURE_SPRITE_SCALE;
       if (Object.prototype.hasOwnProperty.call(PROP_SCALE_OVERRIDES, assetKey)) return PROP_SCALE_OVERRIDES[assetKey]!;
+      if (STRUCTURE_ASSETS.has(assetKey)) return STRUCTURE_SPRITE_SCALE;
       return PROP_SPRITE_SCALE;
     }
 
