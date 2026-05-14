@@ -419,6 +419,8 @@ export default function GameCanvas({ width, height }: Props) {
   const imgEnvHumveeWreck5     = useImage(EnvSprites.env_humvee_wreck_5);
   const imgEnvHumveeWreck6     = useImage(EnvSprites.env_humvee_wreck_6);
   const imgEnvAcsWreck         = useImage(EnvSprites.env_acs_wreck);
+  const imgEnvBomberWreck2     = useImage(EnvSprites.env_bomber_wreck_2);
+  const imgEnvBomberWreck3     = useImage(EnvSprites.env_bomber_wreck_3);
 
   // Flat lookup: assetKey string → loaded SkImage (or null during load).
   const propImageLookup: Record<string, ReturnType<typeof useImage>> = {
@@ -461,6 +463,8 @@ export default function GameCanvas({ width, height }: Props) {
     env_humvee_wreck_5:   imgEnvHumveeWreck5,
     env_humvee_wreck_6:   imgEnvHumveeWreck6,
     env_acs_wreck:        imgEnvAcsWreck,
+    env_bomber_wreck_2:   imgEnvBomberWreck2,
+    env_bomber_wreck_3:   imgEnvBomberWreck3,
   };
 
   // ─── Pickup sprite image ──────────────────────────────────────────────────

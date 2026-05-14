@@ -126,12 +126,11 @@ const VEGETATION_POOL = [
   { assetKey: 'env_bush_3',       width: 44,  height: 34  },
 ];
 
+// env_truck_wreck_1 and env_truck_wreck_2 excluded from pool (sprites/PNGs kept on disk).
 const WRECK_SCATTER_POOL = [
   { assetKey: 'env_car_wreck_1',       width: 128, height: 128 },
   { assetKey: 'env_car_wreck_2',       width: 128, height: 128 },
   { assetKey: 'env_car_wreck_3',       width: 128, height: 128 },
-  { assetKey: 'env_truck_wreck_1',     width: 128, height: 128 },
-  { assetKey: 'env_truck_wreck_2',     width: 128, height: 128 },
   { assetKey: 'env_small_truck_wreck', width: 128, height: 128 },
   { assetKey: 'env_ambulance_wreck',   width: 128, height: 128 },
   { assetKey: 'env_police_wreck',      width: 128, height: 128 },
@@ -142,6 +141,8 @@ const WRECK_SCATTER_POOL = [
   { assetKey: 'env_humvee_wreck_5',    width: 128, height: 128 },
   { assetKey: 'env_humvee_wreck_6',    width: 128, height: 128 },
   { assetKey: 'env_acs_wreck',         width: 192, height: 192 },
+  { assetKey: 'env_bomber_wreck_2',    width: 288, height: 192 },
+  { assetKey: 'env_bomber_wreck_3',    width: 288, height: 192 },
 ];
 
 const WRECK_BUS        = { assetKey: 'env_bus_wreck',        width: 256, height: 256 };

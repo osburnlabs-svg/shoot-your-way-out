@@ -280,6 +280,8 @@ export const EnvSprites = {
   env_humvee_wreck_5:    require('../../assets/sprites/environment/vehicles/wrecks/humvee_wreck_5.png'),
   env_humvee_wreck_6:    require('../../assets/sprites/environment/vehicles/wrecks/humvee_wreck_6.png'),
   env_acs_wreck:         require('../../assets/sprites/environment/vehicles/wrecks/acs_wreck.png'),
+  env_bomber_wreck_2:    require('../../assets/sprites/environment/vehicles/wrecks/bomber_wreck_2.png'),
+  env_bomber_wreck_3:    require('../../assets/sprites/environment/vehicles/wrecks/bomber_wreck_3.png'),
 } as const;
 
 export const GuiSprites = {
