@@ -31,6 +31,8 @@ export type PlacedEntity = {
   width: number;
   /** Native source height in px (before scale). Used by G3 for collision AABB. */
   height: number;
+  /** Rotation in radians. Undefined (treated as 0) for props without rotation. */
+  rotation?: number;
 };
 
 export type MapData = {

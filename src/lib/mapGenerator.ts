@@ -280,7 +280,8 @@ function buildVehicleWrecks(
   while (buses.length < busCount && busAttempts < 100) {
     busAttempts++;
     const pos = randomWorldPos(rng, 150);
-    const candidate: PlacedEntity = { ...pos, ...WRECK_BUS };
+    const rotation = 0.1 + rng() * (Math.PI * 2 - 0.2);
+    const candidate: PlacedEntity = { ...pos, ...WRECK_BUS, rotation };
     if (
       !isNearSpawn(pos.x, pos.y) &&
       buses.every(b => !tooCloseScaled(b, candidate)) &&
@@ -296,7 +297,8 @@ function buildVehicleWrecks(
     scatterAttempts++;
     const pos = randomWorldPos(rng, 100);
     const def = WRECK_SCATTER_POOL[Math.floor(rng() * WRECK_SCATTER_POOL.length)]!;
-    const candidate: PlacedEntity = { ...pos, ...def };
+    const rotation = 0.1 + rng() * (Math.PI * 2 - 0.2);
+    const candidate: PlacedEntity = { ...pos, ...def, rotation };
     if (
       !isNearSpawn(pos.x, pos.y) &&
       buildings.every(b => !tooCloseScaled(b, candidate)) &&

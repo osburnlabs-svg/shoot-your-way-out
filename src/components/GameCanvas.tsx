@@ -565,9 +565,14 @@ export default function GameCanvas({ width, height }: Props) {
           groups[ent.assetKey] = { sprites: [], transforms: [] };
         }
         const s = scaleFor(ent.assetKey);
+        const θ = ent.rotation ?? 0;
+        const a = s * Math.cos(θ);
+        const b = s * Math.sin(θ);
+        const hw = ent.width / 2;
+        const hh = ent.height / 2;
         groups[ent.assetKey]!.sprites.push({ x: 0, y: 0, width: ent.width, height: ent.height });
         groups[ent.assetKey]!.transforms.push(
-          Skia.RSXform(s, 0, ent.x - ent.width * s / 2, ent.y - ent.height * s / 2),
+          Skia.RSXform(a, b, ent.x - a * hw + b * hh, ent.y - b * hw - a * hh),
         );
       }
       return groups;
