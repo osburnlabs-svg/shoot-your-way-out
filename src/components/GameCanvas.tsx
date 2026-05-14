@@ -49,7 +49,7 @@
  *                HP/Score/XP/isDead for debug and overlay)
  */
 
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import {
   Atlas,
