@@ -296,7 +296,7 @@ const THROWABLE_COLORS = {
   molotov: '#e06020', // orange-red
 };
 
-console.log('G2-ATLAS VERSION: render attempt v1');
+console.log('G2-ATLAS VERSION: half-dist test v2 (obstacles+wrecks distributed)');
 
 type Props = {
   width: number;
@@ -543,6 +543,8 @@ export default function GameCanvas({ width, height }: Props) {
   // Rendered in z-order: vegetation → obstacles → barrels → wrecks → buildings.
   // RSXforms are world-space (centered on entity); camera Group handles scrolling.
   const propAtlasData = useMemo(() => {
+    // [DIAG-PROPS] Probe 1: confirm this fires only once. Remove when stutter resolved.
+    console.log('[DIAG-PROPS] propAtlasData recomputing');
     function groupByAssetKey(entities: typeof initialMapData.buildings) {
       const groups: Record<string, { sprites: { x: number; y: number; width: number; height: number }[]; transforms: ReturnType<typeof Skia.RSXform>[] }> = {};
       for (const ent of entities) {
@@ -565,6 +567,26 @@ export default function GameCanvas({ width, height }: Props) {
       buildings:  groupByAssetKey(initialMapData.buildings),
     };
   }, [initialMapData]);
+
+  // [DIAG-PROPS] Probe 2: log entity counts and Atlas group count at mount.
+  // Shows exactly how many Atlas draw calls are active inside the camera Group.
+  // Remove when stutter resolved.
+  useEffect(() => {
+    const atlasGroupCount =
+      Object.keys(propAtlasData.vegetation).length +
+      Object.keys(propAtlasData.obstacles).length +
+      Object.keys(propAtlasData.barrels).length +
+      Object.keys(propAtlasData.wrecks).length +
+      Object.keys(propAtlasData.buildings).length;
+    console.log('[DIAG-PROPS] entity counts:', {
+      vegetation: initialMapData.vegetation.length,
+      obstacles:  initialMapData.obstacles.length,
+      barrels:    initialMapData.barrels.length,
+      wrecks:     initialMapData.vehicleWrecks.length,
+      buildings:  initialMapData.buildings.length,
+      atlasGroupCount,
+    });
+  }, [initialMapData, propAtlasData]);
 
   // ─── Virtual joystick shared values (UI thread) ───────────────────────────
   const joystickOriginX = useSharedValue(0);
@@ -648,6 +670,8 @@ export default function GameCanvas({ width, height }: Props) {
   // for sprite selection. Hero + enemy sprite state + player vitals computed together.
   useEffect(() => {
     const id = setInterval(() => {
+      // [DIAG-PROPS] Probe 3: measure JS thread cost of this tick. Remove when stutter resolved.
+      const diagTimerStart = performance.now();
       const state = gameState.value;
 
       // Hero sprite state.
@@ -819,6 +843,12 @@ export default function GameCanvas({ width, height }: Props) {
       // Atlas arrays for the visible window when the player crosses a tile boundary.
       setPlayerTileCol(Math.floor(state.player.x / TILE_SIZE));
       setPlayerTileRow(Math.floor(state.player.y / TILE_SIZE));
+
+      // [DIAG-PROPS] Probe 3: log timer duration when expensive (>8ms = JS thread pressure).
+      const diagTimerMs = performance.now() - diagTimerStart;
+      if (diagTimerMs > 8) {
+        console.log(`[DIAG-PROPS] 100ms timer: ${diagTimerMs.toFixed(1)}ms`);
+      }
     }, 100);
     return () => clearInterval(id);
   }, [gameState]);
@@ -1403,14 +1433,12 @@ export default function GameCanvas({ width, height }: Props) {
             </>
           )}
 
-          {/* ── Scatter props (z=1: vegetation → rocks → barrels → wrecks → structures) */}
-          {/* One Atlas per assetKey type. Static world-space RSXforms; camera Group  */}
-          {/* scrolls them. Skipped per-entry if image is still null during load.     */}
+          {/* ── Scatter props IN camera Group (vegetation, barrels, buildings) ── */}
+          {/* [TEST-HALF-DIST] obstacles + wrecks moved outside — see below.    */}
+          {/* vegetation/barrels/buildings remain here as the control half.      */}
           {[
             ...Object.entries(propAtlasData.vegetation),
-            ...Object.entries(propAtlasData.obstacles),
             ...Object.entries(propAtlasData.barrels),
-            ...Object.entries(propAtlasData.wrecks),
             ...Object.entries(propAtlasData.buildings),
           ].map(([assetKey, { sprites, transforms }]) => {
             const img = propImageLookup[assetKey];
@@ -1535,6 +1563,31 @@ export default function GameCanvas({ width, height }: Props) {
           })}
 
           </Group>
+
+          {/* ── Distributed prop Atlases: obstacles + wrecks ─────────────── */}
+          {/* [TEST-HALF-DIST] Each gets its own <Group transform={cameraTransform}> */}
+          {/* rather than sharing the main camera Group with all other children.     */}
+          {/* obstacles = 3 atlas types, highest instance counts (20-40 rocks total) */}
+          {/* wrecks    = up to 9 atlas types, moderate counts (5-15 total)          */}
+          {/* If stutter drops for these but not for in-Group props → Option D       */}
+          {/* direction confirmed. Uniform stutter → revert.                         */}
+          {[
+            ...Object.entries(propAtlasData.obstacles),
+            ...Object.entries(propAtlasData.wrecks),
+          ].map(([assetKey, { sprites, transforms }]) => {
+            const img = propImageLookup[assetKey];
+            if (!img) return null;
+            return (
+              <Group key={`prop-dist-${assetKey}`} transform={cameraTransform}>
+                <Atlas
+                  image={img}
+                  sprites={sprites}
+                  transforms={transforms}
+                  sampling={{ filter: FilterMode.Nearest, mipmap: MipmapMode.None }}
+                />
+              </Group>
+            );
+          })}
 
           {/* ── Crates ───────────────────────────────────────────────────── */}
           {/* Screen-coord derived values — outside camera Group to avoid    */}
