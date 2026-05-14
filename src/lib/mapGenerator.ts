@@ -249,10 +249,6 @@ function buildStructures(rng: () => number): PlacedEntity[] {
     }
   }
 
-  // [DIAG-B2] budget vs placed — remove after blocker 2 resolved
-  console.log('[DIAG-B2] house02: placed', house02.length, '/ attempts', house02Attempts);
-  console.log('[DIAG-B2] house01: budget', house01Count, '/ placed', house01.length, '/ attempts', house01Attempts);
-  console.log('[DIAG-B2] watchtowers: budget', towerCount, '/ placed', towers.length, '/ attempts', towerAttempts);
   return allPlaced;
 }
 
@@ -282,8 +278,6 @@ function buildObstacles(
     }
   }
 
-  // [DIAG-B2] budget vs placed — remove after blocker 2 resolved
-  console.log('[DIAG-B2] obstacles: budget', count, '/ placed', placed.length);
   return placed;
 }
 
@@ -298,45 +292,18 @@ function buildVehicleWrecks(
 
   // Helicopter — exactly 1. Checks buildings only (no buses placed yet).
   const helicopter: PlacedEntity[] = [];
-  const HELI_RETRY_CEILING = 100;
   let heliAttempts = 0;
-  let heliFailSpawn = 0;
-  let heliFailBuilding = 0;
-  while (helicopter.length < 1 && heliAttempts < HELI_RETRY_CEILING) {
+  while (helicopter.length < 1 && heliAttempts < 100) {
     heliAttempts++;
     const pos = randomWorldPos(rng, 150);
     const rotation = 0.1 + rng() * (Math.PI * 2 - 0.2);
     const candidate: PlacedEntity = { ...pos, ...WRECK_HELICOPTER, rotation };
-    if (isNearSpawn(pos.x, pos.y)) {
-      heliFailSpawn++;
-    } else {
-      const blocker = buildings.find(b => tooCloseScaled(b, candidate));
-      if (blocker) {
-        heliFailBuilding++;
-      } else {
-        helicopter.push(candidate);
-      }
+    if (
+      !isNearSpawn(pos.x, pos.y) &&
+      buildings.every(b => !tooCloseScaled(b, candidate))
+    ) {
+      helicopter.push(candidate);
     }
-  }
-  // [DIAG-HELI] — strip at G2 close-out alongside [DIAG-B2]
-  console.log(
-    '[DIAG-HELI] ceiling:', HELI_RETRY_CEILING,
-    '/ attempts:', heliAttempts,
-    '/ placed:', helicopter.length,
-    '/ fail-spawn:', heliFailSpawn,
-    '/ fail-building:', heliFailBuilding,
-  );
-  if (helicopter.length > 0) {
-    console.log('[DIAG-HELI] placed at', helicopter[0]!.x.toFixed(0), helicopter[0]!.y.toFixed(0));
-  } else {
-    // Log each building's key and its exclusion radius vs helicopter to help triage
-    console.log('[DIAG-HELI] PLACEMENT FAILED — building exclusion zones:',
-      buildings.map(b => ({
-        key: b.assetKey,
-        bHalf: scaledHalfSize(b).toFixed(1),
-        minDist: (scaledHalfSize(b) + scaledHalfSize({ ...b, assetKey: 'env_helicopter_wreck', width: 288, height: 288 }) + 20).toFixed(1),
-      })),
-    );
   }
 
   // Bomber — exactly 1. Variant picked once per run (50/50). Checks buildings + helicopter.
@@ -356,9 +323,6 @@ function buildVehicleWrecks(
       bomber.push(candidate);
     }
   }
-  // [DIAG-B2] bomber centerpiece — remove after blocker 2 resolved
-  console.log('[DIAG-B2] bomber centerpiece: variant', bomberDef.assetKey, '/ attempts', bomberAttempts, '/ placed', bomber.length);
-
   const buses: PlacedEntity[] = [];
   let busAttempts = 0;
   while (buses.length < busCount && busAttempts < 100) {
@@ -397,8 +361,6 @@ function buildVehicleWrecks(
     }
   }
 
-  // [DIAG-B2] budget vs placed — remove after blocker 2 resolved
-  console.log('[DIAG-B2] wrecks: heli', helicopter.length, '/ bomber', bomber.length, '/ bus-budget', busCount, '/ placed', buses.length, '/ scatter-budget', scatterCount, '/ placed', scatter.length);
   return { helicopter, bomber, buses, scatter };
 }
 
@@ -430,8 +392,6 @@ function buildVegetation(
     }
   }
 
-  // [DIAG-B2] budget vs placed — remove after blocker 2 resolved
-  console.log('[DIAG-B2] vegetation: budget', count, '/ placed', placed.length);
   return placed;
 }
 
@@ -445,10 +405,8 @@ function buildBarrels(rng: () => number, buildings: PlacedEntity[]): PlacedEntit
   if (buildings.length === 0) return [];
 
   const placed: PlacedEntity[] = [];
-  let barrelBudget = 0;
   for (const building of buildings) {
     const clusterCount = 3 + Math.floor(rng() * 3); // 3–5 per building
-    barrelBudget += clusterCount;
     let barrelPlaced = 0;
     let attempts = 0;
     while (barrelPlaced < clusterCount && attempts < 80) {
@@ -471,8 +429,6 @@ function buildBarrels(rng: () => number, buildings: PlacedEntity[]): PlacedEntit
       }
     }
   }
-  // [DIAG-B2] budget vs placed — remove after blocker 2 resolved
-  console.log('[DIAG-B2] barrels: budget', barrelBudget, '/ placed', placed.length);
   return placed;
 }
 
@@ -491,15 +447,6 @@ export function generateMap(seed: number): MapData {
   const obstacles = buildObstacles(rng, buildings, vehicleWrecks);
   const vegetation = buildVegetation(rng, buildings, vehicleWrecks, obstacles);
   const barrels = buildBarrels(rng, buildings);
-
-  // [DIAG-B2] assetKeys written to MapData — remove after blocker 2 resolved
-  console.log('[DIAG-B2] assetKeys in MapData:', {
-    buildings:  buildings.map(e => e.assetKey),
-    wrecks:     vehicleWrecks.map(e => e.assetKey),  // helicopter + bomber + buses + scatter
-    vegetation: vegetation.map(e => e.assetKey),
-    obstacles:  [...new Set(obstacles.map(e => e.assetKey))],  // unique — 30-60 total
-    barrels:    [...new Set(barrels.map(e => e.assetKey))],    // unique — varies
-  });
 
   return { seed, weather, tileGrid, buildings, obstacles, vehicleWrecks, vegetation, barrels };
 }

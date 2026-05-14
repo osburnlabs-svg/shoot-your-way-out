@@ -606,14 +606,6 @@ export default function GameCanvas({ width, height }: Props) {
     };
   }, [initialMapData]);
 
-  // [DIAG-HELI] one-time check: helicopter placement count + image-load state — strip at G2 close-out
-  const heliDiagFired = useRef(false);
-  if (!heliDiagFired.current && imgEnvHelicopterWreck !== undefined) {
-    heliDiagFired.current = true;
-    const heliInMap = initialMapData.vehicleWrecks.filter(e => e.assetKey === 'env_helicopter_wreck').length;
-    console.log('[DIAG-HELI] GameCanvas — heli in vehicleWrecks:', heliInMap, '/ imgEnvHelicopterWreck:', imgEnvHelicopterWreck !== null ? 'loaded' : 'null');
-  }
-
   // ─── Virtual joystick shared values (UI thread) ───────────────────────────
   const joystickOriginX = useSharedValue(0);
   const joystickOriginY = useSharedValue(0);
