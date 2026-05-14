@@ -30,7 +30,7 @@ Status legend:
 | 4a — Stat skills + level-up | 🟢 Complete | 2026-05-10 | G1: c4daad8 G2: a095517 G3: f297b4b G3-polish: 461b25b→d90aedf→ba505fc G4: ee7f7d5 G4-cleanup: 5690324 | G1 ✅ G2 ✅ G3 ✅ G4 ✅ | Full progression loop closed. G4: weapon unlocks L4/8/12/16 + all 8 weapon renames |
 | 4b — Ability skills + crates | 🟢 Complete | 2026-05-10 | G1: 5411988 Slot-fix: 8ff2533 G2: 18b44e3 G3: e2a1deb G4: 8c31b42 G4-polish: 9cb7762 G5: b4091c6 Smoke: 2438bb4 | G1 ✅ G2 ✅ G3 ✅ G4 ✅ G5 ✅ | All 20 v1 skills shipped; throwable system; revive; bloom-hold-dissipate smoke animation |
 | 4c — Crate weapons | 🟢 Complete | 2026-05-11 | G1: 75dc967 Fix: 68f5ef3 266fbd6 G2: d6f1c1c G3: 8c390b3 Polish: cd2d2d8 5a29a3e 2daeffd a0b7e61 4eca404 Close: cb8bddb | G1 ✅ G2 ✅ G3 ✅ | World-spawn crates; weapon roll + reveal modal; Shotgun/Rocket Launcher/Flamethrower active; custom weapon icons; debug scaffold cleaned up |
-| 5 — Maps + obstacles + vehicle enemies | 🟡 In Progress | 2026-05-12 | G1: 99bf87d→3c17fac | G1 ✅ | Entity follow camera shipped; stutter root cause found and fixed |
+| 5 — Maps + obstacles + vehicle enemies | 🟡 In Progress | 2026-05-13 | G1: 99bf87d→3c17fac G2: Step1+2 stable, Step3 f12a73d pending device fix | G1 ✅ G2-Steps1+2 ✅ G2-Step3 🔴 | Three Step 3 blockers: stutter regression, missing prop categories, sprite scale too small |
 | 6 — Audio + atmospheric effects | ⚪ | | | | |
 | 7 — UI + persistence + analytics | ⚪ | | | | |
 | 8 — Helicopter boss + hazards | ⚪ | | | | |
@@ -912,7 +912,7 @@ Phase 4 transformed the engine from a static survival loop (Phase 3) into a full
 
 **Goal:** Single dynamic procedural map generator (runs at game start, every run is unique), parameterized asset budgets (buildings, vehicles, props, vegetation), seeded random placement with spacing constraints, building metadata for sniper rooftop positions, world camera system, all 8 enemy types working including Humvee/BTR/Panzer/ACS vehicle enemies, enemy ranged fire, single consistent military theme.
 
-**Status:** G1 complete 🟢 — G2+ not started
+**Status:** G1 complete 🟢 — G2 in progress 🟡 (Steps 1+2 stable, Step 3 blocked)
 
 ---
 
@@ -941,6 +941,68 @@ Multi-session debug across two sessions:
 
 - **Inline camera math is the canonical entity rendering pattern.** Each entity's `useDerivedValue` computes screen position directly as `width/2 + (entity.x - player.x) * CAMERA_ZOOM`. No outer animated camera Group wrapping animated entity Groups — that architecture causes Skia intermediate frames where the camera has updated but entities haven't.
 - **Gesture handlers feeding game state must run as UI-thread worklets.** Using `.runOnJS(true)` on input gestures routes the input update through the JS thread queue, adding variable latency to `player.x` that manifests as camera stutter for stationary world objects. The original reason for `.runOnJS(true)` (RNGH flush bug) is an architecture-specific issue that doesn't apply once nested animated Groups are eliminated.
+
+---
+
+## Phase 5 — Group 2: Procedural map + scatter props
+
+**Status:** Steps 1+2 complete 🟢 — Step 3 blocked 🔴
+**Date:** 2026-05-13
+**Commits:** Step 1+2 (world size + culling + JSI fix): 86c1a33, 37f50d7, dc82cf5, d91b4ce, 8407c5e — Step 3 (scatter props): 3c94b82 (asset survey), f12a73d (code + assets)
+
+### Steps completed and stable
+
+**Step 1 — Noise-based biome tile generation**
+- `mapGenerator.ts`: simplex noise (`createNoise2D`) seeded from mulberry32 PRNG. Each tile samples `noise2D(col * 0.05, row * 0.05)` → 3 terrain types (grass / dirt / sand). Variant picker restricted to inner 3×3 of 5×5 tilesheet (`FILL_VARIANTS = [6,7,8,11,12,13,16,17,18]`) — outer ring has feathered transparent edges that caused seam gaps when used as fill.
+- Atlas render in `GameCanvas.tsx`: one `<Atlas>` per terrain type; RSXforms in world space; camera Group scrolls them.
+
+**Step 2 — World size 6000×6000 + viewport culling + JSI serialization fix**
+- `WORLD_WIDTH/HEIGHT` bumped 2000→6000; `TILE_COLS/TILE_ROWS` are derived (`Math.ceil(6000/64) = 94`), so grid automatically scaled 32×32→94×94.
+- Viewport culling: player tile position tracked in 100ms timer; `useMemo` rebuilds Atlas arrays for only the visible ~9×15 window. O(1) range math, O(visible) loop.
+- **JSI serialization fix (architectural):** `mapData: MapData` (containing 8,836 TileCell objects) was stored in `GameState` SharedValue. At 6000×6000 this was fatal — Reanimated deep-copies the entire value tree through JSI on every `gameState.value = ...` at 60fps. Removed `mapData` entirely from GameState. `initialMapData` lives in React `useState` in `GameCanvas` (the only reader). No worklet ever read `state.mapData`. 60fps confirmed on device after fix.
+- **Rule established:** SharedValue must contain ONLY fields read by UI-thread worklets. Non-worklet data (tile grids, map metadata, static entity lists) lives in React state or ref regardless of conceptual ownership.
+
+**Step 3 — Scatter prop asset survey**
+- `_project-docs/environmental-asset-audit.md` Section 14: surveyed all single-sprite static props in `_project-docs/kits/`. 7 categories confirmed: structures (3), trees (7), bushes (3), rocks (3), barrels/crates (6), vehicle wrecks (9). Sandbags deferred to G3 — need collision orientation logic. Placement rules per category established. 31 PNGs copied to `assets/sprites/environment/`.
+
+### Step 3 — Code committed, device test blocked (commit f12a73d)
+
+**What shipped:**
+- `mapTypes.ts`: `barrels: PlacedEntity[]` added to `MapData`; header comment updated (not in GameState; 94×94 grid).
+- `mapGenerator.ts`: real asset pools (`ROCK_POOL`, `VEGETATION_POOL`, `WRECK_SCATTER_POOL`, `WRECK_BUS`, `BARREL_POOL`) with assetKeys + native dimensions; `isNearSpawn()` 200px exclusion zone around player spawn (3000, 3000); `buildBarrels()` clusters 2–5 per building; all builders use spawn clearance; `buildObstacles` → rocks only (sandbags deferred to G4).
+- `sprites.ts`: `EnvSprites` flat assetKey→require() map for all 31 prop images.
+- `GameCanvas.tsx`: 31 `useImage` calls + `propImageLookup` Record; `propAtlasData` useMemo groups entity lists by assetKey → SkRect[]/SkRSXform[]; one `<Atlas>` per assetKey type inside camera Group in z-order (vegetation → obstacles → barrels → wrecks → buildings).
+
+**Three blocking issues found on device:**
+
+1. **Stuttering during player movement** — 60fps regressed after Step 3. Diagnosis not yet performed. Most likely cause: adding 31 `useImage` hooks plus the `propAtlasData` useMemo is introducing overhead on the JS thread that re-introduces the inter-thread timing issue from G1. Could also be a new Skia subscription pattern. **Diagnose first before touching anything else.**
+
+2. **Missing prop categories** — device showed rocks, stumps, one bus, watchtower, crates. Did NOT show houses or most vehicle wrecks. Two candidate causes: (a) placement retry loops gave up early (spawn-clearance or spacing constraints too tight), or (b) assets are placed but not rendering (assetKey mismatch between generator pool and EnvSprites, or image null at render time). Check by logging `initialMapData.buildings.length` and `initialMapData.vehicleWrecks.length` at mount.
+
+3. **Sprite scale too small** — watchtower and crates render at near-native PNG size (72×72 and 30×31 respectively), reading as tiny relative to the player sprite. Needs a `PROP_SPRITE_SCALE` constant applied in `propAtlasData` useMemo (scale applied to RSXform `scos`/`ssin` + adjusted tx/ty to keep centered). Similar pattern to `HERO_SPRITE_SCALE` and `ENEMY_SPRITE_SCALE`.
+
+### G2 close-out work (deferred until Step 3 stable)
+
+- Progress log G2 entry with full debugging narrative (edge tile fix, JSI serialization root cause, prop scatter)
+- Binding pattern additions to master context doc (`shoot-your-way-out-context-v3.md`):
+  - SharedValue ownership rule (established Step 2)
+  - Animated-wrapping-static refinement (static props inside camera Group, dynamic entities outside)
+  - `useImage` null-guard pattern (gate Atlas render per-entry on `!!img`)
+- Tech debt entries to add:
+  - Loading screen needed — at 6000×6000 with ~250 props, load time will be noticeable on first mount
+  - Camera-Group performance question — static props in camera Group (not individually animated) should be safe; not yet verified under full load
+- Strategy doc cleanup (`strategy-notes.md` or similar):
+  - Section 11.8: stale "glow effect" wording (replaced by colored border + label in 9f073b3)
+  - Section 11.10: stray commit-message footer text needs removal
+
+### Next session opens with
+
+Diagnose all three Step 3 blockers in order:
+1. Stuttering — profile before fixing anything else; a wrong diagnosis here wastes the whole session
+2. Missing prop categories — check entity counts at mount, then trace render path
+3. Sprite scale — add `PROP_SPRITE_SCALE` once categories are confirmed visible
+
+After all three fixed and device test passes: G2 close-out (log, context doc, tech debt, strategy doc cleanup), then brainstorm session.
 
 ---
 
