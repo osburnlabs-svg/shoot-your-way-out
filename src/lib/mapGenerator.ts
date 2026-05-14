@@ -167,11 +167,11 @@ function tooClose(a: PlacedEntity, b: PlacedEntity, minDist: number): boolean {
 
 // ─── Entity builders ──────────────────────────────────────────────────────────
 
-// Houses min 2/max 3, cycle pool to guarantee both variants.
-// Watchtowers min 2/max 3, spacing checked cross-category against all placed structures.
+// Houses min 4/max 6, cycle pool for first 2 slots to guarantee both variants.
+// Watchtowers min 4/max 6, spacing checked cross-category against all placed structures.
 function buildStructures(rng: () => number): PlacedEntity[] {
-  const houseCount = 2 + Math.floor(rng() * 2);  // 2 or 3
-  const towerCount = 2 + Math.floor(rng() * 2);  // 2 or 3
+  const houseCount = 4 + Math.floor(rng() * 3);  // 4–6
+  const towerCount = 4 + Math.floor(rng() * 3);  // 4–6
   const allPlaced: PlacedEntity[] = [];
 
   const houses: PlacedEntity[] = [];
@@ -214,9 +214,9 @@ function buildStructures(rng: () => number): PlacedEntity[] {
   return allPlaced;
 }
 
-// 25–50 rocks (no sandbags — those need G4 orientation logic; deferred to G4).
+// 50–100 rocks (no sandbags — those need G4 orientation logic; deferred to G4).
 function buildObstacles(rng: () => number, buildings: PlacedEntity[]): PlacedEntity[] {
-  const count = 25 + Math.floor(rng() * 26); // 25–50
+  const count = 50 + Math.floor(rng() * 51); // 50–100
   const placed: PlacedEntity[] = [];
   let attempts = 0;
 
@@ -239,30 +239,44 @@ function buildObstacles(rng: () => number, buildings: PlacedEntity[]): PlacedEnt
   return placed;
 }
 
-// 0–1 bus centerpiece + 6–16 scatter car/truck wrecks.
+// 2–3 buses (400px bus-to-bus spacing) + 12–32 scatter wrecks (150px bus exclusion).
 function buildVehicleWrecks(rng: () => number, buildings: PlacedEntity[]): PlacedEntity[] {
-  const hasBus = rng() > 0.5;
-  const scatterCount = 6 + Math.floor(rng() * 11); // 6–16
+  const busCount = 2 + Math.floor(rng() * 2);    // 2 or 3
+  const scatterCount = 12 + Math.floor(rng() * 21); // 12–32
+  const BUS_MIN_SPACING = 400;
   const placed: PlacedEntity[] = [];
 
-  if (hasBus) {
+  const buses: PlacedEntity[] = [];
+  let busAttempts = 0;
+  while (buses.length < busCount && busAttempts < 100) {
+    busAttempts++;
     const pos = randomWorldPos(rng, 150);
-    if (!isNearSpawn(pos.x, pos.y)) {
-      placed.push({ ...pos, ...WRECK_BUS });
+    const candidate: PlacedEntity = { ...pos, ...WRECK_BUS };
+    if (
+      !isNearSpawn(pos.x, pos.y) &&
+      buses.every(b => !tooClose(b, candidate, BUS_MIN_SPACING))
+    ) {
+      buses.push(candidate);
+      placed.push(candidate);
     }
   }
 
   let scatterPlaced = 0;
-  let attempts = 0;
-  while (scatterPlaced < scatterCount && attempts < 400) {
-    attempts++;
+  let scatterAttempts = 0;
+  while (scatterPlaced < scatterCount && scatterAttempts < 400) {
+    scatterAttempts++;
     const pos = randomWorldPos(rng, 100);
     const nearBuilding = buildings.some(b => {
       const dx = b.x - pos.x;
       const dy = b.y - pos.y;
       return dx * dx + dy * dy < 120 * 120;
     });
-    if (!nearBuilding && !isNearSpawn(pos.x, pos.y)) {
+    const nearBus = buses.some(b => {
+      const dx = b.x - pos.x;
+      const dy = b.y - pos.y;
+      return dx * dx + dy * dy < 150 * 150;
+    });
+    if (!nearBuilding && !nearBus && !isNearSpawn(pos.x, pos.y)) {
       const def = WRECK_SCATTER_POOL[Math.floor(rng() * WRECK_SCATTER_POOL.length)]!;
       placed.push({ ...pos, ...def });
       scatterPlaced++;
@@ -270,19 +284,13 @@ function buildVehicleWrecks(rng: () => number, buildings: PlacedEntity[]): Place
   }
 
   // [DIAG-B2] budget vs placed — remove after blocker 2 resolved
-  console.log('[DIAG-B2] wrecks: bus-budget', hasBus ? 1 : 0, '/ scatter-budget', scatterCount, '/ placed', placed.length);
+  console.log('[DIAG-B2] wrecks: bus-budget', busCount, '/ scatter-budget', scatterCount, '/ placed', placed.length);
   return placed;
 }
 
-// 12–20 trees/bushes — skipped entirely when raining (visual + thematic).
-function buildVegetation(rng: () => number, weather: WeatherType, buildings: PlacedEntity[]): PlacedEntity[] {
-  if (weather === 'rain') {
-    // [DIAG-B2] skipped — remove after blocker 2 resolved
-    console.log('[DIAG-B2] vegetation: skipped (rain weather)');
-    return [];
-  }
-
-  const count = 12 + Math.floor(rng() * 9); // 12–20
+// 50–80 trees/bushes on every run (rain no longer suppresses vegetation).
+function buildVegetation(rng: () => number, buildings: PlacedEntity[]): PlacedEntity[] {
+  const count = 50 + Math.floor(rng() * 31); // 50–80
   const placed: PlacedEntity[] = [];
   let attempts = 0;
 
@@ -350,7 +358,7 @@ export function generateMap(seed: number): MapData {
   const buildings = buildStructures(rng);
   const obstacles = buildObstacles(rng, buildings);
   const vehicleWrecks = buildVehicleWrecks(rng, buildings);
-  const vegetation = buildVegetation(rng, weather, buildings);
+  const vegetation = buildVegetation(rng, buildings);
   const barrels = buildBarrels(rng, buildings);
 
   // [DIAG-B2] assetKeys written to MapData — remove after blocker 2 resolved
