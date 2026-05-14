@@ -225,6 +225,55 @@ export const TileSprites = {
   road:  require('../../assets/sprites/environment/tilesets/road.png'),
 } as const;
 
+/**
+ * Environment prop sprite registry — Phase 5 G3.
+ *
+ * Flat key → require() map. Keys match assetKey strings in mapGenerator.ts pools.
+ * Metro requires static string literals in require() — no dynamic paths allowed.
+ *
+ * Used in GameCanvas: one useImage() call per key, assembled into propImageLookup
+ * Record<string, SkImage | null>, then rendered as one Atlas per assetKey type.
+ */
+export const EnvSprites = {
+  // Structures
+  env_house01:    require('../../assets/sprites/environment/structures/house_01.png'),
+  env_house02:    require('../../assets/sprites/environment/structures/house_02.png'),
+  env_watchtower: require('../../assets/sprites/environment/structures/watchtower.png'),
+  // Trees
+  env_tree_large_1: require('../../assets/sprites/environment/props/trees/tree_large_1.png'),
+  env_tree_large_2: require('../../assets/sprites/environment/props/trees/tree_large_2.png'),
+  env_tree_large_3: require('../../assets/sprites/environment/props/trees/tree_large_3.png'),
+  env_tree_large_4: require('../../assets/sprites/environment/props/trees/tree_large_4.png'),
+  env_tree_small_1: require('../../assets/sprites/environment/props/trees/tree_small_1.png'),
+  env_tree_small_2: require('../../assets/sprites/environment/props/trees/tree_small_2.png'),
+  env_tree_small_3: require('../../assets/sprites/environment/props/trees/tree_small_3.png'),
+  // Bushes
+  env_bush_1: require('../../assets/sprites/environment/props/bushes/bush_1.png'),
+  env_bush_2: require('../../assets/sprites/environment/props/bushes/bush_2.png'),
+  env_bush_3: require('../../assets/sprites/environment/props/bushes/bush_3.png'),
+  // Rocks
+  env_rock_large:  require('../../assets/sprites/environment/props/rocks/rock_large.png'),
+  env_rock_medium: require('../../assets/sprites/environment/props/rocks/rock_medium.png'),
+  env_rock_small:  require('../../assets/sprites/environment/props/rocks/rock_small.png'),
+  // Barrels / crates
+  env_box_wood:           require('../../assets/sprites/environment/props/barrels/box_wood.png'),
+  env_box_military:       require('../../assets/sprites/environment/props/barrels/box_military.png'),
+  env_barrel_oil:         require('../../assets/sprites/environment/props/barrels/barrel_oil.png'),
+  env_barrel:             require('../../assets/sprites/environment/props/barrels/barrel.png'),
+  env_box_wood_small:     require('../../assets/sprites/environment/props/barrels/box_wood_small.png'),
+  env_box_military_small: require('../../assets/sprites/environment/props/barrels/box_military_small.png'),
+  // Vehicle wrecks
+  env_car_wreck_1:       require('../../assets/sprites/environment/vehicles/wrecks/car_wreck_1.png'),
+  env_car_wreck_2:       require('../../assets/sprites/environment/vehicles/wrecks/car_wreck_2.png'),
+  env_car_wreck_3:       require('../../assets/sprites/environment/vehicles/wrecks/car_wreck_3.png'),
+  env_truck_wreck_1:     require('../../assets/sprites/environment/vehicles/wrecks/truck_wreck_1.png'),
+  env_truck_wreck_2:     require('../../assets/sprites/environment/vehicles/wrecks/truck_wreck_2.png'),
+  env_small_truck_wreck: require('../../assets/sprites/environment/vehicles/wrecks/small_truck_wreck.png'),
+  env_ambulance_wreck:   require('../../assets/sprites/environment/vehicles/wrecks/ambulance_wreck.png'),
+  env_police_wreck:      require('../../assets/sprites/environment/vehicles/wrecks/police_wreck.png'),
+  env_bus_wreck:         require('../../assets/sprites/environment/vehicles/wrecks/bus_wreck.png'),
+} as const;
+
 export const GuiSprites = {
   upgrade: {
     bg: require('../../assets/ui/upgrade/BG.png'),

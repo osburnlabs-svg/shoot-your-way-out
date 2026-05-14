@@ -71,7 +71,7 @@ import {
 } from 'react-native-reanimated';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 
-import { HeroSprites, EnemySprites, PickupSprites, EffectSprites, TileSprites } from '../lib/sprites';
+import { HeroSprites, EnemySprites, PickupSprites, EffectSprites, TileSprites, EnvSprites } from '../lib/sprites';
 import type { HeroWeaponPose } from '../lib/sprites';
 import { loadMap } from '../lib/mapLoader';
 import { SKILLS, SKILL_IDS, getEffectiveStats } from '../data/skills';
@@ -377,6 +377,76 @@ export default function GameCanvas({ width, height }: Props) {
   // crashes Skia's JSI layer on first render before the loaded images arrive.
   const tilesReady = !!(dirtTileImage && sandTileImage && grassTileImage);
 
+  // ─── Environment prop images (loaded once at mount, 31 assets) ───────────
+  // One useImage per EnvSprites key. Keys match assetKey strings in mapGenerator pools.
+  // Rendering is gated per-Atlas on img != null; partial loads render available props.
+  const imgEnvHouse01          = useImage(EnvSprites.env_house01);
+  const imgEnvHouse02          = useImage(EnvSprites.env_house02);
+  const imgEnvWatchtower       = useImage(EnvSprites.env_watchtower);
+  const imgEnvTreeLarge1       = useImage(EnvSprites.env_tree_large_1);
+  const imgEnvTreeLarge2       = useImage(EnvSprites.env_tree_large_2);
+  const imgEnvTreeLarge3       = useImage(EnvSprites.env_tree_large_3);
+  const imgEnvTreeLarge4       = useImage(EnvSprites.env_tree_large_4);
+  const imgEnvTreeSmall1       = useImage(EnvSprites.env_tree_small_1);
+  const imgEnvTreeSmall2       = useImage(EnvSprites.env_tree_small_2);
+  const imgEnvTreeSmall3       = useImage(EnvSprites.env_tree_small_3);
+  const imgEnvBush1            = useImage(EnvSprites.env_bush_1);
+  const imgEnvBush2            = useImage(EnvSprites.env_bush_2);
+  const imgEnvBush3            = useImage(EnvSprites.env_bush_3);
+  const imgEnvRockLarge        = useImage(EnvSprites.env_rock_large);
+  const imgEnvRockMedium       = useImage(EnvSprites.env_rock_medium);
+  const imgEnvRockSmall        = useImage(EnvSprites.env_rock_small);
+  const imgEnvBoxWood          = useImage(EnvSprites.env_box_wood);
+  const imgEnvBoxMilitary      = useImage(EnvSprites.env_box_military);
+  const imgEnvBarrelOil        = useImage(EnvSprites.env_barrel_oil);
+  const imgEnvBarrel           = useImage(EnvSprites.env_barrel);
+  const imgEnvBoxWoodSmall     = useImage(EnvSprites.env_box_wood_small);
+  const imgEnvBoxMilitarySmall = useImage(EnvSprites.env_box_military_small);
+  const imgEnvCarWreck1        = useImage(EnvSprites.env_car_wreck_1);
+  const imgEnvCarWreck2        = useImage(EnvSprites.env_car_wreck_2);
+  const imgEnvCarWreck3        = useImage(EnvSprites.env_car_wreck_3);
+  const imgEnvTruckWreck1      = useImage(EnvSprites.env_truck_wreck_1);
+  const imgEnvTruckWreck2      = useImage(EnvSprites.env_truck_wreck_2);
+  const imgEnvSmallTruckWreck  = useImage(EnvSprites.env_small_truck_wreck);
+  const imgEnvAmbulanceWreck   = useImage(EnvSprites.env_ambulance_wreck);
+  const imgEnvPoliceWreck      = useImage(EnvSprites.env_police_wreck);
+  const imgEnvBusWreck         = useImage(EnvSprites.env_bus_wreck);
+
+  // Flat lookup: assetKey string → loaded SkImage (or null during load).
+  const propImageLookup: Record<string, ReturnType<typeof useImage>> = {
+    env_house01:          imgEnvHouse01,
+    env_house02:          imgEnvHouse02,
+    env_watchtower:       imgEnvWatchtower,
+    env_tree_large_1:     imgEnvTreeLarge1,
+    env_tree_large_2:     imgEnvTreeLarge2,
+    env_tree_large_3:     imgEnvTreeLarge3,
+    env_tree_large_4:     imgEnvTreeLarge4,
+    env_tree_small_1:     imgEnvTreeSmall1,
+    env_tree_small_2:     imgEnvTreeSmall2,
+    env_tree_small_3:     imgEnvTreeSmall3,
+    env_bush_1:           imgEnvBush1,
+    env_bush_2:           imgEnvBush2,
+    env_bush_3:           imgEnvBush3,
+    env_rock_large:       imgEnvRockLarge,
+    env_rock_medium:      imgEnvRockMedium,
+    env_rock_small:       imgEnvRockSmall,
+    env_box_wood:         imgEnvBoxWood,
+    env_box_military:     imgEnvBoxMilitary,
+    env_barrel_oil:       imgEnvBarrelOil,
+    env_barrel:           imgEnvBarrel,
+    env_box_wood_small:   imgEnvBoxWoodSmall,
+    env_box_military_small: imgEnvBoxMilitarySmall,
+    env_car_wreck_1:      imgEnvCarWreck1,
+    env_car_wreck_2:      imgEnvCarWreck2,
+    env_car_wreck_3:      imgEnvCarWreck3,
+    env_truck_wreck_1:    imgEnvTruckWreck1,
+    env_truck_wreck_2:    imgEnvTruckWreck2,
+    env_small_truck_wreck: imgEnvSmallTruckWreck,
+    env_ambulance_wreck:  imgEnvAmbulanceWreck,
+    env_police_wreck:     imgEnvPoliceWreck,
+    env_bus_wreck:        imgEnvBusWreck,
+  };
+
   // ─── Pickup sprite image ──────────────────────────────────────────────────
   const moneySmallImage = useImage(PickupSprites.money.small);
   const crateImage = useImage(PickupSprites.crate);
@@ -467,6 +537,34 @@ export default function GameCanvas({ width, height }: Props) {
       dirtTransforms: dirtXform, sandTransforms: sandXform, grassTransforms: grassXform,
     };
   }, [initialMapData, playerTileCol, playerTileRow, width, height]);
+
+  // ─── Prop Atlas data (computed once at mount; static world-space positions) ─
+  // Groups each entity list by assetKey → { sprites: SkRect[], transforms: SkRSXform[] }.
+  // Rendered in z-order: vegetation → obstacles → barrels → wrecks → buildings.
+  // RSXforms are world-space (centered on entity); camera Group handles scrolling.
+  const propAtlasData = useMemo(() => {
+    function groupByAssetKey(entities: typeof initialMapData.buildings) {
+      const groups: Record<string, { sprites: { x: number; y: number; width: number; height: number }[]; transforms: ReturnType<typeof Skia.RSXform>[] }> = {};
+      for (const ent of entities) {
+        if (!ent.assetKey) continue;
+        if (!groups[ent.assetKey]) {
+          groups[ent.assetKey] = { sprites: [], transforms: [] };
+        }
+        groups[ent.assetKey]!.sprites.push({ x: 0, y: 0, width: ent.width, height: ent.height });
+        groups[ent.assetKey]!.transforms.push(
+          Skia.RSXform(1, 0, ent.x - ent.width / 2, ent.y - ent.height / 2),
+        );
+      }
+      return groups;
+    }
+    return {
+      vegetation: groupByAssetKey(initialMapData.vegetation),
+      obstacles:  groupByAssetKey(initialMapData.obstacles),
+      barrels:    groupByAssetKey(initialMapData.barrels),
+      wrecks:     groupByAssetKey(initialMapData.vehicleWrecks),
+      buildings:  groupByAssetKey(initialMapData.buildings),
+    };
+  }, [initialMapData]);
 
   // ─── Virtual joystick shared values (UI thread) ───────────────────────────
   const joystickOriginX = useSharedValue(0);
@@ -1304,6 +1402,29 @@ export default function GameCanvas({ width, height }: Props) {
               />
             </>
           )}
+
+          {/* ── Scatter props (z=1: vegetation → rocks → barrels → wrecks → structures) */}
+          {/* One Atlas per assetKey type. Static world-space RSXforms; camera Group  */}
+          {/* scrolls them. Skipped per-entry if image is still null during load.     */}
+          {[
+            ...Object.entries(propAtlasData.vegetation),
+            ...Object.entries(propAtlasData.obstacles),
+            ...Object.entries(propAtlasData.barrels),
+            ...Object.entries(propAtlasData.wrecks),
+            ...Object.entries(propAtlasData.buildings),
+          ].map(([assetKey, { sprites, transforms }]) => {
+            const img = propImageLookup[assetKey];
+            if (!img) return null;
+            return (
+              <Atlas
+                key={`prop-${assetKey}`}
+                image={img}
+                sprites={sprites}
+                transforms={transforms}
+                sampling={{ filter: FilterMode.Nearest, mipmap: MipmapMode.None }}
+              />
+            );
+          })}
 
           {/* ── Effect zones (React state positions, static transforms) ──── */}
           {/* Smoke: 7-frame LightSmoke animation (dissipation loop, 150ms/frame). */}

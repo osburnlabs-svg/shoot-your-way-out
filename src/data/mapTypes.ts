@@ -1,13 +1,13 @@
 /**
- * Map data types — Phase 5 G2.
+ * Map data types — Phase 5 G3.
  *
- * MapData is generated once per run by mapGenerator.ts and stored in GameState.
- * The tileGrid is 32×32 (WORLD_WIDTH / TILE_SIZE = 2000 / 64 = 31.25 → 32 columns,
+ * MapData is generated once per run by mapGenerator.ts and stored as initialMapData
+ * in React state in GameCanvas. It does NOT go into the Reanimated SharedValue (GameState).
+ * The tileGrid is 94×94 (WORLD_WIDTH / TILE_SIZE = 6000 / 64 = 93.75 → 94 columns,
  * same for rows). Indexed as tileGrid[row][col].
  *
- * Entity arrays (buildings, obstacles, vehicleWrecks, vegetation) are populated
- * by the generator in G2 but not rendered until G3. They store world-space positions
- * and a registered assetKey for use by the G3 renderer and collision system.
+ * Entity arrays store world-space positions and registered assetKeys (from sprites.ts
+ * EnvSprites) for use by the G3 renderer and the G4+ collision system.
  */
 
 export type TileType = 'dirt' | 'sand' | 'grass' | 'road';
@@ -36,14 +36,16 @@ export type PlacedEntity = {
 export type MapData = {
   seed: number;
   weather: WeatherType;
-  /** [row][col] — 32 rows × 32 cols. */
+  /** [row][col] — 94 rows × 94 cols. */
   tileGrid: TileCell[][];
-  /** 2–3 structures (House01, House02, WatchTower). G3 renders; G4 spawns snipers here. */
+  /** 2–3 structures (house_01, house_02, watchtower). G3 renders; G4 spawns snipers here. */
   buildings: PlacedEntity[];
-  /** 20–40 hard collision obstacles (rocks, sandbags). G3 renders + collision. */
+  /** 20–40 rocks (large/medium/small). G3 renders; G4 adds hard collision. */
   obstacles: PlacedEntity[];
-  /** 0–1 bus centerpiece + 4–14 scatter wrecks. G3 renders + collision. */
+  /** 0–1 bus centerpiece + 4–14 scatter car/truck wrecks. G3 renders; G4 adds hard collision. */
   vehicleWrecks: PlacedEntity[];
   /** 0–20 trees/bushes (0 when weather === 'rain'). G3 renders; soft cover only. */
   vegetation: PlacedEntity[];
+  /** 2–5 barrels/boxes per building, clustered near structures. G3 renders; G4 adds hard collision. */
+  barrels: PlacedEntity[];
 };
