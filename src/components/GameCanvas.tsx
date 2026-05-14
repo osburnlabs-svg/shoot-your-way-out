@@ -422,13 +422,25 @@ export default function GameCanvas({ width, height }: Props) {
   // ─── Game state ────────────────────────────────────────────────────────────
   const gameState = useSharedValue(createInitialGameState(width, height, initialMapData));
 
-  // ─── Tile Atlas pre-computation (static, computed once from initialMapData) ───
-  // Tile positions (col/row) are captured by the useRSXformBuffer modifier worklet
-  // Tile sprites (source rects into the 320×320 tilesheet, 5×5 grid of 64×64) and
-  // world-space RSXforms computed once per run. The camera Group's cameraTransform
-  // handles all scrolling — no per-frame RSXform update needed.
+  // ─── Tile viewport culling state ──────────────────────────────────────────────
+  // Tracks which tile the player is currently on. The 100ms timer updates these
+  // whenever the player crosses a tile boundary; useMemo rebuilds Atlas arrays only
+  // for the ~9×15 tile window visible at the current zoom level (~135 tiles/type max).
+  const [playerTileCol, setPlayerTileCol] = useState(() => Math.floor(TILE_COLS / 2));
+  const [playerTileRow, setPlayerTileRow] = useState(() => Math.floor(TILE_ROWS / 2));
+
+  // ─── Tile Atlas (viewport-culled, rebuilt when player crosses a tile boundary) ─
+  // Visible tile range = player tile ± halfCols/halfRows (+1 buffer for edge pop).
+  // RSXforms are world-space; camera Group handles all scrolling.
   const { dirtSprites, sandSprites, grassSprites,
           dirtTransforms, sandTransforms, grassTransforms } = useMemo(() => {
+    const halfCols = Math.ceil(width / 2 / CAMERA_ZOOM / TILE_SIZE) + 1;
+    const halfRows = Math.ceil(height / 2 / CAMERA_ZOOM / TILE_SIZE) + 1;
+    const colMin = Math.max(0, playerTileCol - halfCols);
+    const colMax = Math.min(TILE_COLS - 1, playerTileCol + halfCols);
+    const rowMin = Math.max(0, playerTileRow - halfRows);
+    const rowMax = Math.min(TILE_ROWS - 1, playerTileRow + halfRows);
+
     const dirtSrc:   { x: number; y: number; width: number; height: number }[] = [];
     const sandSrc:   { x: number; y: number; width: number; height: number }[] = [];
     const grassSrc:  { x: number; y: number; width: number; height: number }[] = [];
@@ -436,9 +448,9 @@ export default function GameCanvas({ width, height }: Props) {
     const sandXform: ReturnType<typeof Skia.RSXform>[] = [];
     const grassXform: ReturnType<typeof Skia.RSXform>[] = [];
 
-    for (let row = 0; row < TILE_ROWS; row++) {
-      for (let col = 0; col < TILE_COLS; col++) {
-        const cell = initialMapData.tileGrid[row][col];
+    for (let row = rowMin; row <= rowMax; row++) {
+      for (let col = colMin; col <= colMax; col++) {
+        const cell = initialMapData.tileGrid[row]![col]!;
         const srcX = (cell.variantIndex % 5) * TILE_SIZE;
         const srcY = Math.floor(cell.variantIndex / 5) * TILE_SIZE;
         const src  = { x: srcX, y: srcY, width: TILE_SIZE, height: TILE_SIZE };
@@ -454,24 +466,7 @@ export default function GameCanvas({ width, height }: Props) {
       dirtSprites:    dirtSrc,   sandSprites:    sandSrc,   grassSprites:    grassSrc,
       dirtTransforms: dirtXform, sandTransforms: sandXform, grassTransforms: grassXform,
     };
-  }, [initialMapData]);
-
-  // ─── Diagnostic logging (G2-ATLAS, remove after blank-tile issue confirmed) ─
-  useEffect(() => {
-    console.log('G2-ATLAS TILE_IMAGES:', {
-      dirt:  dirtTileImage  ? 'ok' : 'NULL',
-      sand:  sandTileImage  ? 'ok' : 'NULL',
-      grass: grassTileImage ? 'ok' : 'NULL',
-    });
-  }, [dirtTileImage, sandTileImage, grassTileImage]);
-
-  useEffect(() => {
-    console.log('G2-ATLAS SPRITES:', {
-      dirt:  { count: dirtSprites.length,  sample: dirtSprites[0] },
-      sand:  { count: sandSprites.length,  sample: sandSprites[0] },
-      grass: { count: grassSprites.length, sample: grassSprites[0] },
-    });
-  }, [dirtSprites, sandSprites, grassSprites]);
+  }, [initialMapData, playerTileCol, playerTileRow, width, height]);
 
   // ─── Virtual joystick shared values (UI thread) ───────────────────────────
   const joystickOriginX = useSharedValue(0);
@@ -721,6 +716,11 @@ export default function GameCanvas({ width, height }: Props) {
       setDisplayCrateReveal(state.pendingCrateReveal);
       setDisplayCrateWeaponId(state.crateRevealWeaponId);
       setDisplayCrateTier(state.crateRevealTier);
+
+      // Tile viewport culling: update player tile position so useMemo rebuilds
+      // Atlas arrays for the visible window when the player crosses a tile boundary.
+      setPlayerTileCol(Math.floor(state.player.x / TILE_SIZE));
+      setPlayerTileRow(Math.floor(state.player.y / TILE_SIZE));
     }, 100);
     return () => clearInterval(id);
   }, [gameState]);
