@@ -3,8 +3,10 @@
  * Runs on the Reanimated UI thread (worklet) as part of the updateGameState chain,
  * immediately after tickPickups.
  *
- * Fires every CRATE_SPAWN_INTERVAL_MS. Spawns one crate at a random canvas position
- * (CRATE_SPAWN_MARGIN_PX from each edge) if active count < CRATE_MAX_ACTIVE.
+ * Fires every CRATE_SPAWN_INTERVAL_MS. Spawns one crate at a random WORLD-SPACE
+ * position within the camera viewport, inset by CRATE_SPAWN_MARGIN_PX from each
+ * screen edge (so crates are always visible and reachable). Clamped to
+ * [0, worldWidth] × [0, worldHeight] so world-edge players don't push spawn OOB.
  * Skips silently if cap is reached or no slot is free (advances timer regardless).
  */
 
