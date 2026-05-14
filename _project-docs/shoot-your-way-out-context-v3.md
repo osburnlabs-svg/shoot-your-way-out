@@ -933,6 +933,14 @@ Routing gesture callbacks through `.runOnJS(true)` writes input SharedValues fro
 
 *Fix pattern:* Gesture handlers that feed game state must run as UI-thread worklets (default, no `.runOnJS`). Input SharedValue writes are then synchronous on the UI thread and always available before the next `useFrameCallback` invocation. Only add `.runOnJS(true)` if the gesture worklet triggers a downstream derived-value → Skia subscription cascade that causes the gesture-flush symptom described above. Used in `GameCanvas.tsx` (runOnJS removed commit 3c17fac after nested-group fix eliminated the original cascade).
 
+**GameState SharedValue must contain ONLY fields read by UI-thread worklets**
+
+Reanimated's `SharedValue.value = x` deep-copies the entire object tree through JSI to the C++ worklet runtime on every write. `gameState.value = updateGameState(...)` runs every frame at 60fps — so every field in `GameState`, however deeply nested, is serialized 60 times per second. Fields that worklets never read are pure serialization overhead.
+
+Symptom: adding a large data structure (e.g. an 8,836-element tile grid) to GameState that no worklet reads produces 9× JSI serialization cost per frame and a multi-minute initial SharedValue allocation. The performance cliff is invisible at small sizes (32×32 = 1,024 cells tolerable; 94×94 = 8,836 cells fatal at 60fps).
+
+*Binding rule:* Any data that only the JS thread reads (tile grids, map metadata, weather, static entity lists, any future pre-computed lookup tables) must live in regular React `useState` or `useRef`, NOT in `GameState`. Conceptual ownership ("this is game data") does not override this rule. The criterion is: **does a UI-thread worklet read it?** If no, it stays out of `GameState`. Applied in Phase 5 G2 (commit d91b4ce): `MapData` (including `tileGrid: TileCell[][]`) removed from `GameState`; lives as `initialMapData` in `GameCanvas` React state. Tile rendering reads `initialMapData.tileGrid` directly, never through `gameState.value`.
+
 ---
 
 ## Phase 1 Setup Commands
