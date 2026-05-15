@@ -30,7 +30,7 @@ Status legend:
 | 4a — Stat skills + level-up | 🟢 Complete | 2026-05-10 | G1: c4daad8 G2: a095517 G3: f297b4b G3-polish: 461b25b→d90aedf→ba505fc G4: ee7f7d5 G4-cleanup: 5690324 | G1 ✅ G2 ✅ G3 ✅ G4 ✅ | Full progression loop closed. G4: weapon unlocks L4/8/12/16 + all 8 weapon renames |
 | 4b — Ability skills + crates | 🟢 Complete | 2026-05-10 | G1: 5411988 Slot-fix: 8ff2533 G2: 18b44e3 G3: e2a1deb G4: 8c31b42 G4-polish: 9cb7762 G5: b4091c6 Smoke: 2438bb4 | G1 ✅ G2 ✅ G3 ✅ G4 ✅ G5 ✅ | All 20 v1 skills shipped; throwable system; revive; bloom-hold-dissipate smoke animation |
 | 4c — Crate weapons | 🟢 Complete | 2026-05-11 | G1: 75dc967 Fix: 68f5ef3 266fbd6 G2: d6f1c1c G3: 8c390b3 Polish: cd2d2d8 5a29a3e 2daeffd a0b7e61 4eca404 Close: cb8bddb | G1 ✅ G2 ✅ G3 ✅ | World-spawn crates; weapon roll + reveal modal; Shotgun/Rocket Launcher/Flamethrower active; custom weapon icons; debug scaffold cleaned up |
-| 5 — Maps + obstacles + vehicle enemies | 🟡 In Progress | 2026-05-13 → 2026-05-14 | G1: 99bf87d→3c17fac G2: 86c1a33→44cb822 G3: 6ed8a3c→b391493 | G1 ✅ G2 ✅ G3 🟡 | G3 committed (collision); pending device verification |
+| 5 — Maps + obstacles + vehicle enemies | 🟡 In Progress | 2026-05-13 → 2026-05-14 | G1: 99bf87d→3c17fac G2: 86c1a33→44cb822 G3: 6ed8a3c→b391493→30fb59c→2c04ed9→656fddf | G1 ✅ G2 ✅ G3 🟡 | G3 partial — rubber-band fix shipped; scale overrides + diag strip remain |
 | 6 — Audio + atmospheric effects | ⚪ | | | | |
 | 7 — UI + persistence + analytics | ⚪ | | | | |
 | 8 — Helicopter boss + hazards | ⚪ | | | | |
@@ -58,6 +58,9 @@ Status legend:
 | **Muzzle flashes + bullet origin correction** — kit ships muzzle flash frames for every weapon archetype in `Effects/` (Pistol Shot/, Rifle Shot/, MachineGun Shot/, Grenade Launcher Shot/). Not wired. Adding them also requires fixing bullet spawn origin: currently player center, not gun barrel tip. Bundle both fixes into a single Phase 6 polish commit. | Phase 4c (identified during G3 review) | Bullets emanate from player center; no muzzle flash | Phase 6 — atmospheric effects + polish pass |
 | **Pistol and SMG weapon icons at 64×64 vs others at 80×80** — the custom weapon sprite batch shipped with Pistol.png and SMG.png at 64×64, the other five at 80×80. Causes slight size mismatch in the crate modal icon. Low priority. | Phase 4c weapon sprite swap (a0b7e61) | `resizeMode="contain"` handles it acceptably | Future sprite work — re-source at 80×80 or accept variance |
 | **`persistence.ts` `highScorePerMap` stale type + getter** — `HighScorePerMap` type and its getter still reference `{ compound, outskirts, treeline }` keys. Dropped from persistence schema in context v3 update (13066f1) but not yet removed from code. | Docs update 2026-05-12 | Key is never written or read by any live game code yet (persistence not wired until Phase 7) | Phase 7 — persistence implementation pass; remove `HighScorePerMap` type, drop `highScorePerMap` getter entirely |
+| **[F] CC context bloat from large source files** — `GameCanvas.tsx` alone is ~30k tokens and responsible for an estimated 40–50% of per-prompt CC token cost. Other large files (`gameEngine.ts`, `combatEngine.ts`, `enemyEngine.ts`, `mapGenerator.ts`) contribute additional cost. Forces CC to load extensive context per prompt, causing slow response times and frequent auto-compaction (50k+ tokens/turn, sessions auto-compacting every 1–2 turns). Two mitigation paths to evaluate: (a) **targeted split** — separate `GameCanvas.tsx` derived-value hooks and timer logic into dedicated files, roughly halving its token cost (recommended, Phase 5.5 window between G3 and G4); (b) **full code-organization pass** — split all engine files into focused modules, larger investment, deferred to Phase 6. CC self-identified workflow improvement: use Grep + offset-limited Reads instead of full-file reads; apply this discipline going forward. | Phase 5 G3 session (2026-05-14) | Accept cost for now; token burn confirmed | Phase 5.5 — evaluate targeted split before G4 begins |
+| **[G] resolveAABB rotated-wreck AABB approximation** — Helicopter and bomber rotation produces ~1.4× phantom collision zone due to AABB-on-rotated-sprite (unrotated box used for rotated visual). Per-asset scale overrides compensate visually but the underlying math limitation remains. Accepted for v1. OBB (oriented bounding box) deferred indefinitely. | Phase 5 G3 (2026-05-14) | Per-asset COLLISION_SCALE_OVERRIDES shrink to roughly match visible silhouette | Deferred indefinitely — acceptable for v1 |
+| **[H] useImage diagnostic instrumentation timing** — `useImage` returns null synchronously on first render; the image resolves async via Skia's internal loader. Diagnostic logs that read the `useImage` return value at mount always report null. Always wrap useImage diagnostic reads in `useEffect` or a delayed `setTimeout`. Helicopter-rendering false alarm in G2 was the original example; confirmed pattern in G3. | Phase 5 G2 helicopter false alarm (2026-05-14) | None — awareness note only | Pattern established; no code change needed |
 | **`theme.ts` per-map tint keys (compound/outskirts/treeline) stale** — `mapTints` object still has three named map keys. Should become a per-run weather-driven tint (rain/dust/leaves/clear) to match the procedural generator. | Docs update 2026-05-12 | Tint values are not read at runtime yet | Phase 5 G2 — procedural generator color/atmosphere pass; replace named map keys with weather-variant tints |
 | ~~**`App.tsx` routing comment stale**~~ — **Resolved.** Comment already reads `PreRunModal` not `MapSelect`. No action needed. | Docs update 2026-05-12 | n/a | ✅ Closed Phase 5 G1 |
 | **`useFrameCallback` spurious zero-dt invocations** — frame callback fires extra times (~every 100ms) with `timeSincePreviousFrame=0`, correlated with the 100ms `setInterval` used for sprite-frame polling. Cause: JS-thread timer activity appears to trigger spurious UI-thread frame callbacks in Reanimated. Worked around by skipping `dtMs <= 0` frames at the top of `useFrameCallback`. Functional impact: none after workaround. Worth revisiting if Reanimated is upgraded or if a future feature needs the sprite-frame polling to run at a different cadence. | Phase 5 G1 stutter investigation 2026-05-12 | None after guard; without it, player movement stutters ~10×/sec | Keep guard in place; investigate root cause if Reanimated major version bump |
@@ -1015,40 +1018,83 @@ G2 ships a fully procedural 6000×6000 military map:
 
 ## Phase 5 — Group 3: Static-prop collision
 
-**Status:** Committed — pending device test 🟡
+**Status:** 🟡 Partial — in progress (stopping for the night 2026-05-14)
 **Date:** 2026-05-14
-**Commits:** C1 (collision module): 6ed8a3c | C2 (engine wiring): b391493
+**Commits:** C1 (collision module): 6ed8a3c | C2 (engine wiring): b391493 | C3 (scale overrides): 30fb59c | C4 (diag logging): 2c04ed9 | C5 (sign fix): 656fddf
 
-### What shipped
+---
 
-- `src/data/gameConstants.ts`: `COLLISION_GRID_CELL_SIZE = 500` — cell size for the spatial grid (6000 / 500 = 12 cols × 12 rows = 144 cells).
-- `src/lib/collision.ts`: Full collision module.
-  - `ColliderRect` / `CollisionData` types.
-  - `SOLID_ASSET_KEYS` set — 29 asset keys: all structures, all vehicle wrecks, medium + large rocks, all trees. Passable props (barrels, crates, small rocks, bushes) are absent.
-  - `buildCollisionData(mapData)` — JS-thread builder called once at map load. Filters MapData to solid props, computes scaled AABB half-extents (STRUCTURE_SPRITE_SCALE=3 for buildings, PROP_SPRITE_SCALE=2 for everything else), bins each collider into the flat spatial grid.
-  - `resolveAABB(currentX, currentY, proposedX, proposedY, entityRadius, collData)` — Reanimated worklet. Minkowski-expanded AABB. Axis-separated: X pass then Y pass, enabling wall-sliding. Grid lookup covers 1–4 cells per query (cellSize=500 >> entityRadius=20), typically 2–8 colliders tested per entity per frame.
-- `src/lib/gameEngine.ts`: `updateGameState` gains `collData: CollisionData` parameter. Player proposed position resolved via `resolveAABB` inside the `if (inputVector !== null)` block, before world-bounds clamping. `tickEnemies` call updated to forward `collData`.
-- `src/lib/enemyEngine.ts`: `tickEnemies` gains `collData: CollisionData` parameter. Each enemy's proposed position resolved via `resolveAABB` before being pushed to `moved[]`.
-- `src/components/GameCanvas.tsx`: `collisionDataShared = useSharedValue<CollisionData>(buildCollisionData(initialMapData))` constructed synchronously at mount. `useFrameCallback` passes `collisionDataShared.value` to `updateGameState`.
+### Completed
+
+- **Collision pool locked: uniform full-bounding-box AABB**
+  - Solid (29 asset keys): all structures, all vehicle wrecks, medium + large rocks, all trees
+  - Passable (excluded): bushes, barrels/crates, small rocks
+- **Spatial partitioning: fixed 12×12 grid, cellSize=500px** — NOT viewport-cull (would clip enemies through off-screen buildings)
+- **`collision.ts` shipped (6ed8a3c):** `ColliderRect`, `CollisionData`, `buildCollisionData()`, `resolveAABB()` with axis-separated response and Minkowski expansion
+- **Engine integration shipped (b391493):** `gameEngine.ts` and `enemyEngine.ts` call `resolveAABB` during movement; `GameCanvas` builds `CollisionData` after map load and passes via its own `SharedValue` (outside `GameState` per JSI-serialization rule)
+- **`resolveAABB` sign bug fixed (656fddf):** `dxDir`/`dyDir` now use `currentX`/`currentY` as the push-direction source instead of the proposed/resolved position. Eliminates large teleports and rubber-banding. Root cause: a large step could cross the rect centre, flipping the sign and launching the entity to the far wall. Most dramatic near the bomber wreck (~800px effective AABB).
+- **AABB approximation for rotated wrecks accepted as known limitation** — helicopter and bomber rotation produces ~1.4× phantom collision zone. OBB deferred indefinitely. Per-asset scale overrides compensate visually; math limitation remains (tech debt G).
+- **Bullet/projectile collision against props OUT of scope** — deferred to Phase 6 polish if at all.
+- **Diagnostic instrumentation active (2c04ed9):** `[DIAG coll]` mount-time log + `[DIAG resolve]` worklet log with `<<BACKWARD>>` flag. Strip at G3 close-out.
+
+---
+
+### Remaining for G3 close-out
+
+**Item 1 — Per-asset collision scale overrides**
+
+Wrecks have transparent PNG padding producing oversized hitboxes (visible "invisible wall" outside the rendered sprite). Implement `COLLISION_SCALE_OVERRIDES` map keyed by `assetKey` in `collision.ts`. Apply multiplier to `halfW`/`halfH` at collider build time in `buildCollisionData`.
+
+Starting tuning values:
+- `env_helicopter_wreck`: 0.60
+- `env_bomber_wreck_2`, `env_bomber_wreck_3`: 0.55
+- `env_bus_wreck`: 0.75
+- `env_acs_wreck`: 0.75
+- `env_humvee_wreck_1` → `env_humvee_wreck_6`: 0.70
+- `env_car_wreck_1`, `env_car_wreck_2`, `env_car_wreck_3`: 0.65
+- `env_police_wreck`, `env_ambulance_wreck`, `env_small_truck_wreck`: 0.70
+
+Device-test after commit. Tune individual values ±0.05–0.10 if any specific asset still feels off.
+
+**Item 2 — G3 close-out commit**
+- Strip all `[DIAG coll]` and `[DIAG resolve]` instrumentation
+- Progress log entry summarizing G3 (similar to G2 narrative entry)
+- Binding pattern additions to master context doc:
+  - **Collision data ownership rule:** `CollisionData` lives in its own `SharedValue`, NOT in `GameState`. Built once at map load, read by worklets every frame. Same rule as `tileGrid` in G2 — only worklet-mutated data goes in `GameState`.
+  - **Scaled-footprint collision rule:** AABB collision uses the same scaled dimensions as the renderer. If `PROP_SPRITE_SCALE` changes, collision math reflects it automatically. Same rule as spacing logic in G2.
+  - **Per-asset collision overrides:** Some sprites have significant transparent PNG padding. Use `COLLISION_SCALE_OVERRIDES` map to shrink per asset. Future assets with padding need an override entry.
+- Tech debt entries F, G, H already added to this log (see Open Issues table above).
+
+---
+
+### Pending brainstorm topics (deferred to next session, before G4 work)
+
+- **File refactor decision:** targeted splits between G3 and G4 (GameCanvas.tsx derived-value hooks + timer logic → separate files), full pass as Phase 5.5, or accept context cost through Phase 5
+- **Polish ideas tabled during Phase 5:** cluster tree spawning, water as centerpiece prop (vegetation theme), water border at map edge, bomber sprite scale tuning if needed
+- **DLC concept:** urban theme map for v1.1+ free update (Mo sourcing 4–5 war-torn buildings, concrete barriers, rubble piles, street lamps; reuses existing modern vehicle pack)
+- Anything else accumulated during Phase 5 work
+
+---
 
 ### Architectural decisions made during G3
 
 - **Fixed-grid spatial partitioning over viewport culling.** Viewport cull rejected: enemies spawn at screen edge and walk toward player. A building just off-screen would produce clip-through until it crossed into view. Fixed 12×12 grid covers the full world; O(1) neighbourhood lookup regardless of player position.
 - **CollisionData in its own SharedValue, not embedded in GameState.** Follows the G2 JSI-serialization rule: only worklet-read data goes in SharedValues; static world data must not inflate the per-frame GameState write cost. CollisionData is written once at mount from the JS thread; worklets read it cheaply each frame.
-- **AABB approximation for rotated wrecks (accepted for G3).** Helicopter and bomber wrecks have random `rotation` values in `PlacedEntity`. Axis-aligned bounding boxes using unrotated native dimensions are used. Square sprites (most wrecks) are exact; non-square sprites (bomber_wreck_2/3, 288×192) are slightly under-sized at oblique angles. Accepted as "wrecks feel slightly smaller than they look" at worst. Upgrade to OBB in Phase 6+ if device testing reveals visible clip-through on bomber wrecks.
-- **Passable props excluded via explicit opt-in set.** `SOLID_ASSET_KEYS` is the authoritative list. `mapData.barrels` is skipped entirely in `buildCollisionData`; env_rock_small and all env_bush_* variants are absent from the set. No interaction or feedback for passable props — per spec.
-- **Enemy-vs-enemy collision unchanged.** Enemies still clip through each other. Only entity-vs-static-prop is added in G3.
+- **AABB approximation for rotated wrecks (accepted for G3).** Helicopter and bomber wrecks have random `rotation` values in `PlacedEntity`. Unrotated AABB used. Square sprites (most wrecks) are exact; non-square sprites (`bomber_wreck_2/3`, 288×192) slightly under-sized at oblique angles. OBB deferred indefinitely.
+- **Passable props excluded via explicit opt-in set.** `SOLID_ASSET_KEYS` is the authoritative list. `mapData.barrels` skipped entirely in `buildCollisionData`; `env_rock_small` and all `env_bush_*` absent from the set.
+- **Enemy-vs-enemy collision unchanged.** Enemies still clip through each other. Only entity-vs-static-prop added in G3.
+- **resolveAABB sign source: currentX/currentY, not proposed/resolved.** Push direction must be derived from the pre-movement position. Using the proposed position as the sign source causes incorrect push direction when a large step crosses the rect centre (far-wall teleport). Fix landed in 656fddf.
 
 ### Pending verification (device test before marking complete)
 
 - [ ] Player cannot walk through any solid prop (houses, wrecks, medium/large rocks, trees)
 - [ ] Player walks through passable props with no resistance (barrels, crates, small rocks, bushes)
 - [ ] Sliding along walls works smoothly — diagonal into a wall resolves to a parallel slide, not a stuck freeze
-- [ ] Enemies route around buildings — do they bunch at corners, route around, or get stuck?
+- [ ] Collision hitboxes approximately match visible sprite silhouettes (scale override tuning pass)
+- [ ] No large teleports or rubber-banding near any prop
+- [ ] Enemies route around buildings
 - [ ] No FPS regression (60fps; stutter bounded to pre-G3 baseline)
 - [ ] All Phase 4 systems still functional (combat, pickups, throwables, crates, progression)
-
----
 
 ---
 
