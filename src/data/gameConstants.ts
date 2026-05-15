@@ -298,10 +298,10 @@ export const SNIPER_RATIO_RAMP_END_MS = 120000;
 /** Peak fraction of spawns that are snipers (reached at SNIPER_RATIO_RAMP_END_MS). */
 export const SNIPER_RATIO_MAX = 0.15;
 
-/** Muzzle flash animation: 3 frames at 50ms each = 150ms total. Non-looping. */
+/** Muzzle flash animation: 3 frames at 50ms each. 200ms window catches the 100ms timer. Non-looping. */
 export const MUZZLE_FLASH_FRAME_COUNT = 3;
 export const MUZZLE_FLASH_FRAME_DURATION_MS = 50;
-export const MUZZLE_FLASH_DURATION_MS = 150;
+export const MUZZLE_FLASH_DURATION_MS = 200;
 
 // ─── Throwables ───────────────────────────────────────────────────────────────
 

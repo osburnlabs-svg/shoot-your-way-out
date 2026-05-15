@@ -224,6 +224,12 @@ export type EnemyState = {
    * Always 0 for scav and raider (fire mechanic unused).
    */
   fireCooldownMs: number;
+  /**
+   * elapsedMs when this sniper last fired (muzzle flash trigger).
+   * 0 at spawn. Read by the 100ms timer to compute per-slot flash frame index.
+   * Always 0 for scav and raider.
+   */
+  lastFiredAtMs: number;
 };
 
 /**
@@ -263,16 +269,11 @@ export type ProjectileState = {
    */
   hitEnemyIds: number[];
   /**
-   * True when this projectile is a rocket (gp25 weapon OR sniperB variant).
+   * True when this projectile is a rocket (gp25 weapon).
    * Renderer switches from Circle to rocket sprite Image.
-   * combatEngine applies AOE damage only when isRocket && !isEnemyProjectile.
+   * combatEngine applies AOE damage on first enemy hit.
    */
   isRocket: boolean;
-  /**
-   * True when fired by a sniper enemy. Collision is checked against the player
-   * instead of enemies. AOE logic is skipped regardless of isRocket.
-   */
-  isEnemyProjectile: boolean;
 };
 
 /**
@@ -347,17 +348,13 @@ export type ThrowableState = {
  *   Duration: FRAG_EXPLODE_FRAME_COUNT × FRAG_EXPLODE_FRAME_DURATION_MS (400ms).
  *   Visual: Explode sprite (4 frames, non-looping) — same as frag detonation.
  *
- * type 'muzzle_flash_a': sniper kit (sniperA) fire flash. 3 frames × 50ms = 150ms.
- *   Spawned at sniper position when fireCooldownMs resets. Visual-only, no gameplay effect.
- * type 'muzzle_flash_b': soldier02 (sniperB) fire flash. Same duration/frame count as 'a'.
- *
  * spawnedAtMs: elapsedMs when the zone was created (throwable landed or rocket hit).
  * lastTickAppliedMs: elapsedMs of the most recent DoT tick. 0 at spawn.
  *   Updated by tickEffectZones each time damage is applied. Unused for explosion/muzzle_flash.
  */
 export type EffectZoneState = {
   id: number;
-  type: 'smoke' | 'molotov' | 'flame' | 'explosion' | 'muzzle_flash_a' | 'muzzle_flash_b';
+  type: 'smoke' | 'molotov' | 'flame' | 'explosion';
   x: number;
   y: number;
   /** Spawn-time orientation in radians. Non-zero only for 'flame' (flamethrower cone zones). */

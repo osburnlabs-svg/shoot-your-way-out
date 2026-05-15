@@ -17,7 +17,7 @@
  *   - Gunner/Sniper/vehicle AI variants (Phase 5)
  */
 
-import type { GameState, EnemyState, ProjectileState } from './gameEngine';
+import type { GameState, EnemyState } from './gameEngine';
 import { ENEMY_PROFILES } from '../data/enemies';
 import type { EnemyType } from '../data/enemies';
 import {
@@ -37,8 +37,6 @@ import {
   CAMERA_ZOOM,
   SNIPER_FIRE_RANGE_PX,
   SNIPER_FIRE_COOLDOWN_MS,
-  SNIPER_PROJECTILE_SPEED_PX_PER_SEC,
-  SNIPER_PROJECTILE_DAMAGE,
   SNIPER_MAX_ACTIVE,
   SNIPER_RATIO_RAMP_START_MS,
   SNIPER_RATIO_RAMP_END_MS,
@@ -46,7 +44,6 @@ import {
 } from '../data/gameConstants';
 import { resolveAABB, resolveCircle } from './collision';
 import type { CollisionData } from './collision';
-import { spawnEffectZoneAt } from './throwableEngine';
 
 /** Linear interpolation — inlined here to avoid importing a non-worklet util. */
 function lerp(a: number, b: number, t: number): number {
@@ -155,10 +152,6 @@ export function tickEnemies(state: GameState, dtMs: number, collData: CollisionD
   let enemies = state.enemies;
   let nextEnemyId = state.nextEnemyId;
   let spawnAccMs = state.spawnAccMs;
-  let nextProjectileId = state.nextProjectileId;
-  let effectZones = state.effectZones;
-  let nextEffectZoneId = state.nextEffectZoneId;
-  const newEnemyProjectiles: ProjectileState[] = [];
 
   // ─── Spawner ──────────────────────────────────────────────────────────────
   // enemies is a fixed ENEMY_SOFT_CAP-length sparse array (null = empty slot).
@@ -218,6 +211,7 @@ export function tickEnemies(state: GameState, dtMs: number, collData: CollisionD
           lastHitPlayerAtMs: 0,
           hitFlashUntilMs: 0,
           fireCooldownMs: isSniper ? SNIPER_FIRE_COOLDOWN_MS : 0,
+          lastFiredAtMs: 0,
         };
         nextEnemyId += 1;
         acc -= intervalMs;
@@ -278,40 +272,13 @@ export function tickEnemies(state: GameState, dtMs: number, collData: CollisionD
     const dy = py - enemy.y;
     const dist = Math.sqrt(dx * dx + dy * dy);
 
-    // ── Sniper fire: decrement cooldown, fire when in range and ready ─────
+    // ── Sniper fire: decrement cooldown, record lastFiredAtMs when in range ──
     let newFireCd = enemy.fireCooldownMs;
+    let newLastFiredAtMs = enemy.lastFiredAtMs;
     if ((enemy.type === 'sniperA' || enemy.type === 'sniperB') && dist > 0) {
       newFireCd = Math.max(0, enemy.fireCooldownMs - dtMs);
       if (newFireCd === 0 && dist <= SNIPER_FIRE_RANGE_PX) {
-        const angle = Math.random() * 2 * Math.PI;
-        const nx = Math.cos(angle);
-        const ny = Math.sin(angle);
-        newEnemyProjectiles.push({
-          id: nextProjectileId,
-          x: enemy.x,
-          y: enemy.y,
-          vxPxPerSec: nx * SNIPER_PROJECTILE_SPEED_PX_PER_SEC,
-          vyPxPerSec: ny * SNIPER_PROJECTILE_SPEED_PX_PER_SEC,
-          speedPxPerSec: SNIPER_PROJECTILE_SPEED_PX_PER_SEC,
-          distanceTraveledPx: 0,
-          maxRangePx: SNIPER_FIRE_RANGE_PX,
-          damage: SNIPER_PROJECTILE_DAMAGE,
-          pierceRemaining: 0,
-          hitEnemyIds: [],
-          isRocket: false,
-          isEnemyProjectile: true,
-        });
-        nextProjectileId += 1;
-        // Muzzle flash at sniper position — visual flair only.
-        const flashType = enemy.type === 'sniperA' ? 'muzzle_flash_a' : 'muzzle_flash_b';
-        const tmpFlashState = spawnEffectZoneAt(
-          { ...state, effectZones, nextEffectZoneId },
-          flashType,
-          enemy.x,
-          enemy.y,
-        );
-        effectZones = tmpFlashState.effectZones;
-        nextEffectZoneId = tmpFlashState.nextEffectZoneId;
+        newLastFiredAtMs = elapsedMs;
         newFireCd = SNIPER_FIRE_COOLDOWN_MS;
       }
     }
@@ -330,6 +297,7 @@ export function tickEnemies(state: GameState, dtMs: number, collData: CollisionD
         lastHitPlayerAtMs: enemy.lastHitPlayerAtMs,
         hitFlashUntilMs: enemy.hitFlashUntilMs,
         fireCooldownMs: newFireCd,
+        lastFiredAtMs: newLastFiredAtMs,
       });
     } else {
       const propX = enemy.x + (dx / dist) * speed * dtSec;
@@ -348,17 +316,9 @@ export function tickEnemies(state: GameState, dtMs: number, collData: CollisionD
         lastHitPlayerAtMs: enemy.lastHitPlayerAtMs,
         hitFlashUntilMs: enemy.hitFlashUntilMs,
         fireCooldownMs: newFireCd,
+        lastFiredAtMs: newLastFiredAtMs,
       });
     }
-  }
-
-  // Merge new sniper projectiles into the existing projectile array.
-  let updatedProjectiles = state.projectiles;
-  if (newEnemyProjectiles.length > 0) {
-    const allProjs: ProjectileState[] = [];
-    for (let i = 0; i < state.projectiles.length; i++) allProjs.push(state.projectiles[i]);
-    for (let i = 0; i < newEnemyProjectiles.length; i++) allProjs.push(newEnemyProjectiles[i]);
-    updatedProjectiles = allProjs;
   }
 
   return {
@@ -366,9 +326,5 @@ export function tickEnemies(state: GameState, dtMs: number, collData: CollisionD
     enemies: moved,
     nextEnemyId,
     spawnAccMs,
-    projectiles: updatedProjectiles,
-    nextProjectileId,
-    effectZones,
-    nextEffectZoneId,
   };
 }

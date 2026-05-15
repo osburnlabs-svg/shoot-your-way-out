@@ -151,7 +151,6 @@ export function tickCombat(state: GameState, dtMs: number): GameState {
           pierceRemaining: effective.pierce,
           hitEnemyIds: [],
           isRocket: false,
-          isEnemyProjectile: false,
         });
         nextProjectileId += 1;
       }
@@ -170,7 +169,6 @@ export function tickCombat(state: GameState, dtMs: number): GameState {
         pierceRemaining: effective.pierce,
         hitEnemyIds: [],
         isRocket: true,
-        isEnemyProjectile: false,
       });
       nextProjectileId += 1;
     } else if (weapon.id === 'rpo') {
@@ -202,7 +200,6 @@ export function tickCombat(state: GameState, dtMs: number): GameState {
         pierceRemaining: effective.pierce,
         hitEnemyIds: [],
         isRocket: false,
-        isEnemyProjectile: false,
       });
       nextProjectileId += 1;
     }
@@ -230,7 +227,6 @@ export function tickCombat(state: GameState, dtMs: number): GameState {
       pierceRemaining: p.pierceRemaining,
       hitEnemyIds: p.hitEnemyIds,
       isRocket: p.isRocket,
-      isEnemyProjectile: p.isEnemyProjectile,
     });
   }
 
@@ -255,20 +251,6 @@ export function tickCombat(state: GameState, dtMs: number): GameState {
   for (let pi = 0; pi < movedProjectiles.length; pi++) {
     const proj = movedProjectiles[pi];
 
-    // Enemy projectiles skip the enemy collision loop — handled in step 6.5.
-    if (proj.isEnemyProjectile) {
-      finalProjectiles.push({
-        id: proj.id, x: proj.x, y: proj.y,
-        vxPxPerSec: proj.vxPxPerSec, vyPxPerSec: proj.vyPxPerSec,
-        speedPxPerSec: proj.speedPxPerSec,
-        distanceTraveledPx: proj.distanceTraveledPx, maxRangePx: proj.maxRangePx,
-        damage: proj.damage, pierceRemaining: proj.pierceRemaining,
-        hitEnemyIds: proj.hitEnemyIds, isRocket: proj.isRocket,
-        isEnemyProjectile: true,
-      });
-      continue;
-    }
-
     let pierceRemaining = proj.pierceRemaining;
     // Copy hitEnemyIds for mutation within this tick.
     const hitEnemyIds: number[] = [];
@@ -292,7 +274,7 @@ export function tickCombat(state: GameState, dtMs: number): GameState {
       const dx = proj.x - enemy.x;
       const dy = proj.y - enemy.y;
       if (dx * dx + dy * dy < PROJ_ENEMY_COLLISION_R_SQ) {
-        if (proj.isRocket && !proj.isEnemyProjectile) {
+        if (proj.isRocket) {
           // Player rocket: record impact position for AOE pass — skip damageAccum.
           rocketImpacts.push({ x: proj.x, y: proj.y, damage: proj.damage });
           rocketDetonated = true;
@@ -341,7 +323,6 @@ export function tickCombat(state: GameState, dtMs: number): GameState {
         pierceRemaining,
         hitEnemyIds,
         isRocket: proj.isRocket,
-        isEnemyProjectile: false,
       });
     }
   }
@@ -397,6 +378,7 @@ export function tickCombat(state: GameState, dtMs: number): GameState {
       // Flash on every hit, including the kill shot — applies to dying enemies too.
       hitFlashUntilMs: elapsedMs + HIT_FLASH_DURATION_MS,
       fireCooldownMs: enemy.fireCooldownMs,
+      lastFiredAtMs: enemy.lastFiredAtMs,
     });
   }
 
@@ -512,6 +494,7 @@ export function tickCombat(state: GameState, dtMs: number): GameState {
         lastHitPlayerAtMs: elapsedMs,
         hitFlashUntilMs: enemy.hitFlashUntilMs,
         fireCooldownMs: enemy.fireCooldownMs,
+        lastFiredAtMs: enemy.lastFiredAtMs,
       });
     } else {
       contactCheckedEnemies.push(enemy);

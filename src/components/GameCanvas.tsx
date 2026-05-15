@@ -96,6 +96,7 @@ import {
   SOLDIER02_WALK_FRAME_DURATION_MS,
   MUZZLE_FLASH_FRAME_COUNT,
   MUZZLE_FLASH_FRAME_DURATION_MS,
+  MUZZLE_FLASH_DURATION_MS,
   WALK_FRAME_COUNT,
   WALK_FRAME_DURATION_MS,
   ENEMY_DIE_FRAME_COUNT,
@@ -726,6 +727,10 @@ export default function GameCanvas({ width, height }: Props) {
   const [enemySlotFrames, setEnemySlotFrames] = useState<number[]>(
     () => Array.from({ length: ENEMY_SOFT_CAP }, () => 0),
   );
+  // Per-slot muzzle flash frame index. -1 = not flashing. 0–2 = active flash frame.
+  const [enemySlotFlashFrames, setEnemySlotFlashFrames] = useState<number[]>(
+    () => Array.from({ length: ENEMY_SOFT_CAP }, () => -1),
+  );
 
   // ─── Player vitals + death flag + level (React, updated by 100ms timer) ──
   const [displayHp, setDisplayHp] = useState(100);
@@ -754,6 +759,7 @@ export default function GameCanvas({ width, height }: Props) {
     enemyTypes:   new Array<EnemyType | null>(ENEMY_SOFT_CAP).fill(null),
     enemyStatus:  new Array<'alive' | 'dying' | null>(ENEMY_SOFT_CAP).fill(null),
     enemyFrames:  new Array<number>(ENEMY_SOFT_CAP).fill(0),
+    flashFrames:  new Array<number>(ENEMY_SOFT_CAP).fill(-1),
     pickupActive: new Array<boolean>(PICKUP_SLOT_COUNT).fill(false),
     rockets:      new Array<boolean>(PROJECTILE_SLOT_COUNT).fill(false),
     tSlots: Array.from({ length: THROWABLE_SLOT_COUNT }, () => ({
@@ -764,7 +770,7 @@ export default function GameCanvas({ width, height }: Props) {
       targetY: 0,
     })),
     zSlots: Array.from({ length: EFFECT_ZONE_SLOT_COUNT }, () => ({
-      type:     null as 'smoke' | 'molotov' | 'flame' | 'explosion' | 'muzzle_flash_a' | 'muzzle_flash_b' | null,
+      type:     null as 'smoke' | 'molotov' | 'flame' | 'explosion' | null,
       x: 0, y: 0, frame: 0, rotation: 0,
     })),
   });
@@ -857,6 +863,23 @@ export default function GameCanvas({ width, height }: Props) {
       setEnemySlotStatuses(es.slice());
       setEnemySlotFrames(ef.slice());
 
+      // Muzzle flash frame per enemy slot — -1 when not flashing.
+      const ff = timerBuffers.current.flashFrames;
+      for (let i = 0; i < ENEMY_SOFT_CAP; i++) { ff[i] = -1; }
+      for (let i = 0; i < state.enemies.length; i++) {
+        const enemy = state.enemies[i];
+        if (!enemy || (enemy.type !== 'sniperA' && enemy.type !== 'sniperB')) continue;
+        if (enemy.lastFiredAtMs <= 0) continue;
+        const flashElapsed = state.elapsedMs - enemy.lastFiredAtMs;
+        if (flashElapsed >= 0 && flashElapsed < MUZZLE_FLASH_DURATION_MS) {
+          ff[i] = Math.min(
+            Math.floor(flashElapsed / MUZZLE_FLASH_FRAME_DURATION_MS),
+            MUZZLE_FLASH_FRAME_COUNT - 1,
+          );
+        }
+      }
+      setEnemySlotFlashFrames(ff.slice());
+
       // Pickup slot active flags — buffer pattern.
       const pa = timerBuffers.current.pickupActive;
       for (let i = 0; i < PICKUP_SLOT_COUNT; i++) { pa[i] = !!state.pickups[i]; }
@@ -913,11 +936,6 @@ export default function GameCanvas({ width, height }: Props) {
         } else if (z.type === 'explosion') {
           zFrame = getCurrentFrame(
             { frameCount: FRAG_EXPLODE_FRAME_COUNT, frameDurationMs: FRAG_EXPLODE_FRAME_DURATION_MS, loop: false },
-            state.elapsedMs - z.spawnedAtMs,
-          );
-        } else if (z.type === 'muzzle_flash_a' || z.type === 'muzzle_flash_b') {
-          zFrame = getCurrentFrame(
-            { frameCount: MUZZLE_FLASH_FRAME_COUNT, frameDurationMs: MUZZLE_FLASH_FRAME_DURATION_MS, loop: false },
             state.elapsedMs - z.spawnedAtMs,
           );
         }
@@ -1226,7 +1244,7 @@ export default function GameCanvas({ width, height }: Props) {
   // type drives render mode (null = skip). x/y are static per zone lifetime.
   // frame drives flame/explosion animation cycling.
   const [zoneSlotData, setZoneSlotData] = useState<Array<{
-    type: 'smoke' | 'molotov' | 'flame' | 'explosion' | 'muzzle_flash_a' | 'muzzle_flash_b' | null;
+    type: 'smoke' | 'molotov' | 'flame' | 'explosion' | null;
     x: number;
     y: number;
     frame: number;
@@ -1616,24 +1634,6 @@ export default function GameCanvas({ width, height }: Props) {
                 />
               );
             }
-            if (z.type === 'muzzle_flash_a' || z.type === 'muzzle_flash_b') {
-              const imgs = z.type === 'muzzle_flash_a' ? muzzleFlashAImages : muzzleFlashBImages;
-              const flashImg = imgs[z.frame] ?? imgs[0] ?? null;
-              if (!flashImg) return null;
-              const fw = flashImg.width() * EFFECT_SPRITE_SCALE;
-              const fh = flashImg.height() * EFFECT_SPRITE_SCALE;
-              return (
-                <Image
-                  key={`zone-${i}`}
-                  image={flashImg}
-                  x={z.x - fw / 2}
-                  y={z.y - fh / 2}
-                  width={fw}
-                  height={fh}
-                  sampling={{ filter: FilterMode.Nearest, mipmap: MipmapMode.None }}
-                />
-              );
-            }
             // Molotov — static Explode frame 3 (index 2): peak-bloom, reads as
             // fire patch rather than directional stream. No frame cycling.
             const molotovImg = explodeImages[2] ?? null;
@@ -1812,6 +1812,10 @@ export default function GameCanvas({ width, height }: Props) {
             const bw = bodyOverlay ? bodyOverlay.width() * ENEMY_SPRITE_SCALE : 0;
             const bh = bodyOverlay ? bodyOverlay.height() * ENEMY_SPRITE_SCALE : 0;
 
+            const flashFrame = (type === 'sniperA' || type === 'sniperB') ? (enemySlotFlashFrames[i] ?? -1) : -1;
+            const flashImgs = type === 'sniperA' ? muzzleFlashAImages : muzzleFlashBImages;
+            const flashImg = flashFrame >= 0 ? (flashImgs[flashFrame] ?? null) : null;
+
             return (
               <Group key={i} transform={transform}>
                 <Image
@@ -1829,6 +1833,16 @@ export default function GameCanvas({ width, height }: Props) {
                     y={-bh / 2}
                     width={bw}
                     height={bh}
+                    sampling={{ filter: FilterMode.Nearest, mipmap: MipmapMode.None }}
+                  />
+                )}
+                {flashImg && (
+                  <Image
+                    image={flashImg}
+                    x={-flashImg.width() * EFFECT_SPRITE_SCALE / 2}
+                    y={-flashImg.height() * EFFECT_SPRITE_SCALE / 2}
+                    width={flashImg.width() * EFFECT_SPRITE_SCALE}
+                    height={flashImg.height() * EFFECT_SPRITE_SCALE}
                     sampling={{ filter: FilterMode.Nearest, mipmap: MipmapMode.None }}
                   />
                 )}
