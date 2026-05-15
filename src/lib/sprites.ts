@@ -184,8 +184,9 @@ export const EffectSprites = {
     require('../../assets/effects/explode/4.png'),
   ],
   bullet: require('../../assets/effects/bullet/GunnerBullet.png'),
-  // 2-frame rocket body animation (assets/effects/rocket/1–2.png).
-  // Exhaust trail frames (rocket-f1/f2/f3 from kit) skipped for v1 — Phase 6 polish.
+  // Grenade launcher projectile sprite (3×12 px, static single frame).
+  rocketF1: require('../../assets/effects/rocket/rocket-f1.png'),
+  // 2-frame rocket body animation — kept for tank turret projectile (Phase 5 G5).
   rocket: [
     require('../../assets/effects/rocket/1.png'),
     require('../../assets/effects/rocket/2.png'),

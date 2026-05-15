@@ -502,8 +502,10 @@ export default function GameCanvas({ width, height }: Props) {
   const smoke6 = useImage(EffectSprites.smoke[6]);
   const smokeImages = [smoke0, smoke1, smoke2, smoke3, smoke4, smoke5, smoke6];
 
-  // Rocket: 2-frame body animation (effects/rocket/1–2.png).
   const bulletImage = useImage(EffectSprites.bullet);
+  // Grenade launcher projectile: single static frame (rocket-f1.png, 3×12 px).
+  const rocketF1Image = useImage(EffectSprites.rocketF1);
+  // Tank turret rocket (Phase 5 G5): 2-frame body animation — kept for future use.
   const rocket0 = useImage(EffectSprites.rocket[0]);
   const rocket1 = useImage(EffectSprites.rocket[1]);
   const rocketImages = [rocket0, rocket1];
@@ -1635,24 +1637,23 @@ export default function GameCanvas({ width, height }: Props) {
 
           {/* ── Projectiles ──────────────────────────────────────────────── */}
           {/* Screen-coord derived values — outside camera Group.            */}
-          {/* Rockets: animated sprite. Bullets: GunnerBullet sprite (1×3 px, 2× scale). */}
-          {/* Transform includes rotation from atan2(vy, vx) — sprite points in travel dir. */}
+          {/* Rockets: rocketF1 sprite (3×12, 2× scale). Bullets: GunnerBullet (1×3, 2× scale). */}
+          {/* Transform includes rotation from atan2(vy, vx) — sprite points in travel dir.  */}
           {allProjectileTransforms.map((transform, i) => {
             if (projIsRocket[i]) {
-              const rImg = rocketImages[rocketFrame] ?? rocketImages[0] ?? null;
-              if (!rImg) {
+              if (!rocketF1Image) {
                 return (
                   <Group key={`proj-${i}`} transform={transform}>
                     <Circle cx={0} cy={0} r={4} color="#f5c842" />
                   </Group>
                 );
               }
-              const rw = rImg.width() * EFFECT_SPRITE_SCALE;
-              const rh = rImg.height() * EFFECT_SPRITE_SCALE;
+              const rw = rocketF1Image.width() * EFFECT_SPRITE_SCALE;
+              const rh = rocketF1Image.height() * EFFECT_SPRITE_SCALE;
               return (
                 <Group key={`proj-${i}`} transform={transform}>
                   <Image
-                    image={rImg}
+                    image={rocketF1Image}
                     x={-rw / 2}
                     y={-rh / 2}
                     width={rw}
