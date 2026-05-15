@@ -98,11 +98,16 @@ const COLLISION_SCALE_OVERRIDES: Record<string, number> = {
   env_humvee_wreck_6: 0.70,
   // ACS wreck + bus — large sprites with visible padding
   env_acs_wreck: 0.75,
-  env_bus_wreck: 0.75,
+  env_bus_wreck: 0.65,
   // Aircraft — heavy padding + rotation AABB approximation compounds the oversize
   env_helicopter_wreck: 0.60,
   env_bomber_wreck_2:   0.55,
   env_bomber_wreck_3:   0.55,
+  // Large trees — sprite canvas has padding outside the trunk/canopy silhouette
+  env_tree_large_1: 0.70,
+  env_tree_large_2: 0.70,
+  env_tree_large_3: 0.70,
+  env_tree_large_4: 0.70,
 };
 
 // ─── Helpers (JS-thread only) ─────────────────────────────────────────────────
