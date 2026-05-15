@@ -83,11 +83,12 @@ export const SOLID_ASSET_KEYS = new Set<string>([
   'env_tree_small_3',
 ]);
 
-// ─── Wreck circle radii ───────────────────────────────────────────────────────
+// ─── Circle collider radii ────────────────────────────────────────────────────
 //
-// Vehicle wrecks use circle collision instead of AABB — rotation-invariant,
-// no axis-separation edge cases. Radii are tuning-starting values in world px.
-const WRECK_COLLISION_RADIUS: Record<string, number> = {
+// Props in this map use circle collision instead of AABB — rotation-invariant,
+// no axis-separation edge cases. Radii are world-px values tuned on device.
+const CIRCLE_COLLIDER_RADIUS: Record<string, number> = {
+  // Vehicle wrecks
   env_helicopter_wreck:  120,
   env_bomber_wreck_2:    144,
   env_bomber_wreck_3:    144,
@@ -105,6 +106,11 @@ const WRECK_COLLISION_RADIUS: Record<string, number> = {
   env_police_wreck:       75,
   env_ambulance_wreck:    75,
   env_small_truck_wreck:  75,
+  // Large trees — non-square AABB produces asymmetric hitbox; circle is uniform
+  env_tree_large_1:       50,
+  env_tree_large_2:       50,
+  env_tree_large_3:       50,
+  env_tree_large_4:       50,
 };
 
 // ─── Per-asset collision scale overrides ─────────────────────────────────────
@@ -177,7 +183,7 @@ export function buildCollisionData(mapData: MapData): CollisionData {
   for (let i = 0; i < cols * rows; i++) circleGrid.push([]);
 
   function addCircle(ent: PlacedEntity): void {
-    const radius = WRECK_COLLISION_RADIUS[ent.assetKey];
+    const radius = CIRCLE_COLLIDER_RADIUS[ent.assetKey];
     if (radius === undefined) return;
     const idx = circles.length;
     circles.push({ x: ent.x, y: ent.y, radius });
@@ -217,7 +223,10 @@ export function buildCollisionData(mapData: MapData): CollisionData {
   for (const ent of mapData.buildings) addEntity(ent);
   for (const ent of mapData.obstacles) addEntity(ent);
   for (const ent of mapData.vehicleWrecks) addCircle(ent);
-  for (const ent of mapData.vegetation) addEntity(ent);
+  for (const ent of mapData.vegetation) {
+    if (CIRCLE_COLLIDER_RADIUS[ent.assetKey] !== undefined) addCircle(ent);
+    else addEntity(ent);
+  }
   // mapData.barrels intentionally skipped — all passable
 
   return { rects, grid, circles, circleGrid, cellSize, cols, rows };
