@@ -152,6 +152,14 @@ export const PROJECTILE_SLOT_COUNT = 30;
 // ─── Collision ────────────────────────────────────────────────────────────────
 
 /**
+ * World-space cell size (px) for the static-prop collision spatial grid.
+ * 6000 / 500 = 12 columns × 12 rows = 144 cells. At ~101 solid props maximum,
+ * average density is <1 per cell. Each entity checks current cell + up to 8
+ * neighbours → typically 2–8 AABB tests per frame.
+ */
+export const COLLISION_GRID_CELL_SIZE = 500;
+
+/**
  * Circle collision radius for enemies (px). Sprites are 64px source × 2× scale
  * = 128px display, but the actual character body is roughly 40px wide, so 20px
  * radius is a fair hitbox — not too tight, not too forgiving.
