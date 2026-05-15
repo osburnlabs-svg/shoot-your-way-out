@@ -235,7 +235,7 @@ export function resolveAABB(
     const wasOutsideX = Math.abs(currentX - rect.x) >= exHalfW;
     const dx = resolvedX - rect.x;
     const dy = currentY - rect.y;
-    if (wasOutsideX && Math.abs(dx) < exHalfW && Math.abs(dy) < exHalfH) {
+    if (wasOutsideX && Math.abs(dx) < exHalfW && Math.abs(dy) <= exHalfH) {
       const dxDir = currentX - rect.x;
       resolvedX = dxDir >= 0 ? rect.x + exHalfW : rect.x - exHalfW;
     }
@@ -255,7 +255,7 @@ export function resolveAABB(
     const wasOutsideY = Math.abs(currentY - rect.y) >= exHalfH;
     const dx = resolvedX - rect.x;
     const dy = resolvedY - rect.y;
-    if (wasOutsideY && Math.abs(dx) < exHalfW && Math.abs(dy) < exHalfH) {
+    if (wasOutsideY && Math.abs(dx) <= exHalfW && Math.abs(dy) < exHalfH) {
       const dyDir = currentY - rect.y;
       resolvedY = dyDir >= 0 ? rect.y + exHalfH : rect.y - exHalfH;
     }
