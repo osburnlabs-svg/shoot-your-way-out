@@ -30,7 +30,7 @@ Status legend:
 | 4a — Stat skills + level-up | 🟢 Complete | 2026-05-10 | G1: c4daad8 G2: a095517 G3: f297b4b G3-polish: 461b25b→d90aedf→ba505fc G4: ee7f7d5 G4-cleanup: 5690324 | G1 ✅ G2 ✅ G3 ✅ G4 ✅ | Full progression loop closed. G4: weapon unlocks L4/8/12/16 + all 8 weapon renames |
 | 4b — Ability skills + crates | 🟢 Complete | 2026-05-10 | G1: 5411988 Slot-fix: 8ff2533 G2: 18b44e3 G3: e2a1deb G4: 8c31b42 G4-polish: 9cb7762 G5: b4091c6 Smoke: 2438bb4 | G1 ✅ G2 ✅ G3 ✅ G4 ✅ G5 ✅ | All 20 v1 skills shipped; throwable system; revive; bloom-hold-dissipate smoke animation |
 | 4c — Crate weapons | 🟢 Complete | 2026-05-11 | G1: 75dc967 Fix: 68f5ef3 266fbd6 G2: d6f1c1c G3: 8c390b3 Polish: cd2d2d8 5a29a3e 2daeffd a0b7e61 4eca404 Close: cb8bddb | G1 ✅ G2 ✅ G3 ✅ | World-spawn crates; weapon roll + reveal modal; Shotgun/Rocket Launcher/Flamethrower active; custom weapon icons; debug scaffold cleaned up |
-| 5 — Maps + obstacles + vehicle enemies | 🟡 In Progress | 2026-05-13 → 2026-05-15 | G1: 99bf87d→3c17fac G2: 86c1a33→44cb822 G3: 6ed8a3c→b391493→30fb59c→2c04ed9→656fddf→c979729→93bc790→289a832→f9c30e7→74b6376→a311bdb→c3450b7 | G1 ✅ G2 ✅ G3 ✅ | Hybrid AABB+circle collision complete and device-verified |
+| 5 — Maps + obstacles + vehicle enemies | 🟡 In Progress | 2026-05-13 → 2026-05-15 | G1: 99bf87d→3c17fac G2: 86c1a33→44cb822 G3: 6ed8a3c→b391493→30fb59c→2c04ed9→656fddf→c979729→93bc790→289a832→f9c30e7→74b6376→a311bdb→c3450b7 G4: 81a0cbd→832828a→1e94df5→ee1e503→345c364→eb0ceec | G1 ✅ G2 ✅ G3 ✅ G4 🟡 device test pending | Collision complete; G4 sniper class + muzzle flash shipped, pending device verification |
 | 6 — Audio + atmospheric effects | ⚪ | | | | |
 | 7 — UI + persistence + analytics | ⚪ | | | | |
 | 8 — Helicopter boss + hazards | ⚪ | | | | |
@@ -925,7 +925,7 @@ Phase 4 transformed the engine from a static survival loop (Phase 3) into a full
 
 **Goal:** Single dynamic procedural map generator (runs at game start, every run is unique), parameterized asset budgets (buildings, vehicles, props, vegetation), seeded random placement with spacing constraints, building metadata for sniper rooftop positions, world camera system, all 8 enemy types working including Humvee/BTR/Panzer/ACS vehicle enemies, enemy ranged fire, single consistent military theme.
 
-**Status:** G1 complete 🟢 — G2 complete 🟢 — G3 committed, pending device test 🟡
+**Status:** G1 complete 🟢 — G2 complete 🟢 — G3 complete 🟢 — G4 in progress 🟡
 
 ---
 
@@ -1091,6 +1091,54 @@ Both passes run every frame; pools never overlap.
 - **Passable props excluded via opt-in set.** `SOLID_ASSET_KEYS` is the authoritative AABB set; `CIRCLE_COLLIDER_RADIUS` is the authoritative circle set. Any prop absent from both is passable.
 - **Enemy-vs-enemy collision unchanged.** Enemies clip through each other. Genre-typical for Vampire Survivors / Brotato style.
 - **Bullets pass through all props.** Genre-typical. Deferred to Phase 6 polish (if added at all).
+
+---
+
+## Phase 5 — Group 4: Sniper class + muzzle flash
+
+**Status:** 🟡 In Progress — code shipped, device test pending
+**Date:** 2026-05-15
+**Commits:** 81a0cbd (bullet sprite swap) → 832828a (raider visual swap) → 1e94df5 (raider body overlay fix) → ee1e503 (sniper class original impl) → 345c364 (G4 redesign: visual-only fire) → eb0ceec (muzzle flash z-order fix + strip projectiles)
+
+### What shipped
+
+**Completed sub-tasks:**
+- **Player bullet sprite swap** (81a0cbd): replaced Skia `<Circle>` projectile rendering with GunnerBullet sprite image. All non-rocket weapons render the GunnerBullet asset; rockets render rocket-f1. Closes the Phase 4c tech debt entry on projectile Circle vs Rect.
+- **Grenade launcher rocket sprite** (part of 81a0cbd): rocket-f1.png wired for gp25 weapon projectiles.
+- **Raider visual swap** (832828a): Raider class now renders Gunner (spec ops) sprite, resolving the "soldier with rocket launcher meleeing" mismatch identified at G3 device test.
+- **Raider body overlay fix** (1e94df5): two-layer compositing for Raider (legs + body overlay) was broken after the sprite swap. Fixed to follow the same pattern as Scav and SniperA.
+- **Sniper class — original impl** (ee1e503): two sniper variants spawned via standard wave pipeline with SNIPER_MAX_ACTIVE=5 cap. sniperA uses Sniper kit sprite; sniperB uses Soldier02. Both walked toward player and dealt melee contact damage. Original spec: sniperB fired rocket projectiles. Enemy-projectile collision detection against player was wired.
+- **G4 redesign** (345c364): scrapped enemy projectiles entirely. Root cause: both variants rendered the same bullet sprite (isRocket flag was never set), and the collision detection against the player was incorrectly routing through the enemy hit path. Decision: make enemy fire visual-only. All enemy projectile code removed from combatEngine.ts. Muzzle flash EffectZones added as the sole visual fire feedback. HP bumped: sniperA 30→50 (2.5× scav), sniperB 30→40 (2× scav).
+- **Muzzle flash z-order fix** (eb0ceec): EffectZones render inside the camera Group (JSX first) but enemy sprites render outside it (JSX after). Result: flash zones were drawn behind enemy sprites — complete occlusion. Fix: abandoned EffectZone approach for muzzle flash. Added `lastFiredAtMs` to EnemyState; fire trigger sets it instead of spawning a zone. 100ms timer computes per-slot flash frame index from `lastFiredAtMs` and pushes it to `enemySlotFlashFrames` React state. Flash image renders inside each sniper's own enemy Group — correct Z-order, guaranteed above the sprite. MUZZLE_FLASH_DURATION_MS bumped 150→200 to ensure the 100ms timer always catches a fresh fire event.
+
+### Current state (pending device verification)
+
+- Snipers spawn correctly via wave pipeline, count capped at SNIPER_MAX_ACTIVE=5
+- sniperA visually distinct (Sniper kit sprite + body overlay)
+- sniperB visually distinct (Soldier02 — no body overlay, full-character sprite)
+- Both variants walk toward player and deal melee contact damage on overlap
+- Muzzle flashes trigger at sniper position when fire cooldown resets and player is within SNIPER_FIRE_RANGE_PX
+- sniperA flash uses Sniper/Effects/1–3.png; sniperB flash uses Gunner/Effect/1–3.png
+- No projectile travels from either sniper variant
+- `isEnemyProjectile` field fully removed from ProjectileState and all combat/enemy engine code
+
+### Known issue (deferred, not blocking device test)
+
+**Muzzle flash position:** flashes render at sprite center, not at weapon barrel. The flash origin is anatomically wrong — appears from chest area instead of gun barrel. Fix requires a per-variant weapon-barrel offset added to the flash render position (different offset for sniperA vs sniperB since their weapon positions differ within the sprite). Tunable per asset once verified visible on device. Deferred until flash visibility is confirmed.
+
+### Remaining for G4 close
+
+1. Device test: confirm flashes visible, correct sprite per variant, no projectile travels, FPS unchanged
+2. Muzzle flash position fix — anchor flash to weapon barrel per variant
+3. Optional (Mo's call): extend muzzle flash to scav and raider classes so all enemies appear to be shooting
+4. Optional (Mo's call): scav/raider sprite swap — Mo editing weaponless Gunner PSD; will drop files when ready
+5. Optional: 50 enemy cap investigation — read-only, check whether 100–150 is feasible at current performance
+6. G4 close-out: strip any diagnostic logging, write G4 narrative entry, add binding patterns to context doc, add tech debt entries
+
+### Pending work after G4 close
+
+- **G5: Tank turret class** — stationary, 3 visual variants (Humvee/BTR/Panzer), fires rocket-shaped projectiles on cooldown, spawns after 2 minutes, drops guaranteed crate. Now the ONLY enemy with genuine ranged damage (G4 became visual-only). Reuses sniper fire trigger pattern but with actual player-hit projectiles.
+- **Camera zoom lock** — CAMERA_ZOOM=1.0 is a placeholder. Final value locked once tiles + enemies + HUD are visible together in G5.
 
 ---
 
