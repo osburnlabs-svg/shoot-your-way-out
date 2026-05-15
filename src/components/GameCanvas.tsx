@@ -520,6 +520,31 @@ export default function GameCanvas({ width, height }: Props) {
   // cheap when no solid props are nearby.
   const collisionDataShared = useSharedValue<CollisionData>(buildCollisionData(initialMapData));
 
+  // DIAG G3 — mount-time collision structure check; strip at G3 close-out
+  useEffect(() => {
+    const cd = collisionDataShared.value;
+    console.log(
+      '[DIAG coll] rects=' + cd.rects.length +
+      ' gridCells=' + cd.grid.length +
+      ' cellSize=' + cd.cellSize,
+    );
+    const wr = initialMapData.vehicleWrecks[0];
+    if (wr) {
+      const match = cd.rects.find(r => Math.abs(r.x - wr.x) < 1 && Math.abs(r.y - wr.y) < 1);
+      console.log(
+        '[DIAG coll] wreck0 ' + wr.assetKey +
+        ' mapPos=(' + wr.x.toFixed(1) + ',' + wr.y.toFixed(1) +
+        ') w=' + wr.width + ' h=' + wr.height,
+      );
+      console.log(
+        '[DIAG coll] wreck0 collider=' + (match
+          ? 'halfW=' + match.halfW.toFixed(1) + ' halfH=' + match.halfH.toFixed(1) +
+            ' at (' + match.x.toFixed(1) + ',' + match.y.toFixed(1) + ')'
+          : 'NOT FOUND'),
+      );
+    }
+  }, []);
+
   // ─── Tile viewport culling state ──────────────────────────────────────────────
   // Tracks which tile the player is currently on. The 100ms timer updates these
   // whenever the player crosses a tile boundary; useMemo rebuilds Atlas arrays only

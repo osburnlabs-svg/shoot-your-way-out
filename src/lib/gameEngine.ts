@@ -626,9 +626,22 @@ export function updateGameState(state: GameState, dtMs: number, collData: Collis
     }
 
     // Resolve proposed position against static solid props.
+    // DIAG G3 — strip at G3 close-out
+    const diagPreX = newX;
+    const diagPreY = newY;
     const resolved = resolveAABB(player.x, player.y, newX, newY, PLAYER_COLLISION_RADIUS_PX, collData);
     newX = resolved.x;
     newY = resolved.y;
+    if (Math.abs(newX - diagPreX) > 2 || Math.abs(newY - diagPreY) > 2) {
+      const backX = newX < player.x - 0.5;
+      const backY = newY < player.y - 0.5;
+      console.log(
+        '[DIAG resolve] cur=(' + player.x.toFixed(1) + ',' + player.y.toFixed(1) +
+        ') prop=(' + diagPreX.toFixed(1) + ',' + diagPreY.toFixed(1) +
+        ') res=(' + newX.toFixed(1) + ',' + newY.toFixed(1) + ')' +
+        (backX || backY ? ' <<BACKWARD>>' : ''),
+      );
+    }
   }
 
   // Clamp player to world bounds so the camera never shows void past tile edges.
