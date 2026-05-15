@@ -218,6 +218,12 @@ export type EnemyState = {
   lastHitPlayerAtMs: number;
   /** elapsedMs until which the enemy renders with a white hit-flash tint. 0 when not flashing. */
   hitFlashUntilMs: number;
+  /**
+   * Remaining cooldown (ms) before the sniper fires its next projectile.
+   * Initialized to SNIPER_FIRE_COOLDOWN_MS at sniper spawn; decremented each tick.
+   * Always 0 for scav and raider (fire mechanic unused).
+   */
+  fireCooldownMs: number;
 };
 
 /**
@@ -257,11 +263,16 @@ export type ProjectileState = {
    */
   hitEnemyIds: number[];
   /**
-   * True when this projectile is a rocket (gp25 weapon).
+   * True when this projectile is a rocket (gp25 weapon OR sniperB variant).
    * Renderer switches from Circle to rocket sprite Image.
-   * combatEngine applies AOE damage on impact instead of single-target damageAccum.
+   * combatEngine applies AOE damage only when isRocket && !isEnemyProjectile.
    */
   isRocket: boolean;
+  /**
+   * True when fired by a sniper enemy. Collision is checked against the player
+   * instead of enemies. AOE logic is skipped regardless of isRocket.
+   */
+  isEnemyProjectile: boolean;
 };
 
 /**

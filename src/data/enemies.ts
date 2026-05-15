@@ -10,7 +10,7 @@
  * xpOnKill is on the profile so G3/4a can consume it — unused in G1.
  */
 
-export type EnemyType = 'scav' | 'raider';
+export type EnemyType = 'scav' | 'raider' | 'sniperA' | 'sniperB';
 
 export type EnemyProfile = {
   id: EnemyType;
@@ -48,5 +48,22 @@ export const ENEMY_PROFILES: Record<EnemyType, EnemyProfile> = {
     // contactDamage=12: meaningfully more threatening than Scav; 24 HP/sec from one Raider
     contactDamage: 12,
     xpOnKill: 8,
+  },
+  sniperA: {
+    id: 'sniperA',
+    displayName: 'Sniper',
+    // hp=30: dies in 3 shots at pistol damage=12 — glass cannon backline character
+    hp: 30,
+    moveSpeed: 0.8,
+    contactDamage: 12,
+    xpOnKill: 6,
+  },
+  sniperB: {
+    id: 'sniperB',
+    displayName: 'Sniper',
+    hp: 30,
+    moveSpeed: 0.8,
+    contactDamage: 12,
+    xpOnKill: 6,
   },
 };

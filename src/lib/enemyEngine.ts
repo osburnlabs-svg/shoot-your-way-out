@@ -17,7 +17,7 @@
  *   - Gunner/Sniper/vehicle AI variants (Phase 5)
  */
 
-import type { GameState, EnemyState } from './gameEngine';
+import type { GameState, EnemyState, ProjectileState } from './gameEngine';
 import { ENEMY_PROFILES } from '../data/enemies';
 import type { EnemyType } from '../data/enemies';
 import {
@@ -35,6 +35,14 @@ import {
   SMOKE_RADIUS_PX,
   SMOKE_SLOW_MULT,
   CAMERA_ZOOM,
+  SNIPER_FIRE_RANGE_PX,
+  SNIPER_FIRE_COOLDOWN_MS,
+  SNIPER_PROJECTILE_SPEED_PX_PER_SEC,
+  SNIPER_PROJECTILE_DAMAGE,
+  SNIPER_MAX_ACTIVE,
+  SNIPER_RATIO_RAMP_START_MS,
+  SNIPER_RATIO_RAMP_END_MS,
+  SNIPER_RATIO_MAX,
 } from '../data/gameConstants';
 import { resolveAABB, resolveCircle } from './collision';
 import type { CollisionData } from './collision';
@@ -59,9 +67,24 @@ function raiderRatioAt(elapsedMs: number): number {
   return lerp(RAIDER_RATIO_INITIAL, RAIDER_RATIO_MAX, t);
 }
 
-/** Roll enemy type based on current Raider ratio. */
+/** Sniper spawn fraction — linearly ramps from 0 to SNIPER_RATIO_MAX between the ramp window. */
+function sniperRatioAt(elapsedMs: number): number {
+  'worklet';
+  if (elapsedMs < SNIPER_RATIO_RAMP_START_MS) return 0;
+  const t = Math.min(
+    (elapsedMs - SNIPER_RATIO_RAMP_START_MS) / (SNIPER_RATIO_RAMP_END_MS - SNIPER_RATIO_RAMP_START_MS),
+    1,
+  );
+  return lerp(0, SNIPER_RATIO_MAX, t);
+}
+
+/** Roll enemy type based on current ratios. Sniper rolls first, then raider/scav split. */
 function rollEnemyType(elapsedMs: number): EnemyType {
   'worklet';
+  const sniperRatio = sniperRatioAt(elapsedMs);
+  if (sniperRatio > 0 && Math.random() < sniperRatio) {
+    return Math.random() < 0.5 ? 'sniperA' : 'sniperB';
+  }
   return Math.random() < raiderRatioAt(elapsedMs) ? 'raider' : 'scav';
 }
 
@@ -131,6 +154,8 @@ export function tickEnemies(state: GameState, dtMs: number, collData: CollisionD
   let enemies = state.enemies;
   let nextEnemyId = state.nextEnemyId;
   let spawnAccMs = state.spawnAccMs;
+  let nextProjectileId = state.nextProjectileId;
+  const newEnemyProjectiles: ProjectileState[] = [];
 
   // ─── Spawner ──────────────────────────────────────────────────────────────
   // enemies is a fixed ENEMY_SOFT_CAP-length sparse array (null = empty slot).
@@ -152,6 +177,13 @@ export function tickEnemies(state: GameState, dtMs: number, collData: CollisionD
         next.push(enemies[i]);
       }
 
+      // Count active snipers for the cap check inside the spawn loop.
+      let activeSniperCount = 0;
+      for (let si = 0; si < next.length; si++) {
+        const e = next[si];
+        if (e && (e.type === 'sniperA' || e.type === 'sniperB')) activeSniperCount += 1;
+      }
+
       while (acc >= intervalMs) {
         // Find the first free (null) slot.
         let freeSlot = -1;
@@ -161,7 +193,16 @@ export function tickEnemies(state: GameState, dtMs: number, collData: CollisionD
         if (freeSlot === -1) break; // all slots occupied — at soft cap
 
         const pos = randomEdgePos(state.player.x, state.player.y, viewHalfW, viewHalfH, worldWidth, worldHeight);
-        const type = rollEnemyType(elapsedMs);
+        let type = rollEnemyType(elapsedMs);
+
+        // Sniper cap: fall back to raider/scav when SNIPER_MAX_ACTIVE already active.
+        if ((type === 'sniperA' || type === 'sniperB') && activeSniperCount >= SNIPER_MAX_ACTIVE) {
+          type = Math.random() < raiderRatioAt(elapsedMs) ? 'raider' : 'scav';
+        }
+
+        const isSniper = type === 'sniperA' || type === 'sniperB';
+        if (isSniper) activeSniperCount += 1;
+
         next[freeSlot] = {
           id: nextEnemyId,
           type,
@@ -173,6 +214,7 @@ export function tickEnemies(state: GameState, dtMs: number, collData: CollisionD
           dyingStartedAtMs: 0,
           lastHitPlayerAtMs: 0,
           hitFlashUntilMs: 0,
+          fireCooldownMs: isSniper ? SNIPER_FIRE_COOLDOWN_MS : 0,
         };
         nextEnemyId += 1;
         acc -= intervalMs;
@@ -190,7 +232,7 @@ export function tickEnemies(state: GameState, dtMs: number, collData: CollisionD
     spawnAccMs = spawnAccMs + dtMs;
   }
 
-  // ─── AI movement (walk toward player) ────────────────────────────────────
+  // ─── AI movement (walk toward player) + sniper fire ──────────────────────
   // Dying enemies stay in place — their die animation runs until combatEngine
   // removes them once the animation completes.
   const px = state.player.x;
@@ -233,9 +275,48 @@ export function tickEnemies(state: GameState, dtMs: number, collData: CollisionD
     const dy = py - enemy.y;
     const dist = Math.sqrt(dx * dx + dy * dy);
 
+    // ── Sniper fire: decrement cooldown, fire when in range and ready ─────
+    let newFireCd = enemy.fireCooldownMs;
+    if ((enemy.type === 'sniperA' || enemy.type === 'sniperB') && dist > 0) {
+      newFireCd = Math.max(0, enemy.fireCooldownMs - dtMs);
+      if (newFireCd === 0 && dist <= SNIPER_FIRE_RANGE_PX) {
+        const nx = dx / dist;
+        const ny = dy / dist;
+        newEnemyProjectiles.push({
+          id: nextProjectileId,
+          x: enemy.x,
+          y: enemy.y,
+          vxPxPerSec: nx * SNIPER_PROJECTILE_SPEED_PX_PER_SEC,
+          vyPxPerSec: ny * SNIPER_PROJECTILE_SPEED_PX_PER_SEC,
+          speedPxPerSec: SNIPER_PROJECTILE_SPEED_PX_PER_SEC,
+          distanceTraveledPx: 0,
+          maxRangePx: SNIPER_FIRE_RANGE_PX,
+          damage: SNIPER_PROJECTILE_DAMAGE,
+          pierceRemaining: 0,
+          hitEnemyIds: [],
+          isRocket: enemy.type === 'sniperB',
+          isEnemyProjectile: true,
+        });
+        nextProjectileId += 1;
+        newFireCd = SNIPER_FIRE_COOLDOWN_MS;
+      }
+    }
+
     if (dist < 1) {
       // Already on top of player — no movement to avoid divide-by-zero.
-      moved.push(enemy);
+      moved.push({
+        id: enemy.id,
+        type: enemy.type,
+        x: enemy.x,
+        y: enemy.y,
+        hp: enemy.hp,
+        walkStartedAtMs: enemy.walkStartedAtMs,
+        status: enemy.status,
+        dyingStartedAtMs: enemy.dyingStartedAtMs,
+        lastHitPlayerAtMs: enemy.lastHitPlayerAtMs,
+        hitFlashUntilMs: enemy.hitFlashUntilMs,
+        fireCooldownMs: newFireCd,
+      });
     } else {
       const propX = enemy.x + (dx / dist) * speed * dtSec;
       const propY = enemy.y + (dy / dist) * speed * dtSec;
@@ -252,8 +333,18 @@ export function tickEnemies(state: GameState, dtMs: number, collData: CollisionD
         dyingStartedAtMs: enemy.dyingStartedAtMs,
         lastHitPlayerAtMs: enemy.lastHitPlayerAtMs,
         hitFlashUntilMs: enemy.hitFlashUntilMs,
+        fireCooldownMs: newFireCd,
       });
     }
+  }
+
+  // Merge new sniper projectiles into the existing projectile array.
+  let updatedProjectiles = state.projectiles;
+  if (newEnemyProjectiles.length > 0) {
+    const allProjs: ProjectileState[] = [];
+    for (let i = 0; i < state.projectiles.length; i++) allProjs.push(state.projectiles[i]);
+    for (let i = 0; i < newEnemyProjectiles.length; i++) allProjs.push(newEnemyProjectiles[i]);
+    updatedProjectiles = allProjs;
   }
 
   return {
@@ -261,5 +352,7 @@ export function tickEnemies(state: GameState, dtMs: number, collData: CollisionD
     enemies: moved,
     nextEnemyId,
     spawnAccMs,
+    projectiles: updatedProjectiles,
+    nextProjectileId,
   };
 }

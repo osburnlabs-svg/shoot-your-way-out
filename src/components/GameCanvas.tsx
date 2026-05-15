@@ -90,6 +90,10 @@ import {
   RAIDER_WALK_FRAME_DURATION_MS,
   SCAV_WALK_FRAME_COUNT,
   SCAV_WALK_FRAME_DURATION_MS,
+  SNIPER_WALK_FRAME_COUNT,
+  SNIPER_WALK_FRAME_DURATION_MS,
+  SOLDIER02_WALK_FRAME_COUNT,
+  SOLDIER02_WALK_FRAME_DURATION_MS,
   WALK_FRAME_COUNT,
   WALK_FRAME_DURATION_MS,
   ENEMY_DIE_FRAME_COUNT,
@@ -372,6 +376,38 @@ export default function GameCanvas({ width, height }: Props) {
   const raiderDie4 = useImage(EnemySprites.raider.die[4]);
   const raiderDieImages = [raiderDie0, raiderDie1, raiderDie2, raiderDie3, raiderDie4];
   const raiderBodyImage = useImage(EnemySprites.raider.body);
+
+  // SniperA walk: 7 frames (SW_01–07), legs-only + Base.png body overlay
+  const sniperAWalk0 = useImage(EnemySprites.sniperA.walk[0]);
+  const sniperAWalk1 = useImage(EnemySprites.sniperA.walk[1]);
+  const sniperAWalk2 = useImage(EnemySprites.sniperA.walk[2]);
+  const sniperAWalk3 = useImage(EnemySprites.sniperA.walk[3]);
+  const sniperAWalk4 = useImage(EnemySprites.sniperA.walk[4]);
+  const sniperAWalk5 = useImage(EnemySprites.sniperA.walk[5]);
+  const sniperAWalk6 = useImage(EnemySprites.sniperA.walk[6]);
+  const sniperAWalkImages = [sniperAWalk0, sniperAWalk1, sniperAWalk2, sniperAWalk3, sniperAWalk4, sniperAWalk5, sniperAWalk6];
+  // SniperA die: 5 frames (SniperDIe_00–04); 5th frame clips before despawn — acceptable
+  const sniperADie0 = useImage(EnemySprites.sniperA.die[0]);
+  const sniperADie1 = useImage(EnemySprites.sniperA.die[1]);
+  const sniperADie2 = useImage(EnemySprites.sniperA.die[2]);
+  const sniperADie3 = useImage(EnemySprites.sniperA.die[3]);
+  const sniperADie4 = useImage(EnemySprites.sniperA.die[4]);
+  const sniperADieImages = [sniperADie0, sniperADie1, sniperADie2, sniperADie3, sniperADie4];
+  const sniperABodyImage = useImage(EnemySprites.sniperA.body);
+
+  // SniperB (Soldier02) walk: 5 frames (SF_01–05), full character — no body overlay
+  const sniperBWalk0 = useImage(EnemySprites.soldier02.walk[0]);
+  const sniperBWalk1 = useImage(EnemySprites.soldier02.walk[1]);
+  const sniperBWalk2 = useImage(EnemySprites.soldier02.walk[2]);
+  const sniperBWalk3 = useImage(EnemySprites.soldier02.walk[3]);
+  const sniperBWalk4 = useImage(EnemySprites.soldier02.walk[4]);
+  const sniperBWalkImages = [sniperBWalk0, sniperBWalk1, sniperBWalk2, sniperBWalk3, sniperBWalk4];
+  // SniperB die: 4 frames (SD2_01–04)
+  const sniperBDie0 = useImage(EnemySprites.soldier02.die[0]);
+  const sniperBDie1 = useImage(EnemySprites.soldier02.die[1]);
+  const sniperBDie2 = useImage(EnemySprites.soldier02.die[2]);
+  const sniperBDie3 = useImage(EnemySprites.soldier02.die[3]);
+  const sniperBDieImages = [sniperBDie0, sniperBDie1, sniperBDie2, sniperBDie3];
 
   // ─── Terrain tilesheet images (loaded once at mount) ─────────────────────
   // Each is a 320×320 sprite sheet of 25 tile variants (5×5 grid of 64×64px).
@@ -790,13 +826,17 @@ export default function GameCanvas({ width, height }: Props) {
             state.elapsedMs - enemy.dyingStartedAtMs,
           );
         } else {
-          const isScav = enemy.type === 'scav';
+          const t = enemy.type;
+          const fc = t === 'scav' ? SCAV_WALK_FRAME_COUNT
+            : t === 'raider' ? RAIDER_WALK_FRAME_COUNT
+            : t === 'sniperA' ? SNIPER_WALK_FRAME_COUNT
+            : SOLDIER02_WALK_FRAME_COUNT; // sniperB
+          const fd = t === 'scav' ? SCAV_WALK_FRAME_DURATION_MS
+            : t === 'raider' ? RAIDER_WALK_FRAME_DURATION_MS
+            : t === 'sniperA' ? SNIPER_WALK_FRAME_DURATION_MS
+            : SOLDIER02_WALK_FRAME_DURATION_MS; // sniperB
           ef[i] = getCurrentFrame(
-            {
-              frameCount: isScav ? SCAV_WALK_FRAME_COUNT : RAIDER_WALK_FRAME_COUNT,
-              frameDurationMs: isScav ? SCAV_WALK_FRAME_DURATION_MS : RAIDER_WALK_FRAME_DURATION_MS,
-              loop: true,
-            },
+            { frameCount: fc, frameDurationMs: fd, loop: true },
             state.elapsedMs - enemy.walkStartedAtMs,
           );
         }
@@ -1714,8 +1754,14 @@ export default function GameCanvas({ width, height }: Props) {
             const isDying = status === 'dying';
 
             const images = isDying
-              ? (type === 'scav' ? scavDieImages : raiderDieImages)
-              : (type === 'scav' ? scavWalkImages : raiderWalkImages);
+              ? (type === 'scav' ? scavDieImages
+                : type === 'raider' ? raiderDieImages
+                : type === 'sniperA' ? sniperADieImages
+                : sniperBDieImages)
+              : (type === 'scav' ? scavWalkImages
+                : type === 'raider' ? raiderWalkImages
+                : type === 'sniperA' ? sniperAWalkImages
+                : sniperBWalkImages);
 
             const img = images[enemySlotFrames[i]] ?? null;
             if (!img) return null;
@@ -1723,7 +1769,10 @@ export default function GameCanvas({ width, height }: Props) {
             const h = img.height() * ENEMY_SPRITE_SCALE;
 
             const bodyOverlay = !isDying
-              ? (type === 'scav' ? scavBodyImage : type === 'raider' ? raiderBodyImage : null)
+              ? (type === 'scav' ? scavBodyImage
+                : type === 'raider' ? raiderBodyImage
+                : type === 'sniperA' ? sniperABodyImage
+                : null) // sniperB (Soldier02) is full-character — no overlay needed
               : null;
             const bw = bodyOverlay ? bodyOverlay.width() * ENEMY_SPRITE_SCALE : 0;
             const bh = bodyOverlay ? bodyOverlay.height() * ENEMY_SPRITE_SCALE : 0;

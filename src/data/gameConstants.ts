@@ -266,6 +266,38 @@ export const STRUCTURE_SPRITE_SCALE = 3;
  */
 export const HIT_FLASH_RADIUS_PX = 7;
 
+// ─── Sniper enemy ─────────────────────────────────────────────────────────────
+
+/** Sniper (variant A) uses Sniper kit walk cycle: 7 frames. */
+export const SNIPER_WALK_FRAME_COUNT = 7;
+export const SNIPER_WALK_FRAME_DURATION_MS = 120;
+
+/** Soldier02 (variant B) fire cycle used as walk: 5 frames. */
+export const SOLDIER02_WALK_FRAME_COUNT = 5;
+export const SOLDIER02_WALK_FRAME_DURATION_MS = 110;
+
+/** ~60% of a 390px-wide viewport at CAMERA_ZOOM=1.0. Tunable. */
+export const SNIPER_FIRE_RANGE_PX = 300;
+
+/** Seconds between sniper shots. Tunable. */
+export const SNIPER_FIRE_COOLDOWN_MS = 3500;
+
+/** Speed of sniper projectiles in px/sec. Slightly faster than player movement so dodging requires timing. */
+export const SNIPER_PROJECTILE_SPEED_PX_PER_SEC = 350;
+
+/** Damage per sniper projectile hit. Matches raider contactDamage. */
+export const SNIPER_PROJECTILE_DAMAGE = 12;
+
+/** Max concurrent snipers across both variants. Spawner falls back to scav/raider when cap is reached. */
+export const SNIPER_MAX_ACTIVE = 5;
+
+/** Sniper ratio ramp: 0% until this elapsed time, then linearly rises to SNIPER_RATIO_MAX. */
+export const SNIPER_RATIO_RAMP_START_MS = 45000;
+export const SNIPER_RATIO_RAMP_END_MS = 120000;
+
+/** Peak fraction of spawns that are snipers (reached at SNIPER_RATIO_RAMP_END_MS). */
+export const SNIPER_RATIO_MAX = 0.15;
+
 // ─── Throwables ───────────────────────────────────────────────────────────────
 
 /**

@@ -87,10 +87,13 @@ export type HeroWeaponPose = 'pistol' | 'rifle' | 'machinegun' | 'grenade_launch
 /**
  * Enemy sprite registry — same require() / asset-map pattern as HeroSprites.
  *
- * Scav   = Soldier (kit 1a): 7-frame walk, 1-frame shot, 4-frame die.
- * Raider = Gunner (kit 2): 7-frame walk (GunnerWalk_01–07), 5-frame die (GDS_01–05).
+ * Scav    = Soldier (kit 1a): 7-frame walk, 1-frame shot, 4-frame die.
+ * Raider  = Gunner (kit 2): 7-frame walk (GunnerWalk_01–07), 5-frame die (GDS_01–05).
  *   Raider is melee-only — no fire frame wired. Walk frames cover all non-dying states.
- * Soldier02 entry kept registered below — reused as Sniper variant 2 in Phase 5 G4.
+ * SniperA = Sniper (kit 2): 7-frame walk (SW_01–07), 5-frame die (SniperDIe_00–04).
+ *   Two-layer compositing: walk legs-only + Base.png body overlay (same pattern as scav/raider).
+ *   Fires GunnerBullet projectile. Variant B = Soldier02 below (full-character SF frames, no overlay).
+ * Soldier02 = variant B sniper: SF_01–05 walk (full character, no overlay), SD2_01–04 die.
  */
 export const EnemySprites = {
   scav: {
@@ -135,7 +138,27 @@ export const EnemySprites = {
       require('../../assets/sprites/enemies/raider/die/GDS_05.png'),
     ],
   },
-  /** Soldier02 — freed up from raider, reused as Sniper variant 2 in Phase 5 G4. */
+  /** SniperA — Sniper kit (kit 2): legs-only walk + Base.png body overlay + 5-frame die. */
+  sniperA: {
+    body: require('../../assets/sprites/enemies/sniper/Base.png'),
+    walk: [
+      require('../../assets/sprites/enemies/sniper/walk/SW_01.png'),
+      require('../../assets/sprites/enemies/sniper/walk/SW_02.png'),
+      require('../../assets/sprites/enemies/sniper/walk/SW_03.png'),
+      require('../../assets/sprites/enemies/sniper/walk/SW_04.png'),
+      require('../../assets/sprites/enemies/sniper/walk/SW_05.png'),
+      require('../../assets/sprites/enemies/sniper/walk/SW_06.png'),
+      require('../../assets/sprites/enemies/sniper/walk/SW_07.png'),
+    ],
+    die: [
+      require('../../assets/sprites/enemies/sniper/die/SniperDIe_00.png'),
+      require('../../assets/sprites/enemies/sniper/die/SniperDIe_01.png'),
+      require('../../assets/sprites/enemies/sniper/die/SniperDIe_02.png'),
+      require('../../assets/sprites/enemies/sniper/die/SniperDIe_03.png'),
+      require('../../assets/sprites/enemies/sniper/die/SniperDIe_04.png'),
+    ],
+  },
+  /** Soldier02 — Sniper variant B: full-character SF fire frames used as walk, no body overlay. */
   soldier02: {
     walk: [
       require('../../assets/sprites/enemies/raider/fire/SF_01.png'),

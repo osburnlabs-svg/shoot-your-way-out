@@ -60,6 +60,11 @@ const PLAYER_ENEMY_COLLISION_R_SQ =
   (PLAYER_COLLISION_RADIUS_PX + ENEMY_COLLISION_RADIUS_PX) *
   (PLAYER_COLLISION_RADIUS_PX + ENEMY_COLLISION_RADIUS_PX);
 
+/** Combined player-projectile collision radius squared — used for enemy projectile vs player. */
+const PROJ_PLAYER_COLLISION_R_SQ =
+  (PLAYER_COLLISION_RADIUS_PX + PROJECTILE_COLLISION_RADIUS_PX) *
+  (PLAYER_COLLISION_RADIUS_PX + PROJECTILE_COLLISION_RADIUS_PX);
+
 /** Total die animation duration in ms. Enemies despawn after this elapses. */
 const DIE_DURATION_MS = ENEMY_DIE_FRAME_COUNT * ENEMY_DIE_FRAME_DURATION_MS;
 
@@ -151,6 +156,7 @@ export function tickCombat(state: GameState, dtMs: number): GameState {
           pierceRemaining: effective.pierce,
           hitEnemyIds: [],
           isRocket: false,
+          isEnemyProjectile: false,
         });
         nextProjectileId += 1;
       }
@@ -169,6 +175,7 @@ export function tickCombat(state: GameState, dtMs: number): GameState {
         pierceRemaining: effective.pierce,
         hitEnemyIds: [],
         isRocket: true,
+        isEnemyProjectile: false,
       });
       nextProjectileId += 1;
     } else if (weapon.id === 'rpo') {
@@ -200,6 +207,7 @@ export function tickCombat(state: GameState, dtMs: number): GameState {
         pierceRemaining: effective.pierce,
         hitEnemyIds: [],
         isRocket: false,
+        isEnemyProjectile: false,
       });
       nextProjectileId += 1;
     }
@@ -250,6 +258,21 @@ export function tickCombat(state: GameState, dtMs: number): GameState {
 
   for (let pi = 0; pi < movedProjectiles.length; pi++) {
     const proj = movedProjectiles[pi];
+
+    // Enemy projectiles skip the enemy collision loop — handled in step 6.5.
+    if (proj.isEnemyProjectile) {
+      finalProjectiles.push({
+        id: proj.id, x: proj.x, y: proj.y,
+        vxPxPerSec: proj.vxPxPerSec, vyPxPerSec: proj.vyPxPerSec,
+        speedPxPerSec: proj.speedPxPerSec,
+        distanceTraveledPx: proj.distanceTraveledPx, maxRangePx: proj.maxRangePx,
+        damage: proj.damage, pierceRemaining: proj.pierceRemaining,
+        hitEnemyIds: proj.hitEnemyIds, isRocket: proj.isRocket,
+        isEnemyProjectile: true,
+      });
+      continue;
+    }
+
     let pierceRemaining = proj.pierceRemaining;
     // Copy hitEnemyIds for mutation within this tick.
     const hitEnemyIds: number[] = [];
@@ -273,8 +296,8 @@ export function tickCombat(state: GameState, dtMs: number): GameState {
       const dx = proj.x - enemy.x;
       const dy = proj.y - enemy.y;
       if (dx * dx + dy * dy < PROJ_ENEMY_COLLISION_R_SQ) {
-        if (proj.isRocket) {
-          // Rocket: record impact position for AOE pass — skip damageAccum.
+        if (proj.isRocket && !proj.isEnemyProjectile) {
+          // Player rocket: record impact position for AOE pass — skip damageAccum.
           rocketImpacts.push({ x: proj.x, y: proj.y, damage: proj.damage });
           rocketDetonated = true;
           break; // rocket always consumed on first contact
@@ -322,7 +345,31 @@ export function tickCombat(state: GameState, dtMs: number): GameState {
         pierceRemaining,
         hitEnemyIds,
         isRocket: proj.isRocket,
+        isEnemyProjectile: false,
       });
+    }
+  }
+
+  // ─── 6.5. Enemy projectile → player collision ────────────────────────────
+  // Separate pass over finalProjectiles: enemy projectiles check distance to player
+  // instead of enemies. Surviving enemy projectiles are preserved in allFinalProjectiles.
+  const isInvulnerable = elapsedMs < player.invulnerableUntilMs;
+  let enemyProjPlayerDamage = 0;
+  const allFinalProjectiles: ProjectileState[] = [];
+  for (let pi = 0; pi < finalProjectiles.length; pi++) {
+    const proj = finalProjectiles[pi];
+    if (!proj.isEnemyProjectile) {
+      allFinalProjectiles.push(proj);
+      continue;
+    }
+    const pdx = proj.x - player.x;
+    const pdy = proj.y - player.y;
+    if (!isInvulnerable && pdx * pdx + pdy * pdy < PROJ_PLAYER_COLLISION_R_SQ) {
+      enemyProjPlayerDamage += proj.damage;
+      audioEngine.playSFX('hit_grunt');
+      // projectile consumed — do not push
+    } else {
+      allFinalProjectiles.push(proj);
     }
   }
 
@@ -376,6 +423,7 @@ export function tickCombat(state: GameState, dtMs: number): GameState {
       lastHitPlayerAtMs: enemy.lastHitPlayerAtMs,
       // Flash on every hit, including the kill shot — applies to dying enemies too.
       hitFlashUntilMs: elapsedMs + HIT_FLASH_DURATION_MS,
+      fireCooldownMs: enemy.fireCooldownMs,
     });
   }
 
@@ -433,10 +481,13 @@ export function tickCombat(state: GameState, dtMs: number): GameState {
   // Invulnerability: when elapsedMs < player.invulnerableUntilMs, the damage
   // application is skipped but lastHitPlayerAtMs is NOT advanced — enemies
   // deal damage immediately on their natural cooldown when the window expires.
-  let newPlayerHp = player.hp;
-  let newLastDamagedAtMs = player.lastDamagedAtMs;
+  // Pre-apply enemy projectile hits accumulated in step 6.5.
+  let newPlayerHp = enemyProjPlayerDamage > 0
+    ? Math.max(0, player.hp - enemyProjPlayerDamage)
+    : player.hp;
+  let newLastDamagedAtMs = enemyProjPlayerDamage > 0 ? elapsedMs : player.lastDamagedAtMs;
   const contactCheckedEnemies: Array<EnemyState | null> = [];
-  const isInvulnerable = elapsedMs < player.invulnerableUntilMs;
+  // isInvulnerable declared in step 6.5 — reused here for contact damage gate.
 
   for (let i = 0; i < postRocketEnemies.length; i++) {
     const enemy = postRocketEnemies[i];
@@ -490,6 +541,7 @@ export function tickCombat(state: GameState, dtMs: number): GameState {
         dyingStartedAtMs: enemy.dyingStartedAtMs,
         lastHitPlayerAtMs: elapsedMs,
         hitFlashUntilMs: enemy.hitFlashUntilMs,
+        fireCooldownMs: enemy.fireCooldownMs,
       });
     } else {
       contactCheckedEnemies.push(enemy);
@@ -508,7 +560,7 @@ export function tickCombat(state: GameState, dtMs: number): GameState {
       lastDamagedAtMs: newLastDamagedAtMs,
     },
     enemies: contactCheckedEnemies,
-    projectiles: finalProjectiles,
+    projectiles: allFinalProjectiles,
     nextProjectileId,
     killCount,
     pickups: finalPickups,
