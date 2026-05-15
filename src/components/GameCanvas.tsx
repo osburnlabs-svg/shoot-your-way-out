@@ -503,6 +503,7 @@ export default function GameCanvas({ width, height }: Props) {
   const smokeImages = [smoke0, smoke1, smoke2, smoke3, smoke4, smoke5, smoke6];
 
   // Rocket: 2-frame body animation (effects/rocket/1–2.png).
+  const bulletImage = useImage(EffectSprites.bullet);
   const rocket0 = useImage(EffectSprites.rocket[0]);
   const rocket1 = useImage(EffectSprites.rocket[1]);
   const rocketImages = [rocket0, rocket1];
@@ -1634,7 +1635,8 @@ export default function GameCanvas({ width, height }: Props) {
 
           {/* ── Projectiles ──────────────────────────────────────────────── */}
           {/* Screen-coord derived values — outside camera Group.            */}
-          {/* Rockets: Image sprite (transform includes rotation). Bullets: Circle. */}
+          {/* Rockets: animated sprite. Bullets: GunnerBullet sprite (1×3 px, 2× scale). */}
+          {/* Transform includes rotation from atan2(vy, vx) — sprite points in travel dir. */}
           {allProjectileTransforms.map((transform, i) => {
             if (projIsRocket[i]) {
               const rImg = rocketImages[rocketFrame] ?? rocketImages[0] ?? null;
@@ -1660,9 +1662,25 @@ export default function GameCanvas({ width, height }: Props) {
                 </Group>
               );
             }
+            if (!bulletImage) {
+              return (
+                <Group key={`proj-${i}`} transform={transform}>
+                  <Circle cx={0} cy={0} r={4} color="#f5c842" />
+                </Group>
+              );
+            }
+            const bw = bulletImage.width() * EFFECT_SPRITE_SCALE;
+            const bh = bulletImage.height() * EFFECT_SPRITE_SCALE;
             return (
               <Group key={`proj-${i}`} transform={transform}>
-                <Circle cx={0} cy={0} r={4} color="#f5c842" />
+                <Image
+                  image={bulletImage}
+                  x={-bw / 2}
+                  y={-bh / 2}
+                  width={bw}
+                  height={bh}
+                  sampling={{ filter: FilterMode.Nearest, mipmap: MipmapMode.None }}
+                />
               </Group>
             );
           })}
