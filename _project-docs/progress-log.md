@@ -1098,6 +1098,76 @@ Device-test after commit. Tune individual values ±0.05–0.10 if any specific a
 
 ---
 
+## Phase 5/6 Brainstorm Decisions — Locked
+
+Design decisions captured 2026-05-14. Apply when the relevant phase work begins.
+
+---
+
+### 1. Bullet sprite swap (Phase 6 polish — one focused commit)
+
+- **Rockets:** use `rocket-f1` asset
+  - Source: `_project-docs/kits/tds-modern-pixel-game-kit/tds-modern-hero-weapons-and-props/rocket/rocket-f1`
+- **All other weapons:** use `GunnerBullet` asset
+  - Source: `_project-docs/kits/tds-modern-pixel-game-kit/tds-modern-soldiers-and-vehicles-sprites-2/Gunner/Effect/GunnerBullet`
+- Replace current Skia `<Circle>` projectile rendering with sprite-based `<Image>` or atlas rendering using these two assets
+
+---
+
+### 2. Hero auto-rotation to face shot target (Phase 6 polish)
+
+- Compute angle from player to nearest enemy in firing range
+- Apply rotation to player sprite render transform
+- Target selection: nearest enemy currently being auto-fired at
+- **Pre-implementation check:** confirm hero sprite reads correctly at arbitrary angles (45°, 90°, etc). If sprite looks weird at non-cardinal angles, evaluate whether kit has 8-direction variants. If acceptable diagonal look, proceed with arbitrary-angle rotation. If not, fall back to 8-direction cardinal-only rotation.
+
+---
+
+### 3. Raider class visual fix (Phase 5 G4 work, or as standalone commit before G4)
+
+- **Sprite swap:** Raider class gets spec ops soldier appearance
+- Mechanics unchanged: mobile, melee, harder than scav
+- Resolves "soldier with rocket launcher meleeing player" visual mismatch identified during device testing
+- Pure sprite swap, no behavior changes
+- Spawn rates and wave balance unchanged
+
+---
+
+### 4. Sniper class design (Phase 5 G4)
+
+- Implement as two visual variants sharing identical mechanics
+- **50% of sniper spawns:** kit sniper sprite firing bullet projectiles
+- **50% of sniper spawns:** soldier02 (bazooka soldier — previously the raider visual) firing rocket projectiles
+- Both variants: same damage, same fire rate, same hit detection, same telegraph mechanic
+- Rocket projectile is visual-only — no AOE damage, just sprite differentiation
+- Rocket asset can reuse the `rocket-f1` sprite from item 1
+
+---
+
+### 5. Sniper spawn location decision (Phase 5 G4)
+
+- Both sniper variants spawn via the standard wave-spawning pipeline (ground-level), same as other ranged enemies
+- **Rooftop spawn layer originally planned for G4 is DEFERRED to v1.1+ if ever revisited**
+- Engineering simplicity prioritized: uses existing spawn pipeline, no new rooftop placement logic
+- G4 sniper count cap note still applies (planned 3–5 max active snipers) but no longer constrained by rooftop position availability
+
+---
+
+### 6. Net Phase 5 enemy roster after these decisions
+
+| Class | Type | Notes |
+|---|---|---|
+| Scav | Mobile melee, basic | Unchanged |
+| Raider | Mobile melee, harder | Now visually spec ops soldier (item 3) |
+| Sniper variant A | Ground-spawn ranged, bullet | |
+| Sniper variant B | Ground-spawn ranged, rocket visual | Same mechanics as A |
+| Tank turret | Stationary, 3 visual variants | Spawns after 2 min, drops guaranteed crate |
+| Helicopter | Ambient flyby | No attacks |
+
+**Total:** 5 mechanical enemy classes, 6 distinct visual identities. Raider visual mismatch resolved; sniper expanded to two visual variants.
+
+---
+
 ## Scope Cuts — May 13 2026
 
 **Status:** Locked decisions, effective immediately. These are not pending changes — they are formal scope changes. Authoritative documentation lives in:
