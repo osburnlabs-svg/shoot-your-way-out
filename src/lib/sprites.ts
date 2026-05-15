@@ -116,6 +116,8 @@ export const EnemySprites = {
     ],
   },
   raider: {
+    /** Upper body overlay — composited over walk frames (same two-layer pattern as scav). */
+    body: require('../../assets/sprites/enemies/raider/Gunner.png'),
     walk: [
       require('../../assets/sprites/enemies/raider/walk/GunnerWalk_01.png'),
       require('../../assets/sprites/enemies/raider/walk/GunnerWalk_02.png'),

@@ -371,6 +371,7 @@ export default function GameCanvas({ width, height }: Props) {
   const raiderDie3 = useImage(EnemySprites.raider.die[3]);
   const raiderDie4 = useImage(EnemySprites.raider.die[4]);
   const raiderDieImages = [raiderDie0, raiderDie1, raiderDie2, raiderDie3, raiderDie4];
+  const raiderBodyImage = useImage(EnemySprites.raider.body);
 
   // ─── Terrain tilesheet images (loaded once at mount) ─────────────────────
   // Each is a 320×320 sprite sheet of 25 tile variants (5×5 grid of 64×64px).
@@ -1721,7 +1722,9 @@ export default function GameCanvas({ width, height }: Props) {
             const w = img.width() * ENEMY_SPRITE_SCALE;
             const h = img.height() * ENEMY_SPRITE_SCALE;
 
-            const bodyOverlay = (type === 'scav' && !isDying) ? scavBodyImage : null;
+            const bodyOverlay = !isDying
+              ? (type === 'scav' ? scavBodyImage : type === 'raider' ? raiderBodyImage : null)
+              : null;
             const bw = bodyOverlay ? bodyOverlay.width() * ENEMY_SPRITE_SCALE : 0;
             const bh = bodyOverlay ? bodyOverlay.height() * ENEMY_SPRITE_SCALE : 0;
 
