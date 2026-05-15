@@ -222,14 +222,20 @@ export function resolveAABB(
   // X axis: keep Y at current position to allow sliding along horizontal walls.
   // Push direction uses currentX (pre-movement) so a large step that crosses the
   // rect's centre doesn't flip the sign and launch the entity to the far wall.
+  // Guard: only push X if the entity was outside this collider's X range at the
+  // start of this frame. If already inside the X range (e.g. slid there by a
+  // prior Y resolution), skip — the Y pass handles ejection. Without this guard,
+  // entering Y range while currentX sits in the "wrong" half of a wide rect
+  // produces a lateral teleport to the far X edge.
   let resolvedX = proposedX;
   for (let i = 0; i < candidates.length; i++) {
     const rect = rects[candidates[i]];
     const exHalfW = rect.halfW + r;
     const exHalfH = rect.halfH + r;
+    const wasOutsideX = Math.abs(currentX - rect.x) >= exHalfW;
     const dx = resolvedX - rect.x;
     const dy = currentY - rect.y;
-    if (Math.abs(dx) < exHalfW && Math.abs(dy) < exHalfH) {
+    if (wasOutsideX && Math.abs(dx) < exHalfW && Math.abs(dy) < exHalfH) {
       const dxDir = currentX - rect.x;
       resolvedX = dxDir >= 0 ? rect.x + exHalfW : rect.x - exHalfW;
     }
@@ -237,14 +243,19 @@ export function resolveAABB(
 
   // Y axis: use resolvedX (post X-pass) to allow sliding along vertical walls.
   // Push direction uses currentY for the same reason as X-pass above.
+  // Guard: symmetric to X-pass — only push Y if the entity was outside this
+  // collider's Y range at the start of this frame. Prevents the mirror teleport
+  // and also guards against floating-point edge cases on diagonal approaches
+  // where a resolved X at the boundary leaves dx fractionally inside exHalfW.
   let resolvedY = proposedY;
   for (let i = 0; i < candidates.length; i++) {
     const rect = rects[candidates[i]];
     const exHalfW = rect.halfW + r;
     const exHalfH = rect.halfH + r;
+    const wasOutsideY = Math.abs(currentY - rect.y) >= exHalfH;
     const dx = resolvedX - rect.x;
     const dy = resolvedY - rect.y;
-    if (Math.abs(dx) < exHalfW && Math.abs(dy) < exHalfH) {
+    if (wasOutsideY && Math.abs(dx) < exHalfW && Math.abs(dy) < exHalfH) {
       const dyDir = currentY - rect.y;
       resolvedY = dyDir >= 0 ? rect.y + exHalfH : rect.y - exHalfH;
     }
