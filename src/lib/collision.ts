@@ -88,10 +88,10 @@ export const SOLID_ASSET_KEYS = new Set<string>([
 // Vehicle wrecks use circle collision instead of AABB — rotation-invariant,
 // no axis-separation edge cases. Radii are tuning-starting values in world px.
 const WRECK_COLLISION_RADIUS: Record<string, number> = {
-  env_helicopter_wreck:  144,
+  env_helicopter_wreck:  120,
   env_bomber_wreck_2:    144,
   env_bomber_wreck_3:    144,
-  env_bus_wreck:         130,
+  env_bus_wreck:         100,
   env_acs_wreck:         110,
   env_humvee_wreck_1:     80,
   env_humvee_wreck_2:     80,
