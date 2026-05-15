@@ -30,7 +30,7 @@ Status legend:
 | 4a — Stat skills + level-up | 🟢 Complete | 2026-05-10 | G1: c4daad8 G2: a095517 G3: f297b4b G3-polish: 461b25b→d90aedf→ba505fc G4: ee7f7d5 G4-cleanup: 5690324 | G1 ✅ G2 ✅ G3 ✅ G4 ✅ | Full progression loop closed. G4: weapon unlocks L4/8/12/16 + all 8 weapon renames |
 | 4b — Ability skills + crates | 🟢 Complete | 2026-05-10 | G1: 5411988 Slot-fix: 8ff2533 G2: 18b44e3 G3: e2a1deb G4: 8c31b42 G4-polish: 9cb7762 G5: b4091c6 Smoke: 2438bb4 | G1 ✅ G2 ✅ G3 ✅ G4 ✅ G5 ✅ | All 20 v1 skills shipped; throwable system; revive; bloom-hold-dissipate smoke animation |
 | 4c — Crate weapons | 🟢 Complete | 2026-05-11 | G1: 75dc967 Fix: 68f5ef3 266fbd6 G2: d6f1c1c G3: 8c390b3 Polish: cd2d2d8 5a29a3e 2daeffd a0b7e61 4eca404 Close: cb8bddb | G1 ✅ G2 ✅ G3 ✅ | World-spawn crates; weapon roll + reveal modal; Shotgun/Rocket Launcher/Flamethrower active; custom weapon icons; debug scaffold cleaned up |
-| 5 — Maps + obstacles + vehicle enemies | 🟡 In Progress | 2026-05-13 → 2026-05-14 | G1: 99bf87d→3c17fac G2: 86c1a33→44cb822 | G1 ✅ G2 ✅ G3 ⚪ | G2 complete — procedural map, scatter props, wreck centerpieces, terrain themes; G3 (collision) next |
+| 5 — Maps + obstacles + vehicle enemies | 🟡 In Progress | 2026-05-13 → 2026-05-14 | G1: 99bf87d→3c17fac G2: 86c1a33→44cb822 G3: 6ed8a3c→b391493 | G1 ✅ G2 ✅ G3 🟡 | G3 committed (collision); pending device verification |
 | 6 — Audio + atmospheric effects | ⚪ | | | | |
 | 7 — UI + persistence + analytics | ⚪ | | | | |
 | 8 — Helicopter boss + hazards | ⚪ | | | | |
@@ -919,7 +919,7 @@ Phase 4 transformed the engine from a static survival loop (Phase 3) into a full
 
 **Goal:** Single dynamic procedural map generator (runs at game start, every run is unique), parameterized asset budgets (buildings, vehicles, props, vegetation), seeded random placement with spacing constraints, building metadata for sniper rooftop positions, world camera system, all 8 enemy types working including Humvee/BTR/Panzer/ACS vehicle enemies, enemy ranged fire, single consistent military theme.
 
-**Status:** G1 complete 🟢 — G2 complete 🟢 — G3 not started ⚪
+**Status:** G1 complete 🟢 — G2 complete 🟢 — G3 committed, pending device test 🟡
 
 ---
 
@@ -1010,6 +1010,43 @@ G2 ships a fully procedural 6000×6000 military map:
 - **Viewport culling:** visible ~9×15 tile window in Atlas arrays; `propAtlasData` useMemo rebuilds on tile-position change
 - **Sprite scaling:** `PROP_SPRITE_SCALE=2` (props/scatter), `STRUCTURE_SPRITE_SCALE=3` (buildings)
 - **Spacing:** all inter-entity checks via `tooCloseScaled()` (rendered footprint = `max(w,h) × scale / 2 + 20px gap`)
+
+---
+
+## Phase 5 — Group 3: Static-prop collision
+
+**Status:** Committed — pending device test 🟡
+**Date:** 2026-05-14
+**Commits:** C1 (collision module): 6ed8a3c | C2 (engine wiring): b391493
+
+### What shipped
+
+- `src/data/gameConstants.ts`: `COLLISION_GRID_CELL_SIZE = 500` — cell size for the spatial grid (6000 / 500 = 12 cols × 12 rows = 144 cells).
+- `src/lib/collision.ts`: Full collision module.
+  - `ColliderRect` / `CollisionData` types.
+  - `SOLID_ASSET_KEYS` set — 29 asset keys: all structures, all vehicle wrecks, medium + large rocks, all trees. Passable props (barrels, crates, small rocks, bushes) are absent.
+  - `buildCollisionData(mapData)` — JS-thread builder called once at map load. Filters MapData to solid props, computes scaled AABB half-extents (STRUCTURE_SPRITE_SCALE=3 for buildings, PROP_SPRITE_SCALE=2 for everything else), bins each collider into the flat spatial grid.
+  - `resolveAABB(currentX, currentY, proposedX, proposedY, entityRadius, collData)` — Reanimated worklet. Minkowski-expanded AABB. Axis-separated: X pass then Y pass, enabling wall-sliding. Grid lookup covers 1–4 cells per query (cellSize=500 >> entityRadius=20), typically 2–8 colliders tested per entity per frame.
+- `src/lib/gameEngine.ts`: `updateGameState` gains `collData: CollisionData` parameter. Player proposed position resolved via `resolveAABB` inside the `if (inputVector !== null)` block, before world-bounds clamping. `tickEnemies` call updated to forward `collData`.
+- `src/lib/enemyEngine.ts`: `tickEnemies` gains `collData: CollisionData` parameter. Each enemy's proposed position resolved via `resolveAABB` before being pushed to `moved[]`.
+- `src/components/GameCanvas.tsx`: `collisionDataShared = useSharedValue<CollisionData>(buildCollisionData(initialMapData))` constructed synchronously at mount. `useFrameCallback` passes `collisionDataShared.value` to `updateGameState`.
+
+### Architectural decisions made during G3
+
+- **Fixed-grid spatial partitioning over viewport culling.** Viewport cull rejected: enemies spawn at screen edge and walk toward player. A building just off-screen would produce clip-through until it crossed into view. Fixed 12×12 grid covers the full world; O(1) neighbourhood lookup regardless of player position.
+- **CollisionData in its own SharedValue, not embedded in GameState.** Follows the G2 JSI-serialization rule: only worklet-read data goes in SharedValues; static world data must not inflate the per-frame GameState write cost. CollisionData is written once at mount from the JS thread; worklets read it cheaply each frame.
+- **AABB approximation for rotated wrecks (accepted for G3).** Helicopter and bomber wrecks have random `rotation` values in `PlacedEntity`. Axis-aligned bounding boxes using unrotated native dimensions are used. Square sprites (most wrecks) are exact; non-square sprites (bomber_wreck_2/3, 288×192) are slightly under-sized at oblique angles. Accepted as "wrecks feel slightly smaller than they look" at worst. Upgrade to OBB in Phase 6+ if device testing reveals visible clip-through on bomber wrecks.
+- **Passable props excluded via explicit opt-in set.** `SOLID_ASSET_KEYS` is the authoritative list. `mapData.barrels` is skipped entirely in `buildCollisionData`; env_rock_small and all env_bush_* variants are absent from the set. No interaction or feedback for passable props — per spec.
+- **Enemy-vs-enemy collision unchanged.** Enemies still clip through each other. Only entity-vs-static-prop is added in G3.
+
+### Pending verification (device test before marking complete)
+
+- [ ] Player cannot walk through any solid prop (houses, wrecks, medium/large rocks, trees)
+- [ ] Player walks through passable props with no resistance (barrels, crates, small rocks, bushes)
+- [ ] Sliding along walls works smoothly — diagonal into a wall resolves to a parallel slide, not a stuck freeze
+- [ ] Enemies route around buildings — do they bunch at corners, route around, or get stuck?
+- [ ] No FPS regression (60fps; stutter bounded to pre-G3 baseline)
+- [ ] All Phase 4 systems still functional (combat, pickups, throwables, crates, progression)
 
 ---
 
