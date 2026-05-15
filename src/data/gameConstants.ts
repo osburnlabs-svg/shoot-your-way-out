@@ -92,8 +92,8 @@ export const ENEMY_BASE_SPEED_PX_PER_SEC = 80;
 export const SCAV_WALK_FRAME_COUNT = 7;
 export const SCAV_WALK_FRAME_DURATION_MS = 120;
 
-/** Raider uses Soldier 02 fire frames as walk cycle: 5 frames (SF_01–05). */
-export const RAIDER_WALK_FRAME_COUNT = 5;
+/** Raider uses Gunner walk cycle: 7 frames (GunnerWalk_01–07). */
+export const RAIDER_WALK_FRAME_COUNT = 7;
 export const RAIDER_WALK_FRAME_DURATION_MS = 110;
 
 // ─── Enemy spawner ────────────────────────────────────────────────────────────

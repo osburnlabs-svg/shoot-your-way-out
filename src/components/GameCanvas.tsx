@@ -354,20 +354,23 @@ export default function GameCanvas({ width, height }: Props) {
   const scavDie3 = useImage(EnemySprites.scav.die[3]);
   const scavDieImages = [scavDie0, scavDie1, scavDie2, scavDie3];
 
-  // Raider fire: 5 frames (SF_01–05) — used as walk animation
-  const raiderFire0 = useImage(EnemySprites.raider.fire[0]);
-  const raiderFire1 = useImage(EnemySprites.raider.fire[1]);
-  const raiderFire2 = useImage(EnemySprites.raider.fire[2]);
-  const raiderFire3 = useImage(EnemySprites.raider.fire[3]);
-  const raiderFire4 = useImage(EnemySprites.raider.fire[4]);
-  const raiderFireImages = [raiderFire0, raiderFire1, raiderFire2, raiderFire3, raiderFire4];
+  // Raider walk: 7 frames (GunnerWalk_01–07)
+  const raiderWalk0 = useImage(EnemySprites.raider.walk[0]);
+  const raiderWalk1 = useImage(EnemySprites.raider.walk[1]);
+  const raiderWalk2 = useImage(EnemySprites.raider.walk[2]);
+  const raiderWalk3 = useImage(EnemySprites.raider.walk[3]);
+  const raiderWalk4 = useImage(EnemySprites.raider.walk[4]);
+  const raiderWalk5 = useImage(EnemySprites.raider.walk[5]);
+  const raiderWalk6 = useImage(EnemySprites.raider.walk[6]);
+  const raiderWalkImages = [raiderWalk0, raiderWalk1, raiderWalk2, raiderWalk3, raiderWalk4, raiderWalk5, raiderWalk6];
 
-  // Raider die: 4 frames
+  // Raider die: 5 frames (GDS_01–05); 5th frame may not render before despawn — acceptable
   const raiderDie0 = useImage(EnemySprites.raider.die[0]);
   const raiderDie1 = useImage(EnemySprites.raider.die[1]);
   const raiderDie2 = useImage(EnemySprites.raider.die[2]);
   const raiderDie3 = useImage(EnemySprites.raider.die[3]);
-  const raiderDieImages = [raiderDie0, raiderDie1, raiderDie2, raiderDie3];
+  const raiderDie4 = useImage(EnemySprites.raider.die[4]);
+  const raiderDieImages = [raiderDie0, raiderDie1, raiderDie2, raiderDie3, raiderDie4];
 
   // ─── Terrain tilesheet images (loaded once at mount) ─────────────────────
   // Each is a 320×320 sprite sheet of 25 tile variants (5×5 grid of 64×64px).
@@ -1711,7 +1714,7 @@ export default function GameCanvas({ width, height }: Props) {
 
             const images = isDying
               ? (type === 'scav' ? scavDieImages : raiderDieImages)
-              : (type === 'scav' ? scavWalkImages : raiderFireImages);
+              : (type === 'scav' ? scavWalkImages : raiderWalkImages);
 
             const img = images[enemySlotFrames[i]] ?? null;
             if (!img) return null;

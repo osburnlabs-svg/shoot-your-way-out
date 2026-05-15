@@ -87,13 +87,10 @@ export type HeroWeaponPose = 'pistol' | 'rifle' | 'machinegun' | 'grenade_launch
 /**
  * Enemy sprite registry — same require() / asset-map pattern as HeroSprites.
  *
- * Scav  = Soldier (kit 1a): 7-frame walk, 1-frame shot, 4-frame die.
- * Raider = Soldier 02 (kit 1a): 5-frame fire (used as walk cycle), 4-frame die.
- *   Raider has no separate walk frames — fire frames are used for locomotion
- *   (gives a "charging with weapon raised" look, keeps Raider visually distinct).
- *
- * Shot and die frames are imported now (one asset-import pass for all of Phase 3)
- * even though G1 only uses walk/fire frames for rendering.
+ * Scav   = Soldier (kit 1a): 7-frame walk, 1-frame shot, 4-frame die.
+ * Raider = Gunner (kit 2): 7-frame walk (GunnerWalk_01–07), 5-frame die (GDS_01–05).
+ *   Raider is melee-only — no fire frame wired. Walk frames cover all non-dying states.
+ * Soldier02 entry kept registered below — reused as Sniper variant 2 in Phase 5 G4.
  */
 export const EnemySprites = {
   scav: {
@@ -119,8 +116,26 @@ export const EnemySprites = {
     ],
   },
   raider: {
-    /** Fire frames used as walk/move animation (no separate walk cycle in kit). */
-    fire: [
+    walk: [
+      require('../../assets/sprites/enemies/raider/walk/GunnerWalk_01.png'),
+      require('../../assets/sprites/enemies/raider/walk/GunnerWalk_02.png'),
+      require('../../assets/sprites/enemies/raider/walk/GunnerWalk_03.png'),
+      require('../../assets/sprites/enemies/raider/walk/GunnerWalk_04.png'),
+      require('../../assets/sprites/enemies/raider/walk/GunnerWalk_05.png'),
+      require('../../assets/sprites/enemies/raider/walk/GunnerWalk_06.png'),
+      require('../../assets/sprites/enemies/raider/walk/GunnerWalk_07.png'),
+    ],
+    die: [
+      require('../../assets/sprites/enemies/raider/die/GDS_01.png'),
+      require('../../assets/sprites/enemies/raider/die/GDS_02.png'),
+      require('../../assets/sprites/enemies/raider/die/GDS_03.png'),
+      require('../../assets/sprites/enemies/raider/die/GDS_04.png'),
+      require('../../assets/sprites/enemies/raider/die/GDS_05.png'),
+    ],
+  },
+  /** Soldier02 — freed up from raider, reused as Sniper variant 2 in Phase 5 G4. */
+  soldier02: {
+    walk: [
       require('../../assets/sprites/enemies/raider/fire/SF_01.png'),
       require('../../assets/sprites/enemies/raider/fire/SF_02.png'),
       require('../../assets/sprites/enemies/raider/fire/SF_03.png'),
