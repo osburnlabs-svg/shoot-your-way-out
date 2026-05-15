@@ -80,6 +80,7 @@ import type { EnemyType } from '../data/enemies';
 import { STARTING_WEAPON_ID, WEAPON_PROFILES } from '../data/weapons';
 import {
   PLAYER_MAX_ANGULAR_SPEED_RAD_PER_SEC,
+  PLAYER_COLLISION_RADIUS_PX,
   PLAYER_STARTING_HP,
   ENEMY_SOFT_CAP,
   THROWABLE_SLOT_COUNT,
@@ -94,6 +95,8 @@ import {
 import type { CrateTier } from '../data/gameConstants';
 import type { SkillId } from '../data/skills';
 import { getEffectiveStats } from '../data/skills';
+import { resolveAABB } from './collision';
+import type { CollisionData } from './collision';
 import { tickEnemies } from './enemyEngine';
 import { tickCombat } from './combatEngine';
 import { tickPickups } from './pickupEngine';
@@ -570,7 +573,7 @@ export function createInitialGameState(canvasWidth: number, canvasHeight: number
  *   9.  HP regen from provisions_painkillers / provisions_stims (tickRegen)
  *   10. XP threshold check — sets pendingLevelUp if a level was earned (tickProgression)
  */
-export function updateGameState(state: GameState, dtMs: number): GameState {
+export function updateGameState(state: GameState, dtMs: number, collData: CollisionData): GameState {
   'worklet';
 
   // Freeze all simulation when the player is dead.
@@ -621,6 +624,11 @@ export function updateGameState(state: GameState, dtMs: number): GameState {
     if (!player.isMoving) {
       newWalkStartedAtMs = state.elapsedMs;
     }
+
+    // Resolve proposed position against static solid props.
+    const resolved = resolveAABB(player.x, player.y, newX, newY, PLAYER_COLLISION_RADIUS_PX, collData);
+    newX = resolved.x;
+    newY = resolved.y;
   }
 
   // Clamp player to world bounds so the camera never shows void past tile edges.
@@ -646,7 +654,7 @@ export function updateGameState(state: GameState, dtMs: number): GameState {
     },
   };
 
-  const stateAfterEnemies = tickEnemies(stateAfterPlayer, dtMs);
+  const stateAfterEnemies = tickEnemies(stateAfterPlayer, dtMs, collData);
   const stateAfterCombat = tickCombat(stateAfterEnemies, dtMs);
   const stateAfterPickups = tickPickups(stateAfterCombat, dtMs);
   const stateAfterCrates = tickCrateSpawn(stateAfterPickups, dtMs);

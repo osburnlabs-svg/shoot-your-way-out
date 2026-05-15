@@ -31,10 +31,13 @@ import {
   RAIDER_RATIO_MAX,
   RAIDER_RATIO_RAMP_DURATION_MS,
   ENEMY_BASE_SPEED_PX_PER_SEC,
+  ENEMY_COLLISION_RADIUS_PX,
   SMOKE_RADIUS_PX,
   SMOKE_SLOW_MULT,
   CAMERA_ZOOM,
 } from '../data/gameConstants';
+import { resolveAABB } from './collision';
+import type { CollisionData } from './collision';
 
 /** Linear interpolation — inlined here to avoid importing a non-worklet util. */
 function lerp(a: number, b: number, t: number): number {
@@ -119,7 +122,7 @@ function randomEdgePos(
  *
  * Returns a new GameState (no mutation of input).
  */
-export function tickEnemies(state: GameState, dtMs: number): GameState {
+export function tickEnemies(state: GameState, dtMs: number, collData: CollisionData): GameState {
   'worklet';
 
   const { canvasWidth, canvasHeight, worldWidth, worldHeight, elapsedMs } = state;
@@ -234,11 +237,14 @@ export function tickEnemies(state: GameState, dtMs: number): GameState {
       // Already on top of player — no movement to avoid divide-by-zero.
       moved.push(enemy);
     } else {
+      const propX = enemy.x + (dx / dist) * speed * dtSec;
+      const propY = enemy.y + (dy / dist) * speed * dtSec;
+      const resolved = resolveAABB(enemy.x, enemy.y, propX, propY, ENEMY_COLLISION_RADIUS_PX, collData);
       moved.push({
         id: enemy.id,
         type: enemy.type,
-        x: enemy.x + (dx / dist) * speed * dtSec,
-        y: enemy.y + (dy / dist) * speed * dtSec,
+        x: resolved.x,
+        y: resolved.y,
         hp: enemy.hp,
         walkStartedAtMs: enemy.walkStartedAtMs,
         status: enemy.status,

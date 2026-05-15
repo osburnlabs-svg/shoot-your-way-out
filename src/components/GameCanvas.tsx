@@ -127,6 +127,8 @@ import type { CrateTier } from '../data/gameConstants';
 import type { EnemyType } from '../data/enemies';
 import { createInitialGameState, updateGameState } from '../lib/gameEngine';
 import type { GameState } from '../lib/gameEngine';
+import { buildCollisionData } from '../lib/collision';
+import type { CollisionData } from '../lib/collision';
 import { getCurrentFrame } from '../lib/animation';
 
 // Cycle order and display labels for the debug weapon button.
@@ -511,6 +513,12 @@ export default function GameCanvas({ width, height }: Props) {
 
   // ─── Game state ────────────────────────────────────────────────────────────
   const gameState = useSharedValue(createInitialGameState(width, height));
+
+  // ─── Collision data (static; built from map, never mutated after mount) ─────
+  // Stored in a SharedValue so worklets can read it on the UI thread. Written
+  // once at mount from the JS thread; the early-exit in resolveAABB makes reads
+  // cheap when no solid props are nearby.
+  const collisionDataShared = useSharedValue<CollisionData>(buildCollisionData(initialMapData));
 
   // ─── Tile viewport culling state ──────────────────────────────────────────────
   // Tracks which tile the player is currently on. The 100ms timer updates these
@@ -1372,7 +1380,7 @@ export default function GameCanvas({ width, height }: Props) {
     };
 
     // Cap at 50ms so a backgrounded-app resume doesn't produce a giant physics jump.
-    state = updateGameState(state, Math.min(dtMs, 50));
+    state = updateGameState(state, Math.min(dtMs, 50), collisionDataShared.value);
     gameState.value = state;
 
     // FPS + debug counters — bridge to React once per second.
