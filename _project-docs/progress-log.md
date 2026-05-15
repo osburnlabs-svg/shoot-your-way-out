@@ -30,7 +30,7 @@ Status legend:
 | 4a — Stat skills + level-up | 🟢 Complete | 2026-05-10 | G1: c4daad8 G2: a095517 G3: f297b4b G3-polish: 461b25b→d90aedf→ba505fc G4: ee7f7d5 G4-cleanup: 5690324 | G1 ✅ G2 ✅ G3 ✅ G4 ✅ | Full progression loop closed. G4: weapon unlocks L4/8/12/16 + all 8 weapon renames |
 | 4b — Ability skills + crates | 🟢 Complete | 2026-05-10 | G1: 5411988 Slot-fix: 8ff2533 G2: 18b44e3 G3: e2a1deb G4: 8c31b42 G4-polish: 9cb7762 G5: b4091c6 Smoke: 2438bb4 | G1 ✅ G2 ✅ G3 ✅ G4 ✅ G5 ✅ | All 20 v1 skills shipped; throwable system; revive; bloom-hold-dissipate smoke animation |
 | 4c — Crate weapons | 🟢 Complete | 2026-05-11 | G1: 75dc967 Fix: 68f5ef3 266fbd6 G2: d6f1c1c G3: 8c390b3 Polish: cd2d2d8 5a29a3e 2daeffd a0b7e61 4eca404 Close: cb8bddb | G1 ✅ G2 ✅ G3 ✅ | World-spawn crates; weapon roll + reveal modal; Shotgun/Rocket Launcher/Flamethrower active; custom weapon icons; debug scaffold cleaned up |
-| 5 — Maps + obstacles + vehicle enemies | 🟡 In Progress | 2026-05-13 → 2026-05-14 | G1: 99bf87d→3c17fac G2: 86c1a33→44cb822 G3: 6ed8a3c→b391493→30fb59c→2c04ed9→656fddf | G1 ✅ G2 ✅ G3 🟡 | G3 partial — rubber-band fix shipped; scale overrides + diag strip remain |
+| 5 — Maps + obstacles + vehicle enemies | 🟡 In Progress | 2026-05-13 → 2026-05-15 | G1: 99bf87d→3c17fac G2: 86c1a33→44cb822 G3: 6ed8a3c→b391493→30fb59c→2c04ed9→656fddf→c979729→93bc790→289a832→f9c30e7→74b6376→a311bdb→c3450b7 | G1 ✅ G2 ✅ G3 ✅ | Hybrid AABB+circle collision complete and device-verified |
 | 6 — Audio + atmospheric effects | ⚪ | | | | |
 | 7 — UI + persistence + analytics | ⚪ | | | | |
 | 8 — Helicopter boss + hazards | ⚪ | | | | |
@@ -71,6 +71,9 @@ Status legend:
 | **Loading screen needed** — At 6000×6000 with 250+ scatter props and 31+ `useImage` assets, initial mount produces a noticeable blank frame (~1–3s) before the canvas is ready. A loading screen (static image or progress bar) must intercept this gap. A blank screen on launch reads as a crash to new players. | Phase 5 G2 (2026-05-14) | Blank frame on mount; game loads correctly | Phase 7 — implement before user-testing |
 | **Projectile rendering: bullets as Circle vs Rect** — Bullets render as Skia `<Circle>` primitives (4px warm yellow). A `<Rect>` oriented with velocity (~2×8px) reads more convincingly as a traveling projectile. Low visual priority at current size but worth bundling with Phase 6 projectile-path work since muzzle flash, bullet origin, and bullet shape all touch the same render path. | Phase 5 G2 close-out (2026-05-14) | Circle renders acceptably | Phase 6 — bundle with muzzle flash + bullet origin correction + projectile rect shape change |
 | **Camera Group child count threshold** — Phase 5 G2 A/B test (b2e6e88, reverted c5c1e5c) confirmed that 28 Atlas children inside an animated Skia camera Group does NOT cause measurable stutter. The stutter is UI-thread worklet GC churn, not Group child count. Any future render-pipeline investigation should not re-test this vector. Re-evaluate only if child count grows significantly post-launch. | Phase 5 G2 A/B test (2026-05-13) | 28 Atlas children; performance acceptable at current count | Post-launch — re-evaluate if child count grows significantly |
+| **[I] Enemies do not collide with each other** — Enemies clip through one another. Genre-typical for Vampire Survivors / Brotato style; stacking is expected and not disorienting at current enemy density. If post-launch playtesting shows enemy stacking creates gameplay problems (e.g. blob AI trivializes flanking), revisit with a soft push-apart force in v1.1+. | Phase 5 G3 (2026-05-15) | Enemies clip through each other | Deferred — v1.1+ only if playtesting surfaces a real problem |
+| **[J] Bullets do not collide with props** — Projectiles pass through all buildings, wrecks, rocks, and trees. Genre-typical. Adding prop-bullet collision would require adding a second spatial query in `combatEngine.ts` and deciding whether to block projectiles or pass through. | Phase 5 G3 (2026-05-15) | Bullets pass through everything | Phase 6 polish — add only if playtesting surfaces this as a felt problem |
+| **[K] Small trees still use AABB collision** — `env_tree_small_1/2/3` remain in the rect pool. They're small enough that any directional inconsistency is invisible at gameplay scale. If a specific small-tree variant ever shows one-direction-only blocking, move it to the circle pool with radius ~25–30. | Phase 5 G3 (2026-05-15) | AABB for small trees; no reported issues | When and if a specific variant shows visible inconsistency |
 
 ---
 
@@ -1018,83 +1021,76 @@ G2 ships a fully procedural 6000×6000 military map:
 
 ## Phase 5 — Group 3: Static-prop collision
 
-**Status:** 🟡 Partial — in progress (stopping for the night 2026-05-14)
-**Date:** 2026-05-14
-**Commits:** C1 (collision module): 6ed8a3c | C2 (engine wiring): b391493 | C3 (scale overrides): 30fb59c | C4 (diag logging): 2c04ed9 | C5 (sign fix): 656fddf
+**Status:** 🟢 Complete
+**Date:** 2026-05-15
+**Commits:** C1 (collision module): 6ed8a3c | C2 (engine wiring): b391493 | C3 (scale overrides): 30fb59c | C4 (diag logging): 2c04ed9 | C5 (sign fix): 656fddf | C6 (wasOutsideX/Y guard): c979729 | C7 (boundary <=): 93bc790 | C8 (circle pool): 289a832 | C9 (radius tuning): f9c30e7 | C10 (large trees → circles): 74b6376 | C11 (AABB cleanup): a311bdb | C12 (strip diag): c3450b7
 
 ---
 
-### Completed
+### Goal
 
-- **Collision pool locked: uniform full-bounding-box AABB**
-  - Solid (29 asset keys): all structures, all vehicle wrecks, medium + large rocks, all trees
-  - Passable (excluded): bushes, barrels/crates, small rocks
-- **Spatial partitioning: fixed 12×12 grid, cellSize=500px** — NOT viewport-cull (would clip enemies through off-screen buildings)
-- **`collision.ts` shipped (6ed8a3c):** `ColliderRect`, `CollisionData`, `buildCollisionData()`, `resolveAABB()` with axis-separated response and Minkowski expansion
-- **Engine integration shipped (b391493):** `gameEngine.ts` and `enemyEngine.ts` call `resolveAABB` during movement; `GameCanvas` builds `CollisionData` after map load and passes via its own `SharedValue` (outside `GameState` per JSI-serialization rule)
-- **`resolveAABB` sign bug fixed (656fddf):** `dxDir`/`dyDir` now use `currentX`/`currentY` as the push-direction source instead of the proposed/resolved position. Eliminates large teleports and rubber-banding. Root cause: a large step could cross the rect centre, flipping the sign and launching the entity to the far wall. Most dramatic near the bomber wreck (~800px effective AABB).
-- **AABB approximation for rotated wrecks accepted as known limitation** — helicopter and bomber rotation produces ~1.4× phantom collision zone. OBB deferred indefinitely. Per-asset scale overrides compensate visually; math limitation remains (tech debt G).
-- **Bullet/projectile collision against props OUT of scope** — deferred to Phase 6 polish if at all.
-- **Diagnostic instrumentation active (2c04ed9):** `[DIAG coll]` mount-time log + `[DIAG resolve]` worklet log with `<<BACKWARD>>` flag. Strip at G3 close-out.
+Player and enemies are blocked by solid props (buildings, vehicle wrecks, rocks, trees). Passable props (bushes, barrels, small rocks) remain walkable.
 
 ---
 
-### Remaining for G3 close-out
+### Final architecture: hybrid AABB + circle pool
 
-**Item 1 — Per-asset collision scale overrides**
+**Problem encountered:** After 8+ commits of AABB tuning on wrecks (scale overrides, sign fix, wasOutsideX/Y axis-gate, boundary <= patch), wreck collision remained inconsistent across map seeds and approach angles. Root cause: rotated wrecks paired with axis-separated AABB response produce compounding edge cases. Any fix for one angle introduced a regression on another. The approach was not economically fixable.
 
-Wrecks have transparent PNG padding producing oversized hitboxes (visible "invisible wall" outside the rendered sprite). Implement `COLLISION_SCALE_OVERRIDES` map keyed by `assetKey` in `collision.ts`. Apply multiplier to `halfW`/`halfH` at collider build time in `buildCollisionData`.
+**Decision (C8):** Switch all vehicle wrecks to circle collision. Circle math is rotation-invariant — single push-outward-along-vector, no axis-separation, no perpendicular-axis boundary conditions. Extended to large trees in C10 when the same symptom appeared (non-square PNG dimensions producing an asymmetric AABB hitbox).
 
-Starting tuning values:
-- `env_helicopter_wreck`: 0.60
-- `env_bomber_wreck_2`, `env_bomber_wreck_3`: 0.55
-- `env_bus_wreck`: 0.75
-- `env_acs_wreck`: 0.75
-- `env_humvee_wreck_1` → `env_humvee_wreck_6`: 0.70
-- `env_car_wreck_1`, `env_car_wreck_2`, `env_car_wreck_3`: 0.65
-- `env_police_wreck`, `env_ambulance_wreck`, `env_small_truck_wreck`: 0.70
+**Final pool routing in `buildCollisionData`:**
+- `mapData.buildings` → rect pool (AABB) — non-rotated, rectangular silhouette
+- `mapData.obstacles` (rocks medium/large) → rect pool (AABB) — non-rotated
+- `mapData.vehicleWrecks` → circle pool — all 17 variants, random rotation
+- `mapData.vegetation` large trees → circle pool — non-square silhouette
+- `mapData.vegetation` small trees + bushes → rect pool (small trees) or passable (bushes)
+- `mapData.barrels` → not added to either pool (all passable)
 
-Device-test after commit. Tune individual values ±0.05–0.10 if any specific asset still feels off.
+**`CIRCLE_COLLIDER_RADIUS` map** (keyed by `assetKey`, world-px radii, device-tuned):
 
-**Item 2 — G3 close-out commit**
-- Strip all `[DIAG coll]` and `[DIAG resolve]` instrumentation
-- Progress log entry summarizing G3 (similar to G2 narrative entry)
-- Binding pattern additions to master context doc:
-  - **Collision data ownership rule:** `CollisionData` lives in its own `SharedValue`, NOT in `GameState`. Built once at map load, read by worklets every frame. Same rule as `tileGrid` in G2 — only worklet-mutated data goes in `GameState`.
-  - **Scaled-footprint collision rule:** AABB collision uses the same scaled dimensions as the renderer. If `PROP_SPRITE_SCALE` changes, collision math reflects it automatically. Same rule as spacing logic in G2.
-  - **Per-asset collision overrides:** Some sprites have significant transparent PNG padding. Use `COLLISION_SCALE_OVERRIDES` map to shrink per asset. Future assets with padding need an override entry.
-- Tech debt entries F, G, H already added to this log (see Open Issues table above).
+| Asset | Radius |
+|---|---|
+| env_helicopter_wreck | 120 |
+| env_bomber_wreck_2/3 | 144 |
+| env_bus_wreck | 100 |
+| env_acs_wreck | 110 |
+| env_humvee_wreck_1–6 | 80 |
+| env_car_wreck_1–3 | 70 |
+| env_police_wreck | 75 |
+| env_ambulance_wreck | 75 |
+| env_small_truck_wreck | 75 |
+| env_tree_large_1–4 | 50 |
+
+**Spatial grid:** 12×12 flat grid, cellSize=500px, covers full 6000×6000 world. Both rect and circle pools share the same grid dimensions; rect pool uses `grid`, circle pool uses `circleGrid`. Fixed-grid chosen over viewport-cull because enemies spawn at screen edge and walk toward player — a building just off-screen would produce clip-through until it entered the viewport.
+
+**Per-frame resolution order (player and each enemy):**
+1. `resolveAABB(currentX, currentY, proposedX, proposedY, entityRadius, collData)` — structures + small rocks + small trees
+2. `resolveCircle(resolvedX, resolvedY, entityRadius, collData)` — wrecks + large trees
+
+Both passes run every frame; pools never overlap.
 
 ---
 
-### Pending brainstorm topics (deferred to next session, before G4 work)
+### Debugging journey (preserved for context)
 
-- **File refactor decision:** targeted splits between G3 and G4 (GameCanvas.tsx derived-value hooks + timer logic → separate files), full pass as Phase 5.5, or accept context cost through Phase 5
-- **Polish ideas tabled during Phase 5:** cluster tree spawning, water as centerpiece prop (vegetation theme), water border at map edge, bomber sprite scale tuning if needed
-- **DLC concept:** urban theme map for v1.1+ free update (Mo sourcing 4–5 war-torn buildings, concrete barriers, rubble piles, street lamps; reuses existing modern vehicle pack)
-- Anything else accumulated during Phase 5 work
+- **656fddf — AABB sign bug:** `dxDir`/`dyDir` derived from proposed/resolved position caused teleport when a large step crossed the rect centre. Fixed to use `currentX`/`currentY` as the sign source.
+- **c979729 — wasOutsideX/Y guard:** Helicopter rubber-band fix. If entity was already inside the rect's X range (placed there by Y resolution), the X pass would push it laterally to the far X edge. Guard: only push axis N if entity was outside that axis's range before this frame.
+- **93bc790 — boundary <= fix:** After a Y push resolved entity to exactly `rect.y + exHalfH`, next frame `|dy| == exHalfH`. Strict `<` returned false; X push never fired. Entity slid freely along the Y boundary. Fixed `<` → `<=` in perpendicular checks.
+- **289a832 — circle pool:** After 8+ AABB tuning commits still produced cross-seed inconsistency, switched wrecks to circle collision. All wreck behavior normalized immediately on device.
+- **74b6376 — large trees:** Same one-direction-only symptom appeared on a large tree. Trees have no rotation; root cause was non-square AABB (e.g., 161×145px) producing directionally inconsistent hitbox depth. Routed to circle pool.
+- **a311bdb — AABB cleanup:** wasOutsideX/Y guards, `<=` boundary patch, `COLLISION_SCALE_OVERRIDES`, and wreck/large-tree entries in `SOLID_ASSET_KEYS` all removed. AABB pool now contains only non-rotated near-rectangular assets that never needed the defensive patches.
 
 ---
 
 ### Architectural decisions made during G3
 
-- **Fixed-grid spatial partitioning over viewport culling.** Viewport cull rejected: enemies spawn at screen edge and walk toward player. A building just off-screen would produce clip-through until it crossed into view. Fixed 12×12 grid covers the full world; O(1) neighbourhood lookup regardless of player position.
-- **CollisionData in its own SharedValue, not embedded in GameState.** Follows the G2 JSI-serialization rule: only worklet-read data goes in SharedValues; static world data must not inflate the per-frame GameState write cost. CollisionData is written once at mount from the JS thread; worklets read it cheaply each frame.
-- **AABB approximation for rotated wrecks (accepted for G3).** Helicopter and bomber wrecks have random `rotation` values in `PlacedEntity`. Unrotated AABB used. Square sprites (most wrecks) are exact; non-square sprites (`bomber_wreck_2/3`, 288×192) slightly under-sized at oblique angles. OBB deferred indefinitely.
-- **Passable props excluded via explicit opt-in set.** `SOLID_ASSET_KEYS` is the authoritative list. `mapData.barrels` skipped entirely in `buildCollisionData`; `env_rock_small` and all `env_bush_*` absent from the set.
-- **Enemy-vs-enemy collision unchanged.** Enemies still clip through each other. Only entity-vs-static-prop added in G3.
-- **resolveAABB sign source: currentX/currentY, not proposed/resolved.** Push direction must be derived from the pre-movement position. Using the proposed position as the sign source causes incorrect push direction when a large step crosses the rect centre (far-wall teleport). Fix landed in 656fddf.
-
-### Pending verification (device test before marking complete)
-
-- [ ] Player cannot walk through any solid prop (houses, wrecks, medium/large rocks, trees)
-- [ ] Player walks through passable props with no resistance (barrels, crates, small rocks, bushes)
-- [ ] Sliding along walls works smoothly — diagonal into a wall resolves to a parallel slide, not a stuck freeze
-- [ ] Collision hitboxes approximately match visible sprite silhouettes (scale override tuning pass)
-- [ ] No large teleports or rubber-banding near any prop
-- [ ] Enemies route around buildings
-- [ ] No FPS regression (60fps; stutter bounded to pre-G3 baseline)
-- [ ] All Phase 4 systems still functional (combat, pickups, throwables, crates, progression)
+- **Hybrid pool: AABB for non-rotated rectangular assets, circle for rotated or asymmetric.** Rotation × AABB × axis-separation × shrink overrides has more edge cases than can be economically fixed. Circle collision is rotation-invariant; use it when assets rotate or when the PNG silhouette isn't near-rectangular.
+- **CollisionData in its own SharedValue, not GameState.** Static world data built once at mount; worklets read cheaply each frame. Same JSI-serialization rule established in G2 for tileGrid.
+- **Fixed-grid spatial partitioning over viewport culling.** Enemies approach from screen edge — viewport-cull would allow clip-through for off-screen buildings until they entered view. Fixed 12×12 grid covers the full world.
+- **Passable props excluded via opt-in set.** `SOLID_ASSET_KEYS` is the authoritative AABB set; `CIRCLE_COLLIDER_RADIUS` is the authoritative circle set. Any prop absent from both is passable.
+- **Enemy-vs-enemy collision unchanged.** Enemies clip through each other. Genre-typical for Vampire Survivors / Brotato style.
+- **Bullets pass through all props.** Genre-typical. Deferred to Phase 6 polish (if added at all).
 
 ---
 

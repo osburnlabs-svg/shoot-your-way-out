@@ -962,6 +962,24 @@ With `PROP_SPRITE_SCALE = 2` and `STRUCTURE_SPRITE_SCALE = 3`, the rendered foot
 
 ---
 
+## Collision Architecture (Phase 5 G3)
+
+**Dual-pool design.** `CollisionData` holds two independent collision pools — `rects: ColliderRect[]` for AABB and `circles: ColliderCircle[]` for circle — both backed by their own flat spatial grid (`grid` / `circleGrid`, 12×12 cells × 500px). Each grid stores indices into the corresponding pool. Both pools are built once at map load in `buildCollisionData`; neither is mutated at runtime.
+
+**When to use each pool:**
+- **AABB (`resolveAABB`)** — asset is fixed-orientation (no `rotation` field set by the map generator) and the PNG silhouette fills its canvas in a near-rectangular shape. Current AABB assets: structures, medium/large rocks, small trees.
+- **Circle (`resolveCircle`)** — asset rotates randomly OR the PNG silhouette is non-square or doesn't fill its canvas (significant transparent padding). Current circle assets: all vehicle wrecks (17 variants), large trees (4 variants). Circle math is rotation-invariant; no axis-separation edge cases.
+
+**Per-frame resolution order.** For each movement frame, both resolvers run in sequence: `resolveAABB` first, then `resolveCircle` on the output. The pools are disjoint — no asset appears in both — so order doesn't matter for correctness, but running AABB first is conventional.
+
+**`CIRCLE_COLLIDER_RADIUS` map.** Radii are world-px values stored in `collision.ts`, keyed by `assetKey`. New assets routed to the circle pool require a radius entry. There is no default — every circle collider needs an explicit value sized against the visible sprite silhouette on device.
+
+**`CollisionData` ownership rule.** `CollisionData` lives in its own `SharedValue<CollisionData>` in `GameCanvas.tsx`, outside `GameState`. It is never embedded in game state. Built once from `initialMapData` at mount; passed directly to `updateGameState` and `tickEnemies`. Same JSI-serialization rule as `tileGrid` from G2: static world data that worklets read every frame must not inflate per-frame `GameState` write cost.
+
+**`SOLID_ASSET_KEYS` is the AABB opt-in set.** Any prop absent from `SOLID_ASSET_KEYS` and absent from `CIRCLE_COLLIDER_RADIUS` is passable. When routing a new asset, pick one: add to `SOLID_ASSET_KEYS` for AABB, add to `CIRCLE_COLLIDER_RADIUS` for circle, or add to neither for passable.
+
+---
+
 ## Phase 1 Setup Commands
 
 ```powershell
