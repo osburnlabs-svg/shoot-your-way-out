@@ -214,7 +214,9 @@ export function resolveAABB(
 
   if (candidates.length === 0) return { x: proposedX, y: proposedY };
 
-  // X axis: keep Y at current position to allow sliding along horizontal walls
+  // X axis: keep Y at current position to allow sliding along horizontal walls.
+  // Push direction uses currentX (pre-movement) so a large step that crosses the
+  // rect's centre doesn't flip the sign and launch the entity to the far wall.
   let resolvedX = proposedX;
   for (let i = 0; i < candidates.length; i++) {
     const rect = rects[candidates[i]];
@@ -223,11 +225,13 @@ export function resolveAABB(
     const dx = resolvedX - rect.x;
     const dy = currentY - rect.y;
     if (Math.abs(dx) < exHalfW && Math.abs(dy) < exHalfH) {
-      resolvedX = dx >= 0 ? rect.x + exHalfW : rect.x - exHalfW;
+      const dxDir = currentX - rect.x;
+      resolvedX = dxDir >= 0 ? rect.x + exHalfW : rect.x - exHalfW;
     }
   }
 
-  // Y axis: use resolvedX (post X-pass) to allow sliding along vertical walls
+  // Y axis: use resolvedX (post X-pass) to allow sliding along vertical walls.
+  // Push direction uses currentY for the same reason as X-pass above.
   let resolvedY = proposedY;
   for (let i = 0; i < candidates.length; i++) {
     const rect = rects[candidates[i]];
@@ -236,7 +240,8 @@ export function resolveAABB(
     const dx = resolvedX - rect.x;
     const dy = resolvedY - rect.y;
     if (Math.abs(dx) < exHalfW && Math.abs(dy) < exHalfH) {
-      resolvedY = dy >= 0 ? rect.y + exHalfH : rect.y - exHalfH;
+      const dyDir = currentY - rect.y;
+      resolvedY = dyDir >= 0 ? rect.y + exHalfH : rect.y - exHalfH;
     }
   }
 
