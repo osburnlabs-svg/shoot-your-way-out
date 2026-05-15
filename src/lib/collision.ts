@@ -74,6 +74,37 @@ export const SOLID_ASSET_KEYS = new Set<string>([
   'env_tree_small_3',
 ]);
 
+// ─── Per-asset collision scale overrides ─────────────────────────────────────
+//
+// Many vehicle wreck PNGs have transparent padding that inflates the full-sprite
+// AABB beyond the visible silhouette. Multipliers here shrink halfW/halfH before
+// the collider is stored — 1.0 = use full sprite dimensions (default).
+// Tune values with Mo on device; one round of adjustments is expected.
+const COLLISION_SCALE_OVERRIDES: Record<string, number> = {
+  // Car wrecks — significant transparent border around silhouette
+  env_car_wreck_1: 0.65,
+  env_car_wreck_2: 0.65,
+  env_car_wreck_3: 0.65,
+  // Trucks, ambulance, police — moderate padding
+  env_small_truck_wreck: 0.70,
+  env_ambulance_wreck:   0.70,
+  env_police_wreck:      0.70,
+  // Humvee wrecks — moderate padding across all six variants
+  env_humvee_wreck_1: 0.70,
+  env_humvee_wreck_2: 0.70,
+  env_humvee_wreck_3: 0.70,
+  env_humvee_wreck_4: 0.70,
+  env_humvee_wreck_5: 0.70,
+  env_humvee_wreck_6: 0.70,
+  // ACS wreck + bus — large sprites with visible padding
+  env_acs_wreck: 0.75,
+  env_bus_wreck: 0.75,
+  // Aircraft — heavy padding + rotation AABB approximation compounds the oversize
+  env_helicopter_wreck: 0.60,
+  env_bomber_wreck_2:   0.55,
+  env_bomber_wreck_3:   0.55,
+};
+
 // ─── Helpers (JS-thread only) ─────────────────────────────────────────────────
 
 const STRUCTURE_KEYS = new Set(['env_house01', 'env_house02', 'env_watchtower']);
@@ -106,8 +137,9 @@ export function buildCollisionData(mapData: MapData): CollisionData {
   function addEntity(ent: PlacedEntity): void {
     if (!SOLID_ASSET_KEYS.has(ent.assetKey)) return;
     const scale = scaleFor(ent.assetKey);
-    const halfW = (ent.width * scale) / 2;
-    const halfH = (ent.height * scale) / 2;
+    const collisionScale = COLLISION_SCALE_OVERRIDES[ent.assetKey] ?? 1.0;
+    const halfW = (ent.width * scale * collisionScale) / 2;
+    const halfH = (ent.height * scale * collisionScale) / 2;
     const idx = rects.length;
     rects.push({ x: ent.x, y: ent.y, halfW, halfH });
 
