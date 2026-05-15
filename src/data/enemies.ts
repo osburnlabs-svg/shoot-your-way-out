@@ -52,8 +52,8 @@ export const ENEMY_PROFILES: Record<EnemyType, EnemyProfile> = {
   sniperA: {
     id: 'sniperA',
     displayName: 'Sniper',
-    // hp=30: dies in 3 shots at pistol damage=12 — glass cannon backline character
-    hp: 30,
+    // hp=50: 2.5× scav — tankier backline threat, takes ~5 pistol shots to drop
+    hp: 50,
     moveSpeed: 0.8,
     contactDamage: 12,
     xpOnKill: 6,
@@ -61,7 +61,8 @@ export const ENEMY_PROFILES: Record<EnemyType, EnemyProfile> = {
   sniperB: {
     id: 'sniperB',
     displayName: 'Sniper',
-    hp: 30,
+    // hp=40: 2× scav — slightly squishier than sniperA, still requires 4 pistol shots
+    hp: 40,
     moveSpeed: 0.8,
     contactDamage: 12,
     xpOnKill: 6,

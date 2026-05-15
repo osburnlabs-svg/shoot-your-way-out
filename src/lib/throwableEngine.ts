@@ -55,6 +55,7 @@ import {
   FLAMETHROWER_ZONE_DAMAGE_PER_SEC,
   ENEMY_COLLISION_RADIUS_PX,
   THROWABLE_TARGET_RANGE_PX,
+  MUZZLE_FLASH_DURATION_MS,
 } from '../data/gameConstants';
 import type { PickupState } from './gameEngine';
 
@@ -120,6 +121,7 @@ export function applyAOEDamage(
         dyingStartedAtMs: elapsedMs,
         lastHitPlayerAtMs: enemy.lastHitPlayerAtMs,
         hitFlashUntilMs: elapsedMs + 80,
+        fireCooldownMs: enemy.fireCooldownMs,
       });
       kills += 1;
       // Silent drop if all slots full — same policy as crates. Tune PICKUP_SLOT_COUNT if Phase 5+ density requires.
@@ -153,6 +155,7 @@ export function applyAOEDamage(
         dyingStartedAtMs: enemy.dyingStartedAtMs,
         lastHitPlayerAtMs: enemy.lastHitPlayerAtMs,
         hitFlashUntilMs: elapsedMs + 80,
+        fireCooldownMs: enemy.fireCooldownMs,
       });
     }
   }
@@ -169,7 +172,7 @@ export function applyAOEDamage(
  */
 export function spawnEffectZoneAt(
   state: GameState,
-  type: 'flame' | 'explosion',
+  type: 'flame' | 'explosion' | 'muzzle_flash_a' | 'muzzle_flash_b',
   x: number,
   y: number,
   rotation = 0,
@@ -390,6 +393,8 @@ export function tickEffectZones(state: GameState, _dtMs: number): GameState {
       duration = FLAMETHROWER_ZONE_DURATION_MS;
     } else if (zone.type === 'explosion') {
       duration = FRAG_EXPLODE_FRAME_COUNT * FRAG_EXPLODE_FRAME_DURATION_MS;
+    } else if (zone.type === 'muzzle_flash_a' || zone.type === 'muzzle_flash_b') {
+      duration = MUZZLE_FLASH_DURATION_MS;
     } else {
       duration = MOLOTOV_DURATION_MS;
     }

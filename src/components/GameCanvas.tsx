@@ -94,6 +94,8 @@ import {
   SNIPER_WALK_FRAME_DURATION_MS,
   SOLDIER02_WALK_FRAME_COUNT,
   SOLDIER02_WALK_FRAME_DURATION_MS,
+  MUZZLE_FLASH_FRAME_COUNT,
+  MUZZLE_FLASH_FRAME_DURATION_MS,
   WALK_FRAME_COUNT,
   WALK_FRAME_DURATION_MS,
   ENEMY_DIE_FRAME_COUNT,
@@ -550,6 +552,16 @@ export default function GameCanvas({ width, height }: Props) {
   const rocket1 = useImage(EffectSprites.rocket[1]);
   const rocketImages = [rocket0, rocket1];
 
+  // Muzzle flash: 3 frames each, non-looping, 50ms/frame. sniperA = Sniper kit, sniperB = Gunner.
+  const muzzleFlashA0 = useImage(EffectSprites.muzzle_flash_a[0]);
+  const muzzleFlashA1 = useImage(EffectSprites.muzzle_flash_a[1]);
+  const muzzleFlashA2 = useImage(EffectSprites.muzzle_flash_a[2]);
+  const muzzleFlashAImages = [muzzleFlashA0, muzzleFlashA1, muzzleFlashA2];
+  const muzzleFlashB0 = useImage(EffectSprites.muzzle_flash_b[0]);
+  const muzzleFlashB1 = useImage(EffectSprites.muzzle_flash_b[1]);
+  const muzzleFlashB2 = useImage(EffectSprites.muzzle_flash_b[2]);
+  const muzzleFlashBImages = [muzzleFlashB0, muzzleFlashB1, muzzleFlashB2];
+
   // ─── Map data (generated once per mount; reused on redeploy in Phase 5) ──────
   // Phase 7 will generate a fresh map on each run restart via the menu flow.
   const [initialMapData] = useState(() => loadMap(Date.now()));
@@ -752,7 +764,7 @@ export default function GameCanvas({ width, height }: Props) {
       targetY: 0,
     })),
     zSlots: Array.from({ length: EFFECT_ZONE_SLOT_COUNT }, () => ({
-      type:     null as 'smoke' | 'molotov' | 'flame' | 'explosion' | null,
+      type:     null as 'smoke' | 'molotov' | 'flame' | 'explosion' | 'muzzle_flash_a' | 'muzzle_flash_b' | null,
       x: 0, y: 0, frame: 0, rotation: 0,
     })),
   });
@@ -901,6 +913,11 @@ export default function GameCanvas({ width, height }: Props) {
         } else if (z.type === 'explosion') {
           zFrame = getCurrentFrame(
             { frameCount: FRAG_EXPLODE_FRAME_COUNT, frameDurationMs: FRAG_EXPLODE_FRAME_DURATION_MS, loop: false },
+            state.elapsedMs - z.spawnedAtMs,
+          );
+        } else if (z.type === 'muzzle_flash_a' || z.type === 'muzzle_flash_b') {
+          zFrame = getCurrentFrame(
+            { frameCount: MUZZLE_FLASH_FRAME_COUNT, frameDurationMs: MUZZLE_FLASH_FRAME_DURATION_MS, loop: false },
             state.elapsedMs - z.spawnedAtMs,
           );
         }
@@ -1209,7 +1226,7 @@ export default function GameCanvas({ width, height }: Props) {
   // type drives render mode (null = skip). x/y are static per zone lifetime.
   // frame drives flame/explosion animation cycling.
   const [zoneSlotData, setZoneSlotData] = useState<Array<{
-    type: 'smoke' | 'molotov' | 'flame' | 'explosion' | null;
+    type: 'smoke' | 'molotov' | 'flame' | 'explosion' | 'muzzle_flash_a' | 'muzzle_flash_b' | null;
     x: number;
     y: number;
     frame: number;
@@ -1595,6 +1612,24 @@ export default function GameCanvas({ width, height }: Props) {
                   y={z.y - eh / 2}
                   width={ew}
                   height={eh}
+                  sampling={{ filter: FilterMode.Nearest, mipmap: MipmapMode.None }}
+                />
+              );
+            }
+            if (z.type === 'muzzle_flash_a' || z.type === 'muzzle_flash_b') {
+              const imgs = z.type === 'muzzle_flash_a' ? muzzleFlashAImages : muzzleFlashBImages;
+              const flashImg = imgs[z.frame] ?? imgs[0] ?? null;
+              if (!flashImg) return null;
+              const fw = flashImg.width() * EFFECT_SPRITE_SCALE;
+              const fh = flashImg.height() * EFFECT_SPRITE_SCALE;
+              return (
+                <Image
+                  key={`zone-${i}`}
+                  image={flashImg}
+                  x={z.x - fw / 2}
+                  y={z.y - fh / 2}
+                  width={fw}
+                  height={fh}
                   sampling={{ filter: FilterMode.Nearest, mipmap: MipmapMode.None }}
                 />
               );

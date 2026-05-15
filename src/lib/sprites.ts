@@ -249,6 +249,18 @@ export const EffectSprites = {
     require('../../assets/effects/smoke/6.png'),
     require('../../assets/effects/smoke/7.png'),
   ],
+  /** Muzzle flash for sniperA (Sniper kit): 3 frames × 50ms = 150ms, non-looping. */
+  muzzle_flash_a: [
+    require('../../assets/effects/muzzle_flash/sniper_1.png'),
+    require('../../assets/effects/muzzle_flash/sniper_2.png'),
+    require('../../assets/effects/muzzle_flash/sniper_3.png'),
+  ],
+  /** Muzzle flash for sniperB (Soldier02): 3 frames × 50ms = 150ms, non-looping. */
+  muzzle_flash_b: [
+    require('../../assets/effects/muzzle_flash/gunner_1.png'),
+    require('../../assets/effects/muzzle_flash/gunner_2.png'),
+    require('../../assets/effects/muzzle_flash/gunner_3.png'),
+  ],
 } as const;
 
 /**

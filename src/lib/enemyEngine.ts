@@ -46,6 +46,7 @@ import {
 } from '../data/gameConstants';
 import { resolveAABB, resolveCircle } from './collision';
 import type { CollisionData } from './collision';
+import { spawnEffectZoneAt } from './throwableEngine';
 
 /** Linear interpolation — inlined here to avoid importing a non-worklet util. */
 function lerp(a: number, b: number, t: number): number {
@@ -155,6 +156,8 @@ export function tickEnemies(state: GameState, dtMs: number, collData: CollisionD
   let nextEnemyId = state.nextEnemyId;
   let spawnAccMs = state.spawnAccMs;
   let nextProjectileId = state.nextProjectileId;
+  let effectZones = state.effectZones;
+  let nextEffectZoneId = state.nextEffectZoneId;
   const newEnemyProjectiles: ProjectileState[] = [];
 
   // ─── Spawner ──────────────────────────────────────────────────────────────
@@ -280,8 +283,9 @@ export function tickEnemies(state: GameState, dtMs: number, collData: CollisionD
     if ((enemy.type === 'sniperA' || enemy.type === 'sniperB') && dist > 0) {
       newFireCd = Math.max(0, enemy.fireCooldownMs - dtMs);
       if (newFireCd === 0 && dist <= SNIPER_FIRE_RANGE_PX) {
-        const nx = dx / dist;
-        const ny = dy / dist;
+        const angle = Math.random() * 2 * Math.PI;
+        const nx = Math.cos(angle);
+        const ny = Math.sin(angle);
         newEnemyProjectiles.push({
           id: nextProjectileId,
           x: enemy.x,
@@ -294,10 +298,20 @@ export function tickEnemies(state: GameState, dtMs: number, collData: CollisionD
           damage: SNIPER_PROJECTILE_DAMAGE,
           pierceRemaining: 0,
           hitEnemyIds: [],
-          isRocket: enemy.type === 'sniperB',
+          isRocket: false,
           isEnemyProjectile: true,
         });
         nextProjectileId += 1;
+        // Muzzle flash at sniper position — visual flair only.
+        const flashType = enemy.type === 'sniperA' ? 'muzzle_flash_a' : 'muzzle_flash_b';
+        const tmpFlashState = spawnEffectZoneAt(
+          { ...state, effectZones, nextEffectZoneId },
+          flashType,
+          enemy.x,
+          enemy.y,
+        );
+        effectZones = tmpFlashState.effectZones;
+        nextEffectZoneId = tmpFlashState.nextEffectZoneId;
         newFireCd = SNIPER_FIRE_COOLDOWN_MS;
       }
     }
@@ -354,5 +368,7 @@ export function tickEnemies(state: GameState, dtMs: number, collData: CollisionD
     spawnAccMs,
     projectiles: updatedProjectiles,
     nextProjectileId,
+    effectZones,
+    nextEffectZoneId,
   };
 }
