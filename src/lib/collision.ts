@@ -20,6 +20,12 @@ export type ColliderRect = {
   halfH: number;
 };
 
+export type ColliderCircle = {
+  x: number;
+  y: number;
+  radius: number;
+};
+
 export type CollisionData = {
   rects: ColliderRect[];
   /**
@@ -27,6 +33,9 @@ export type CollisionData = {
    * Each element is an array of indices into `rects`.
    */
   grid: number[][];
+  circles: ColliderCircle[];
+  /** Separate spatial grid for the circle pool — same layout as `grid`. */
+  circleGrid: number[][];
   cellSize: number;
   cols: number;
   rows: number;
@@ -73,6 +82,30 @@ export const SOLID_ASSET_KEYS = new Set<string>([
   'env_tree_small_2',
   'env_tree_small_3',
 ]);
+
+// ─── Wreck circle radii ───────────────────────────────────────────────────────
+//
+// Vehicle wrecks use circle collision instead of AABB — rotation-invariant,
+// no axis-separation edge cases. Radii are tuning-starting values in world px.
+const WRECK_COLLISION_RADIUS: Record<string, number> = {
+  env_helicopter_wreck:  144,
+  env_bomber_wreck_2:    144,
+  env_bomber_wreck_3:    144,
+  env_bus_wreck:         130,
+  env_acs_wreck:         110,
+  env_humvee_wreck_1:     80,
+  env_humvee_wreck_2:     80,
+  env_humvee_wreck_3:     80,
+  env_humvee_wreck_4:     80,
+  env_humvee_wreck_5:     80,
+  env_humvee_wreck_6:     80,
+  env_car_wreck_1:        70,
+  env_car_wreck_2:        70,
+  env_car_wreck_3:        70,
+  env_police_wreck:       75,
+  env_ambulance_wreck:    75,
+  env_small_truck_wreck:  75,
+};
 
 // ─── Per-asset collision scale overrides ─────────────────────────────────────
 //
@@ -139,6 +172,27 @@ export function buildCollisionData(mapData: MapData): CollisionData {
   const grid: number[][] = [];
   for (let i = 0; i < cols * rows; i++) grid.push([]);
 
+  const circles: ColliderCircle[] = [];
+  const circleGrid: number[][] = [];
+  for (let i = 0; i < cols * rows; i++) circleGrid.push([]);
+
+  function addCircle(ent: PlacedEntity): void {
+    const radius = WRECK_COLLISION_RADIUS[ent.assetKey];
+    if (radius === undefined) return;
+    const idx = circles.length;
+    circles.push({ x: ent.x, y: ent.y, radius });
+
+    const minCX = Math.max(0, Math.floor((ent.x - radius) / cellSize));
+    const maxCX = Math.min(cols - 1, Math.floor((ent.x + radius) / cellSize));
+    const minCY = Math.max(0, Math.floor((ent.y - radius) / cellSize));
+    const maxCY = Math.min(rows - 1, Math.floor((ent.y + radius) / cellSize));
+    for (let cy = minCY; cy <= maxCY; cy++) {
+      for (let cx = minCX; cx <= maxCX; cx++) {
+        circleGrid[cy * cols + cx].push(idx);
+      }
+    }
+  }
+
   function addEntity(ent: PlacedEntity): void {
     if (!SOLID_ASSET_KEYS.has(ent.assetKey)) return;
     const scale = scaleFor(ent.assetKey);
@@ -162,11 +216,11 @@ export function buildCollisionData(mapData: MapData): CollisionData {
 
   for (const ent of mapData.buildings) addEntity(ent);
   for (const ent of mapData.obstacles) addEntity(ent);
-  for (const ent of mapData.vehicleWrecks) addEntity(ent);
+  for (const ent of mapData.vehicleWrecks) addCircle(ent);
   for (const ent of mapData.vegetation) addEntity(ent);
   // mapData.barrels intentionally skipped — all passable
 
-  return { rects, grid, cellSize, cols, rows };
+  return { rects, grid, circles, circleGrid, cellSize, cols, rows };
 }
 
 // ─── Resolution (worklet-safe) ────────────────────────────────────────────────
@@ -258,6 +312,72 @@ export function resolveAABB(
     if (wasOutsideY && Math.abs(dx) <= exHalfW && Math.abs(dy) < exHalfH) {
       const dyDir = currentY - rect.y;
       resolvedY = dyDir >= 0 ? rect.y + exHalfH : rect.y - exHalfH;
+    }
+  }
+
+  return { x: resolvedX, y: resolvedY };
+}
+
+// ─── Circle resolution (worklet-safe) ────────────────────────────────────────
+
+/**
+ * Resolve entity-vs-wreck collision using circle-vs-point tests.
+ * Called after resolveAABB so AABB (structures/rocks/trees) and circle
+ * (wrecks) passes both run each frame.
+ *
+ * For each nearby wreck circle whose combined radius (circle.radius +
+ * entityRadius) exceeds the distance to the entity center, push the entity
+ * outward along the connecting vector to the boundary. Rotation-invariant —
+ * no axis-separation, no boundary edge cases.
+ */
+export function resolveCircle(
+  proposedX: number,
+  proposedY: number,
+  entityRadius: number,
+  collData: CollisionData,
+): { x: number; y: number } {
+  'worklet';
+
+  const { circles, circleGrid, cellSize, cols, rows } = collData;
+  if (circles.length === 0) return { x: proposedX, y: proposedY };
+
+  const r = entityRadius;
+  const minCX = Math.max(0, Math.floor((proposedX - r) / cellSize));
+  const maxCX = Math.min(cols - 1, Math.floor((proposedX + r) / cellSize));
+  const minCY = Math.max(0, Math.floor((proposedY - r) / cellSize));
+  const maxCY = Math.min(rows - 1, Math.floor((proposedY + r) / cellSize));
+
+  const candidates: number[] = [];
+  for (let cy = minCY; cy <= maxCY; cy++) {
+    for (let cx = minCX; cx <= maxCX; cx++) {
+      const cell = circleGrid[cy * cols + cx];
+      if (cell) {
+        for (let i = 0; i < cell.length; i++) candidates.push(cell[i]);
+      }
+    }
+  }
+
+  if (candidates.length === 0) return { x: proposedX, y: proposedY };
+
+  let resolvedX = proposedX;
+  let resolvedY = proposedY;
+
+  for (let i = 0; i < candidates.length; i++) {
+    const circle = circles[candidates[i]];
+    const combined = entityRadius + circle.radius;
+    const dx = resolvedX - circle.x;
+    const dy = resolvedY - circle.y;
+    const distSq = dx * dx + dy * dy;
+    if (distSq < combined * combined) {
+      const dist = Math.sqrt(distSq);
+      if (dist > 0) {
+        const s = combined / dist;
+        resolvedX = circle.x + dx * s;
+        resolvedY = circle.y + dy * s;
+      } else {
+        // Exact center overlap — push right (degenerate, shouldn't occur in practice)
+        resolvedX = circle.x + combined;
+      }
     }
   }
 

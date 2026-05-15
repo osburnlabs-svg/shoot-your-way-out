@@ -36,7 +36,7 @@ import {
   SMOKE_SLOW_MULT,
   CAMERA_ZOOM,
 } from '../data/gameConstants';
-import { resolveAABB } from './collision';
+import { resolveAABB, resolveCircle } from './collision';
 import type { CollisionData } from './collision';
 
 /** Linear interpolation — inlined here to avoid importing a non-worklet util. */
@@ -239,7 +239,8 @@ export function tickEnemies(state: GameState, dtMs: number, collData: CollisionD
     } else {
       const propX = enemy.x + (dx / dist) * speed * dtSec;
       const propY = enemy.y + (dy / dist) * speed * dtSec;
-      const resolved = resolveAABB(enemy.x, enemy.y, propX, propY, ENEMY_COLLISION_RADIUS_PX, collData);
+      const resolvedAabb = resolveAABB(enemy.x, enemy.y, propX, propY, ENEMY_COLLISION_RADIUS_PX, collData);
+      const resolved = resolveCircle(resolvedAabb.x, resolvedAabb.y, ENEMY_COLLISION_RADIUS_PX, collData);
       moved.push({
         id: enemy.id,
         type: enemy.type,

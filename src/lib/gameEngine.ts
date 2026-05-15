@@ -95,7 +95,7 @@ import {
 import type { CrateTier } from '../data/gameConstants';
 import type { SkillId } from '../data/skills';
 import { getEffectiveStats } from '../data/skills';
-import { resolveAABB } from './collision';
+import { resolveAABB, resolveCircle } from './collision';
 import type { CollisionData } from './collision';
 import { tickEnemies } from './enemyEngine';
 import { tickCombat } from './combatEngine';
@@ -632,6 +632,9 @@ export function updateGameState(state: GameState, dtMs: number, collData: Collis
     const resolved = resolveAABB(player.x, player.y, newX, newY, PLAYER_COLLISION_RADIUS_PX, collData);
     newX = resolved.x;
     newY = resolved.y;
+    const resolvedC = resolveCircle(newX, newY, PLAYER_COLLISION_RADIUS_PX, collData);
+    newX = resolvedC.x;
+    newY = resolvedC.y;
     if (Math.abs(newX - diagPreX) > 2 || Math.abs(newY - diagPreY) > 2) {
       const backX = newX < player.x - 0.5;
       const backY = newY < player.y - 0.5;
