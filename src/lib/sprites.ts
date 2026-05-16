@@ -281,6 +281,15 @@ export const EffectSprites = {
     require('../../assets/effects/muzzle_flash/gunner_2.png'),
     require('../../assets/effects/muzzle_flash/gunner_3.png'),
   ],
+  /**
+   * Muzzle flash for raider: reuses gunner_1–3 frames (Soldier kit has no standalone
+   * flash sprites; Soldier Shot.png is a full-character pose, not a flash overlay).
+   */
+  muzzle_flash_raider: [
+    require('../../assets/effects/muzzle_flash/gunner_1.png'),
+    require('../../assets/effects/muzzle_flash/gunner_2.png'),
+    require('../../assets/effects/muzzle_flash/gunner_3.png'),
+  ],
 } as const;
 
 /**

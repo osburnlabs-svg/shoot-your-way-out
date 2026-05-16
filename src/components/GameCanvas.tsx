@@ -99,6 +99,7 @@ import {
   MUZZLE_FLASH_DURATION_MS,
   SNIPER_A_FLASH_OFFSET,
   SNIPER_B_FLASH_OFFSET,
+  RAIDER_FLASH_OFFSET,
   WALK_FRAME_COUNT,
   WALK_FRAME_DURATION_MS,
   ENEMY_DIE_FRAME_COUNT,
@@ -563,6 +564,11 @@ export default function GameCanvas({ width, height }: Props) {
   const muzzleFlashB1 = useImage(EffectSprites.muzzle_flash_b[1]);
   const muzzleFlashB2 = useImage(EffectSprites.muzzle_flash_b[2]);
   const muzzleFlashBImages = [muzzleFlashB0, muzzleFlashB1, muzzleFlashB2];
+  // Raider muzzle flash: reuses gunner frames (Soldier kit has no standalone flash sprites).
+  const muzzleFlashRaider0 = useImage(EffectSprites.muzzle_flash_raider[0]);
+  const muzzleFlashRaider1 = useImage(EffectSprites.muzzle_flash_raider[1]);
+  const muzzleFlashRaider2 = useImage(EffectSprites.muzzle_flash_raider[2]);
+  const muzzleFlashRaiderImages = [muzzleFlashRaider0, muzzleFlashRaider1, muzzleFlashRaider2];
 
   // ─── Map data (generated once per mount; reused on redeploy in Phase 5) ──────
   // Phase 7 will generate a fresh map on each run restart via the menu flow.
@@ -869,7 +875,7 @@ export default function GameCanvas({ width, height }: Props) {
       for (let i = 0; i < ENEMY_SOFT_CAP; i++) { ff[i] = -1; }
       for (let i = 0; i < state.enemies.length; i++) {
         const enemy = state.enemies[i];
-        if (!enemy || (enemy.type !== 'sniperA' && enemy.type !== 'sniperB')) continue;
+        if (!enemy || (enemy.type !== 'sniperA' && enemy.type !== 'sniperB' && enemy.type !== 'raider')) continue;
         if (enemy.lastFiredAtMs <= 0) continue;
         const flashElapsed = state.elapsedMs - enemy.lastFiredAtMs;
         if (flashElapsed >= 0 && flashElapsed < MUZZLE_FLASH_DURATION_MS) {
@@ -1813,10 +1819,10 @@ export default function GameCanvas({ width, height }: Props) {
             const bw = bodyOverlay ? bodyOverlay.width() * ENEMY_SPRITE_SCALE : 0;
             const bh = bodyOverlay ? bodyOverlay.height() * ENEMY_SPRITE_SCALE : 0;
 
-            const flashFrame = (type === 'sniperA' || type === 'sniperB') ? (enemySlotFlashFrames[i] ?? -1) : -1;
-            const flashImgs = type === 'sniperA' ? muzzleFlashAImages : muzzleFlashBImages;
+            const flashFrame = (type === 'sniperA' || type === 'sniperB' || type === 'raider') ? (enemySlotFlashFrames[i] ?? -1) : -1;
+            const flashImgs = type === 'sniperA' ? muzzleFlashAImages : type === 'raider' ? muzzleFlashRaiderImages : muzzleFlashBImages;
             const flashImg = flashFrame >= 0 ? (flashImgs[flashFrame] ?? null) : null;
-            const flashOffset = type === 'sniperA' ? SNIPER_A_FLASH_OFFSET : SNIPER_B_FLASH_OFFSET;
+            const flashOffset = type === 'sniperA' ? SNIPER_A_FLASH_OFFSET : type === 'raider' ? RAIDER_FLASH_OFFSET : SNIPER_B_FLASH_OFFSET;
 
             return (
               <Group key={i} transform={transform}>

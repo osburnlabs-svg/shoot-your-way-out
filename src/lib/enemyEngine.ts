@@ -37,6 +37,7 @@ import {
   CAMERA_ZOOM,
   SNIPER_FIRE_RANGE_PX,
   SNIPER_FIRE_COOLDOWN_MS,
+  RAIDER_FIRE_COOLDOWN_MS,
   SNIPER_MAX_ACTIVE,
   SNIPER_RATIO_RAMP_START_MS,
   SNIPER_RATIO_RAMP_END_MS,
@@ -210,7 +211,7 @@ export function tickEnemies(state: GameState, dtMs: number, collData: CollisionD
           dyingStartedAtMs: 0,
           lastHitPlayerAtMs: 0,
           hitFlashUntilMs: 0,
-          fireCooldownMs: isSniper ? SNIPER_FIRE_COOLDOWN_MS : 0,
+          fireCooldownMs: isSniper ? SNIPER_FIRE_COOLDOWN_MS : type === 'raider' ? RAIDER_FIRE_COOLDOWN_MS : 0,
           lastFiredAtMs: 0,
         };
         nextEnemyId += 1;
@@ -272,7 +273,7 @@ export function tickEnemies(state: GameState, dtMs: number, collData: CollisionD
     const dy = py - enemy.y;
     const dist = Math.sqrt(dx * dx + dy * dy);
 
-    // ── Sniper fire: decrement cooldown, record lastFiredAtMs when in range ──
+    // ── Fire cooldown: snipers (ranged) and raider (visual flash only) ──
     let newFireCd = enemy.fireCooldownMs;
     let newLastFiredAtMs = enemy.lastFiredAtMs;
     if ((enemy.type === 'sniperA' || enemy.type === 'sniperB') && dist > 0) {
@@ -280,6 +281,12 @@ export function tickEnemies(state: GameState, dtMs: number, collData: CollisionD
       if (newFireCd === 0 && dist <= SNIPER_FIRE_RANGE_PX) {
         newLastFiredAtMs = elapsedMs;
         newFireCd = SNIPER_FIRE_COOLDOWN_MS;
+      }
+    } else if (enemy.type === 'raider') {
+      newFireCd = Math.max(0, enemy.fireCooldownMs - dtMs);
+      if (newFireCd === 0) {
+        newLastFiredAtMs = elapsedMs;
+        newFireCd = RAIDER_FIRE_COOLDOWN_MS;
       }
     }
 

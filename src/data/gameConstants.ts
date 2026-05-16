@@ -282,6 +282,9 @@ export const SNIPER_FIRE_RANGE_PX = 300;
 /** Seconds between sniper shots. Tunable. */
 export const SNIPER_FIRE_COOLDOWN_MS = 3500;
 
+/** Seconds between raider muzzle flashes. Visual only — no projectile. Tunable. */
+export const RAIDER_FIRE_COOLDOWN_MS = 3500;
+
 /** Speed of sniper projectiles in px/sec. Slightly faster than player movement so dodging requires timing. */
 export const SNIPER_PROJECTILE_SPEED_PX_PER_SEC = 350;
 
@@ -316,6 +319,12 @@ export const MUZZLE_FLASH_DURATION_MS = 200;
  */
 export const SNIPER_A_FLASH_OFFSET = { x: -13, y: 34 } as const;
 export const SNIPER_B_FLASH_OFFSET = { x: -16, y: 22 } as const;
+/**
+ * Barrel-tip offset for raider muzzle flash, in Group local coordinates.
+ * Soldier body overlay — rifle extends from upper body toward bottom of sprite.
+ * Tune on device; 1 sprite-pixel = 2 rendered units.
+ */
+export const RAIDER_FLASH_OFFSET = { x: 4, y: 28 } as const;
 
 // ─── Throwables ───────────────────────────────────────────────────────────────
 
