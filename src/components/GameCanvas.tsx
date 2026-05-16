@@ -859,6 +859,14 @@ export default function GameCanvas({ width, height }: Props) {
             { frameCount: fc, frameDurationMs: fd, loop: true },
             state.elapsedMs - enemy.walkStartedAtMs,
           );
+          // Freeze sniperA on frame 0 (SW_01) while the muzzle flash is active so
+          // the barrel tip stays aligned with SNIPER_A_FLASH_OFFSET for all instances.
+          if (t === 'sniperA' && enemy.lastFiredAtMs > 0) {
+            const flashElapsed = state.elapsedMs - enemy.lastFiredAtMs;
+            if (flashElapsed >= 0 && flashElapsed < MUZZLE_FLASH_DURATION_MS) {
+              ef[i] = 0;
+            }
+          }
         }
       }
       setEnemySlotTypes(et.slice());
