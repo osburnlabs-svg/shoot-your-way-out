@@ -30,7 +30,7 @@ Status legend:
 | 4a — Stat skills + level-up | 🟢 Complete | 2026-05-10 | G1: c4daad8 G2: a095517 G3: f297b4b G3-polish: 461b25b→d90aedf→ba505fc G4: ee7f7d5 G4-cleanup: 5690324 | G1 ✅ G2 ✅ G3 ✅ G4 ✅ | Full progression loop closed. G4: weapon unlocks L4/8/12/16 + all 8 weapon renames |
 | 4b — Ability skills + crates | 🟢 Complete | 2026-05-10 | G1: 5411988 Slot-fix: 8ff2533 G2: 18b44e3 G3: e2a1deb G4: 8c31b42 G4-polish: 9cb7762 G5: b4091c6 Smoke: 2438bb4 | G1 ✅ G2 ✅ G3 ✅ G4 ✅ G5 ✅ | All 20 v1 skills shipped; throwable system; revive; bloom-hold-dissipate smoke animation |
 | 4c — Crate weapons | 🟢 Complete | 2026-05-11 | G1: 75dc967 Fix: 68f5ef3 266fbd6 G2: d6f1c1c G3: 8c390b3 Polish: cd2d2d8 5a29a3e 2daeffd a0b7e61 4eca404 Close: cb8bddb | G1 ✅ G2 ✅ G3 ✅ | World-spawn crates; weapon roll + reveal modal; Shotgun/Rocket Launcher/Flamethrower active; custom weapon icons; debug scaffold cleaned up |
-| 5 — Maps + obstacles + vehicle enemies | 🟡 In Progress | 2026-05-13 → 2026-05-15 | G1: 99bf87d→3c17fac G2: 86c1a33→44cb822 G3: 6ed8a3c→b391493→30fb59c→2c04ed9→656fddf→c979729→93bc790→289a832→f9c30e7→74b6376→a311bdb→c3450b7 G4: 81a0cbd→832828a→1e94df5→ee1e503→345c364→eb0ceec | G1 ✅ G2 ✅ G3 ✅ G4 🟡 device test pending | Collision complete; G4 sniper class + muzzle flash shipped, pending device verification |
+| 5 — Maps + obstacles + vehicle enemies | 🟡 In Progress | 2026-05-13 → 2026-05-16 | G1: 99bf87d→3c17fac G2: 86c1a33→44cb822 G3: 6ed8a3c→b391493→30fb59c→2c04ed9→656fddf→c979729→93bc790→289a832→f9c30e7→74b6376→a311bdb→c3450b7 G4: 81a0cbd→832828a→1e94df5→ee1e503→345c364→eb0ceec→384566a→fb1f99d→1029ab4→40cb8bb→5937a47→d18dc5a | G1 ✅ G2 ✅ G3 ✅ G4 🟡 close-out next session | Collision complete; G4 sniper class + muzzle flash + raider flash + sprite swaps done; G4 close-out next session |
 | 6 — Audio + atmospheric effects | ⚪ | | | | |
 | 7 — UI + persistence + analytics | ⚪ | | | | |
 | 8 — Helicopter boss + hazards | ⚪ | | | | |
@@ -1097,9 +1097,9 @@ Both passes run every frame; pools never overlap.
 
 ## Phase 5 — Group 4: Sniper class + muzzle flash
 
-**Status:** 🟡 In Progress — code shipped, device test pending
-**Date:** 2026-05-15
-**Commits:** 81a0cbd (bullet sprite swap) → 832828a (raider visual swap) → 1e94df5 (raider body overlay fix) → ee1e503 (sniper class original impl) → 345c364 (G4 redesign: visual-only fire) → eb0ceec (muzzle flash z-order fix + strip projectiles)
+**Status:** 🟡 In Progress — device tested; G4 close-out next session
+**Date:** 2026-05-15 → 2026-05-16
+**Commits:** 81a0cbd (bullet sprite swap) → 832828a (raider visual swap) → 1e94df5 (raider body overlay fix) → ee1e503 (sniper class original impl) → 345c364 (G4 redesign: visual-only fire) → eb0ceec (muzzle flash z-order fix + strip projectiles) → 384566a (tech debt [L] + revert frame freeze) → fb1f99d (scav/raider sprite swap) → 1029ab4 (raider muzzle flash) → 40cb8bb (flash offset y:60) → 5937a47 (flash offset x:1) → d18dc5a (flash offset x:−2 final)
 
 ### What shipped
 
@@ -1123,22 +1123,27 @@ Both passes run every frame; pools never overlap.
 - No projectile travels from either sniper variant
 - `isEnemyProjectile` field fully removed from ProjectileState and all combat/enemy engine code
 
-### Known issue (deferred, not blocking device test)
+### Known issue (partially resolved)
 
-**Muzzle flash position:** flashes render at sprite center, not at weapon barrel. The flash origin is anatomically wrong — appears from chest area instead of gun barrel. Fix requires a per-variant weapon-barrel offset added to the flash render position (different offset for sniperA vs sniperB since their weapon positions differ within the sprite). Tunable per asset once verified visible on device. Deferred until flash visibility is confirmed.
+**Muzzle flash position:** per-variant offsets now implemented (`SNIPER_A_FLASH_OFFSET = {x:-13, y:34}`, `SNIPER_B_FLASH_OFFSET = {x:-16, y:22}`, `RAIDER_FLASH_OFFSET = {x:-2, y:60}`). Variant B and raider confirmed at barrel on device. Variant A offset confirmed near rifle area; exact position varies across walk frames due to lateral body movement in SW_01–07 — logged as tech debt [L]. Frame-accurate fix would require moving sprite frame selection off the React-state/100ms-timer pathway; deferred.
 
-### Remaining for G4 close
+### Updates this session (2026-05-15 → 2026-05-16)
 
-1. Device test: confirm flashes visible, correct sprite per variant, no projectile travels, FPS unchanged
-2. Muzzle flash position fix — anchor flash to weapon barrel per variant
-3. Optional (Mo's call): extend muzzle flash to scav and raider classes so all enemies appear to be shooting
-4. Optional (Mo's call): scav/raider sprite swap — Mo editing weaponless Gunner PSD; will drop files when ready
-5. Optional: 50 enemy cap investigation — read-only, check whether 100–150 is feasible at current performance
-6. G4 close-out: strip any diagnostic logging, write G4 narrative entry, add binding patterns to context doc, add tech debt entries
+- **Muzzle flash position (partially resolved):** per-variant barrel offsets added. Variant B confirmed at barrel on device. Variant A: attempted frame freeze at 200ms (0970763) then 600ms (3d45dfe) — both failed; React state + 100ms timer pathway can't reliably commit intermediate frame states before subsequent ticks override them. Commits reverted; accepted as tech debt [L]. Current behavior: flash spawns near rifle area, position varies per frame.
+- **Scav/Raider sprite swap** (fb1f99d): scav body updated to `NoGunScav.png` (weaponless Gunner body overlay). Raider rebaselined to Soldier kit — `Soldier.png` body + SW_01–07 walk legs + SD_01–04 die frames. Former Gunner sprite files parked as `EnemySprites.gunner` (dormant, unreferenced). No behavior changes.
+- **Raider muzzle flash** (1029ab4 + tuning commits 40cb8bb, 5937a47, d18dc5a): 3-frame visual flash fires every 3.5s (`RAIDER_FIRE_COOLDOWN_MS = 3500`). No projectile, no range check, no player damage — visual only. Gunner flash frames (`gunner_1-3.png`) used as fallback — Soldier kit has no standalone flash overlay. Final `RAIDER_FLASH_OFFSET = {x:-2, y:60}` confirmed at barrel on device.
+- **50 enemy cap investigation:** PARKED by design. `ENEMY_SOFT_CAP = 50` retained.
 
-### Pending work after G4 close
+### Remaining for G4 close (next session)
 
-- **G5: Tank turret class** — stationary, 3 visual variants (Humvee/BTR/Panzer), fires rocket-shaped projectiles on cooldown, spawns after 2 minutes, drops guaranteed crate. Now the ONLY enemy with genuine ranged damage (G4 became visual-only). Reuses sniper fire trigger pattern but with actual player-hit projectiles.
+1. Strip any remaining diagnostic logging
+2. Write G4 narrative entry (finalize this section)
+3. Add binding patterns to context-v3
+4. Confirm tech debt [L] captured (already in file)
+
+### Next major work after G4 close
+
+- **G5: Tank turret class** — stationary, 3 visual variants (Humvee/BTR/Panzer), fires rocket-shaped projectiles on cooldown, spawns after 2 minutes, drops guaranteed crate. Now the ONLY enemy with genuine ranged damage (G4 became fully visual-only). Reuses sniper fire trigger pattern but with actual player-hit projectiles.
 - **Camera zoom lock** — CAMERA_ZOOM=1.0 is a placeholder. Final value locked once tiles + enemies + HUD are visible together in G5.
 
 ---
@@ -1198,7 +1203,30 @@ Design decisions captured 2026-05-14. Apply when the relevant phase work begins.
 
 ---
 
-### 6. Net Phase 5 enemy roster after these decisions
+### 6. Bullet color change (Phase 6 polish — Photopea edit)
+
+- GunnerBullet sprite is currently used for all non-rocket projectiles; color reads too dark against the map
+- Replace fill with a higher-contrast color (bright yellow, orange, or white glow) in Photopea before Phase 6 ships
+- Source asset: `_project-docs/kits/tds-modern-pixel-game-kit/tds-modern-soldiers-and-vehicles-sprites-2/Gunner/Effect/GunnerBullet`
+
+---
+
+### 7. Grenade launcher rocket sprite swap (Phase 6 polish)
+
+- Current gp25 rocket uses `rocket-f1.png`; kit includes a dedicated grenade sprite at `Effects/Grenade Launcher Shot/1.png`
+- Swap gp25 projectile to the grenade asset for visual accuracy; all other non-rocket weapons keep GunnerBullet
+
+---
+
+### 8. Optional scav muzzle flash (deferred)
+
+- Raider now has a visual-only muzzle flash; scav does not
+- Could extend the same `lastFiredAtMs` + flash frame pipeline to scav using a separate `SCAV_FIRE_COOLDOWN_MS` constant
+- Deferred — scav is a melee class conceptually; flash would be pure cosmetic noise. Mo's call when G4 is closed.
+
+---
+
+### 9. Net Phase 5 enemy roster after these decisions
 
 | Class | Type | Notes |
 |---|---|---|
