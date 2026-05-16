@@ -349,7 +349,7 @@ export default function GameCanvas({ width, height }: Props) {
   const scavWalk6 = useImage(EnemySprites.scav.walk[6]);
   const scavWalkImages = [scavWalk0, scavWalk1, scavWalk2, scavWalk3, scavWalk4, scavWalk5, scavWalk6];
 
-  // Scav upper body — composited over walk frames (two-layer, same as hero)
+  // Scav upper body — NoGunScav (weaponless Gunner body), composited over Soldier kit legs
   const scavBodyImage = useImage(EnemySprites.scav.body);
 
   // Scav shot (staged; used in G3+)
@@ -363,7 +363,7 @@ export default function GameCanvas({ width, height }: Props) {
   const scavDie3 = useImage(EnemySprites.scav.die[3]);
   const scavDieImages = [scavDie0, scavDie1, scavDie2, scavDie3];
 
-  // Raider walk: 7 frames (GunnerWalk_01–07)
+  // Raider walk: 7 frames (SW_01–07, Soldier kit legs — same frames as Scav)
   const raiderWalk0 = useImage(EnemySprites.raider.walk[0]);
   const raiderWalk1 = useImage(EnemySprites.raider.walk[1]);
   const raiderWalk2 = useImage(EnemySprites.raider.walk[2]);
@@ -373,13 +373,12 @@ export default function GameCanvas({ width, height }: Props) {
   const raiderWalk6 = useImage(EnemySprites.raider.walk[6]);
   const raiderWalkImages = [raiderWalk0, raiderWalk1, raiderWalk2, raiderWalk3, raiderWalk4, raiderWalk5, raiderWalk6];
 
-  // Raider die: 5 frames (GDS_01–05); 5th frame may not render before despawn — acceptable
+  // Raider die: 4 frames (SD_01–04, Soldier kit die — same frames as Scav)
   const raiderDie0 = useImage(EnemySprites.raider.die[0]);
   const raiderDie1 = useImage(EnemySprites.raider.die[1]);
   const raiderDie2 = useImage(EnemySprites.raider.die[2]);
   const raiderDie3 = useImage(EnemySprites.raider.die[3]);
-  const raiderDie4 = useImage(EnemySprites.raider.die[4]);
-  const raiderDieImages = [raiderDie0, raiderDie1, raiderDie2, raiderDie3, raiderDie4];
+  const raiderDieImages = [raiderDie0, raiderDie1, raiderDie2, raiderDie3];
   const raiderBodyImage = useImage(EnemySprites.raider.body);
 
   // SniperA walk: 7 frames (SW_01–07), legs-only + Base.png body overlay

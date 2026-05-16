@@ -87,9 +87,10 @@ export type HeroWeaponPose = 'pistol' | 'rifle' | 'machinegun' | 'grenade_launch
 /**
  * Enemy sprite registry — same require() / asset-map pattern as HeroSprites.
  *
- * Scav    = Soldier (kit 1a): 7-frame walk, 1-frame shot, 4-frame die.
- * Raider  = Gunner (kit 2): 7-frame walk (GunnerWalk_01–07), 5-frame die (GDS_01–05).
+ * Scav    = NoGunScav body overlay + Soldier kit legs (kit 1a): 7-frame walk, 1-frame shot, 4-frame die.
+ * Raider  = Soldier body overlay + Soldier kit legs (kit 1a): 7-frame walk, 4-frame die.
  *   Raider is melee-only — no fire frame wired. Walk frames cover all non-dying states.
+ * Gunner  = Gunner kit (kit 2): registered but unreferenced — kept for future enemy class assignment.
  * SniperA = Sniper (kit 2): 7-frame walk (SW_01–07), 5-frame die (SniperDIe_00–04).
  *   Two-layer compositing: walk legs-only + Base.png body overlay (same pattern as scav/raider).
  *   Fires GunnerBullet projectile. Variant B = Soldier02 below (full-character SF frames, no overlay).
@@ -97,8 +98,8 @@ export type HeroWeaponPose = 'pistol' | 'rifle' | 'machinegun' | 'grenade_launch
  */
 export const EnemySprites = {
   scav: {
-    /** Upper body overlay — composited over walk frames (same two-layer pattern as hero). */
-    body: require('../../assets/sprites/enemies/scav/Soldier.png'),
+    /** Upper body overlay — weaponless Gunner body, composited over Soldier kit legs. */
+    body: require('../../assets/sprites/enemies/scav/NoGunScav.png'),
     walk: [
       require('../../assets/sprites/enemies/scav/walk/SW_01.png'),
       require('../../assets/sprites/enemies/scav/walk/SW_02.png'),
@@ -119,7 +120,26 @@ export const EnemySprites = {
     ],
   },
   raider: {
-    /** Upper body overlay — composited over walk frames (same two-layer pattern as scav). */
+    /** Upper body overlay — Soldier kit body, composited over Soldier kit legs. */
+    body: require('../../assets/sprites/enemies/scav/Soldier.png'),
+    walk: [
+      require('../../assets/sprites/enemies/scav/walk/SW_01.png'),
+      require('../../assets/sprites/enemies/scav/walk/SW_02.png'),
+      require('../../assets/sprites/enemies/scav/walk/SW_03.png'),
+      require('../../assets/sprites/enemies/scav/walk/SW_04.png'),
+      require('../../assets/sprites/enemies/scav/walk/SW_05.png'),
+      require('../../assets/sprites/enemies/scav/walk/SW_06.png'),
+      require('../../assets/sprites/enemies/scav/walk/SW_07.png'),
+    ],
+    die: [
+      require('../../assets/sprites/enemies/scav/die/SD_01.png'),
+      require('../../assets/sprites/enemies/scav/die/SD_02.png'),
+      require('../../assets/sprites/enemies/scav/die/SD_03.png'),
+      require('../../assets/sprites/enemies/scav/die/SD_04.png'),
+    ],
+  },
+  /** Gunner kit (kit 2) — unreferenced by any enemy class. Registered for future reuse. */
+  gunner: {
     body: require('../../assets/sprites/enemies/raider/Gunner.png'),
     walk: [
       require('../../assets/sprites/enemies/raider/walk/GunnerWalk_01.png'),
