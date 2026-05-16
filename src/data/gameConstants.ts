@@ -324,7 +324,7 @@ export const SNIPER_B_FLASH_OFFSET = { x: -16, y: 22 } as const;
  * Soldier body overlay — rifle extends from upper body toward bottom of sprite.
  * Tune on device; 1 sprite-pixel = 2 rendered units.
  */
-export const RAIDER_FLASH_OFFSET = { x: 4, y: 60 } as const;
+export const RAIDER_FLASH_OFFSET = { x: 1, y: 60 } as const;
 
 // ─── Throwables ───────────────────────────────────────────────────────────────
 
