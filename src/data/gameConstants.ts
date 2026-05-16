@@ -303,6 +303,20 @@ export const MUZZLE_FLASH_FRAME_COUNT = 3;
 export const MUZZLE_FLASH_FRAME_DURATION_MS = 50;
 export const MUZZLE_FLASH_DURATION_MS = 200;
 
+/**
+ * Barrel-tip offsets for muzzle flash positioning, in Group local coordinates
+ * (sprite pixels × ENEMY_SPRITE_SCALE=2). The flash <Image> is rendered inside
+ * the enemy's Group, which already carries the facing rotation, so these offsets
+ * rotate automatically with the sprite — no manual rotation math needed.
+ *
+ * Derivation: sprite is 96×96, center = (48,48). Barrel tip pixel identified
+ * from pixel map; offset = (tip - center) × 2.
+ *
+ * Tune on device if the flash appears off — 1 sprite-pixel = 2 rendered units.
+ */
+export const SNIPER_A_FLASH_OFFSET = { x: -10, y: 28 } as const;
+export const SNIPER_B_FLASH_OFFSET = { x: -16, y: 22 } as const;
+
 // ─── Throwables ───────────────────────────────────────────────────────────────
 
 /**

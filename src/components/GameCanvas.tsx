@@ -97,6 +97,8 @@ import {
   MUZZLE_FLASH_FRAME_COUNT,
   MUZZLE_FLASH_FRAME_DURATION_MS,
   MUZZLE_FLASH_DURATION_MS,
+  SNIPER_A_FLASH_OFFSET,
+  SNIPER_B_FLASH_OFFSET,
   WALK_FRAME_COUNT,
   WALK_FRAME_DURATION_MS,
   ENEMY_DIE_FRAME_COUNT,
@@ -1815,6 +1817,7 @@ export default function GameCanvas({ width, height }: Props) {
             const flashFrame = (type === 'sniperA' || type === 'sniperB') ? (enemySlotFlashFrames[i] ?? -1) : -1;
             const flashImgs = type === 'sniperA' ? muzzleFlashAImages : muzzleFlashBImages;
             const flashImg = flashFrame >= 0 ? (flashImgs[flashFrame] ?? null) : null;
+            const flashOffset = type === 'sniperA' ? SNIPER_A_FLASH_OFFSET : SNIPER_B_FLASH_OFFSET;
 
             return (
               <Group key={i} transform={transform}>
@@ -1839,8 +1842,8 @@ export default function GameCanvas({ width, height }: Props) {
                 {flashImg && (
                   <Image
                     image={flashImg}
-                    x={-flashImg.width() * EFFECT_SPRITE_SCALE / 2}
-                    y={-flashImg.height() * EFFECT_SPRITE_SCALE / 2}
+                    x={-flashImg.width() * EFFECT_SPRITE_SCALE / 2 + flashOffset.x}
+                    y={-flashImg.height() * EFFECT_SPRITE_SCALE / 2 + flashOffset.y}
                     width={flashImg.width() * EFFECT_SPRITE_SCALE}
                     height={flashImg.height() * EFFECT_SPRITE_SCALE}
                     sampling={{ filter: FilterMode.Nearest, mipmap: MipmapMode.None }}
