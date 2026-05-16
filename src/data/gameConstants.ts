@@ -304,13 +304,6 @@ export const MUZZLE_FLASH_FRAME_DURATION_MS = 50;
 export const MUZZLE_FLASH_DURATION_MS = 200;
 
 /**
- * How long sniperA's walk animation is frozen on frame 0 when the muzzle flash fires.
- * Longer than MUZZLE_FLASH_DURATION_MS to give React time to commit the frame-0 state
- * before the 100ms timer supersedes it. Tune down once reliability is confirmed.
- */
-export const SNIPER_A_FRAME_FREEZE_MS = 600;
-
-/**
  * Barrel-tip offsets for muzzle flash positioning, in Group local coordinates
  * (sprite pixels × ENEMY_SPRITE_SCALE=2). The flash <Image> is rendered inside
  * the enemy's Group, which already carries the facing rotation, so these offsets
