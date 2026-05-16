@@ -314,7 +314,7 @@ export const MUZZLE_FLASH_DURATION_MS = 200;
  *
  * Tune on device if the flash appears off — 1 sprite-pixel = 2 rendered units.
  */
-export const SNIPER_A_FLASH_OFFSET = { x: -12, y: 32 } as const;
+export const SNIPER_A_FLASH_OFFSET = { x: -13, y: 34 } as const;
 export const SNIPER_B_FLASH_OFFSET = { x: -16, y: 22 } as const;
 
 // ─── Throwables ───────────────────────────────────────────────────────────────
