@@ -960,6 +960,32 @@ With `PROP_SPRITE_SCALE = 2` and `STRUCTURE_SPRITE_SCALE = 3`, the rendered foot
 
 *Fix pattern:* Wrap `useImage` diagnostics in a `useEffect` that fires when the value transitions from null → non-null (`useEffect(() => { if (img) { console.log(...); } }, [img])`), or use a ref-guarded `setTimeout` (~500ms) to log after the async load window. As an alternative, confirm placement by counting entity records in `initialMapData` directly (e.g., `vehicleWrecks.filter(e => e.assetKey === 'env_helicopter_wreck').length`) — this verifies the generator produced the entity without touching image load state at all.
 
+**Sprite frame index lives in React state and is not reliable for sub-600ms intermediate overrides**
+
+`enemySlotFrames` and `enemySlotFlashFrames` are updated by a 100ms `setInterval` on the JS thread. This is acceptable for walk-cycle progression and binary states (flash active / inactive) because those transitions are coarse enough that the 100ms cadence always catches them. It is NOT reliable for intermediate frame overrides shorter than approximately 600ms — attempting to freeze a sprite at frame N for 200ms or 400ms during a flash event will fail because React reconciliation may batch and discard the intermediate state before the next paint. Discovered in Phase 5 G4 when two frame-freeze override commits (0970763 at 200ms, 3d45dfe at 600ms) both failed and were reverted.
+
+*Fix pattern:* For effects that require frame-accurate control (e.g., holding a firing-pose frame for the exact duration of a muzzle flash), sprite frame selection must move off React state into a worklet-readable `SharedValue`. The 100ms timer pathway cannot provide sub-600ms frame guarantees. Cross-reference tech debt [L]: Sniper Variant A muzzle flash position varies across walk frames for this reason.
+
+**Two-layer compositing for legs-only walk sprites**
+
+Some kit sprites (Gunner body, Soldier body) ship walk-cycle frames with only legs, expecting a separate static body overlay PNG to be composited on top. The body overlay is a full-character-height transparent PNG with only the upper body drawn — it composites cleanly over any walk frame leg position.
+
+*Registration pattern:* Register both the walk frames AND the body overlay in `sprites.ts` as `EnemySprites.{type}.body`. Load via `useImage` with null-guard. Render the body overlay as an additional `<Image>` inside the same Skia Group that contains the walk frame — the overlay naturally sits above the legs at identical world position. Required for: Scav (`NoGunScav.png` body overlay over Soldier kit legs), Raider (`Soldier.png` body overlay over Soldier kit legs). NOT required for: Sniper Variant B (Soldier02 frames are full-character firing poses), Sniper Variant A (`Base.png` overlay over Sniper kit walk frames — same pattern, different asset name).
+
+**Per-variant muzzle flash offset constants**
+
+Each enemy class that shows a muzzle flash has a `{VARIANT}_FLASH_OFFSET = {x: number, y: number}` constant in `gameConstants.ts`. Coordinates are in sprite-local space — they auto-rotate with entity facing direction via the parent Skia Group's transform. 1 sprite-pixel = 2 rendered world units.
+
+Current constants: `SNIPER_A_FLASH_OFFSET`, `SNIPER_B_FLASH_OFFSET`, `RAIDER_FLASH_OFFSET`. Any future enemy class that shows a muzzle flash requires its own offset constant; there is no default. Tune by deploying to device and adjusting until the flash origin sits at the weapon barrel in the firing-pose frame.
+
+Note: offset tuning is only reliable for enemies that render from a stable firing-pose frame set (Variant B, Raider). For enemies that animate through a walk cycle while firing (Variant A), a fixed offset will drift across frames due to lateral weapon movement in the sprite — see tech debt [L].
+
+**Sprite asset registry decoupled from class binding**
+
+Sprite asset files can be registered in `sprites.ts` (creating active `useImage` hooks that load the asset into the bundle) without being referenced by any active enemy class. This pattern preserves an asset for future reuse — the image is loaded and resident in memory, but no render path draws it.
+
+Current example: `EnemySprites.gunner` is fully registered in `sprites.ts` with walk/body/die frames and flash frames, but is unreferenced after the Phase 5 G4 Scav/Raider sprite swap freed the Gunner visual for future use. The asset hooks exist; the render path does not. Any future enemy class can bind to `EnemySprites.gunner` by referencing it in `GameCanvas.tsx` without touching `sprites.ts`.
+
 ---
 
 ## Collision Architecture (Phase 5 G3)
