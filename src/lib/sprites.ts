@@ -138,6 +138,16 @@ export const EnemySprites = {
       require('../../assets/sprites/enemies/scav/die/SD_04.png'),
     ],
   },
+  /** BTR armored vehicle — base (static) and rotating tower. Phase 5 G5. */
+  btr: {
+    base:  require('../../assets/sprites/enemies/tank/btr/BTR_Base.png'),
+    tower: require('../../assets/sprites/enemies/tank/btr/BTR_Tower.png'),
+  },
+  /** Panzer tank — base (static) and rotating tower. Phase 5 G5. */
+  panzer: {
+    base:  require('../../assets/sprites/enemies/tank/panzer/PanzerBase.png'),
+    tower: require('../../assets/sprites/enemies/tank/panzer/PanzerTower.png'),
+  },
   /** Gunner kit (kit 2) — unreferenced by any enemy class. Registered for future reuse. */
   gunner: {
     body: require('../../assets/sprites/enemies/raider/Gunner.png'),
@@ -289,6 +299,16 @@ export const EffectSprites = {
     require('../../assets/effects/muzzle_flash/gunner_1.png'),
     require('../../assets/effects/muzzle_flash/gunner_2.png'),
     require('../../assets/effects/muzzle_flash/gunner_3.png'),
+  ],
+  muzzle_flash_btr: [
+    require('../../assets/effects/muzzle_flash/btr_fire_1.png'),
+    require('../../assets/effects/muzzle_flash/btr_fire_2.png'),
+    require('../../assets/effects/muzzle_flash/btr_fire_3.png'),
+  ],
+  muzzle_flash_panzer: [
+    require('../../assets/effects/muzzle_flash/panzer_fire_1.png'),
+    require('../../assets/effects/muzzle_flash/panzer_fire_2.png'),
+    require('../../assets/effects/muzzle_flash/panzer_fire_3.png'),
   ],
 } as const;
 

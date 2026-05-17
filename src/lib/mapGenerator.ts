@@ -29,10 +29,11 @@
  */
 
 import { createNoise2D } from 'simplex-noise';
-import type { MapData, TileCell, TileType, WeatherType, PlacedEntity } from '../data/mapTypes';
+import type { MapData, TileCell, TileType, WeatherType, PlacedEntity, TankPlacement, TankVariant } from '../data/mapTypes';
 import {
   TILE_SIZE, TILE_COLS, TILE_ROWS, WORLD_WIDTH, WORLD_HEIGHT,
   PROP_SPRITE_SCALE, STRUCTURE_SPRITE_SCALE,
+  TANK_MIN_DISTANCE_FROM_PLAYER, TANK_COLLISION_RADIUS,
 } from '../data/gameConstants';
 
 // ─── PRNG ─────────────────────────────────────────────────────────────────────
@@ -432,6 +433,45 @@ function buildBarrels(rng: () => number, buildings: PlacedEntity[]): PlacedEntit
   return placed;
 }
 
+// ─── Tank placement ───────────────────────────────────────────────────────────
+
+const PLAYER_SPAWN_X = WORLD_WIDTH / 2;
+const PLAYER_SPAWN_Y = WORLD_HEIGHT / 2;
+
+function buildTank(
+  rng: () => number,
+  buildings: PlacedEntity[],
+  obstacles: PlacedEntity[],
+  vehicleWrecks: PlacedEntity[],
+): TankPlacement | null {
+  const variant: TankVariant = rng() < 0.5 ? 'btr' : 'panzer';
+  const margin = 400;
+  const minFromSpawnSq = TANK_MIN_DISTANCE_FROM_PLAYER * TANK_MIN_DISTANCE_FROM_PLAYER;
+
+  for (let attempt = 0; attempt < 15; attempt++) {
+    const x = margin + Math.floor(rng() * (WORLD_WIDTH - margin * 2));
+    const y = margin + Math.floor(rng() * (WORLD_HEIGHT - margin * 2));
+
+    const dxSpawn = x - PLAYER_SPAWN_X;
+    const dySpawn = y - PLAYER_SPAWN_Y;
+    if (dxSpawn * dxSpawn + dySpawn * dySpawn < minFromSpawnSq) continue;
+
+    const allProps = [...buildings, ...obstacles, ...vehicleWrecks];
+    const overlaps = allProps.some(prop => {
+      const halfSize = scaledHalfSize(prop);
+      const minDist = halfSize + TANK_COLLISION_RADIUS + 20;
+      const dx = x - prop.x;
+      const dy = y - prop.y;
+      return dx * dx + dy * dy < minDist * minDist;
+    });
+    if (overlaps) continue;
+
+    return { x, y, variant };
+  }
+
+  return null;
+}
+
 // ─── Entry point ──────────────────────────────────────────────────────────────
 
 export function generateMap(seed: number): MapData {
@@ -447,6 +487,7 @@ export function generateMap(seed: number): MapData {
   const obstacles = buildObstacles(rng, buildings, vehicleWrecks);
   const vegetation = buildVegetation(rng, buildings, vehicleWrecks, obstacles);
   const barrels = buildBarrels(rng, buildings);
+  const tank = buildTank(rng, buildings, obstacles, vehicleWrecks);
 
-  return { seed, weather, tileGrid, buildings, obstacles, vehicleWrecks, vegetation, barrels };
+  return { seed, weather, tileGrid, buildings, obstacles, vehicleWrecks, vegetation, barrels, tank };
 }

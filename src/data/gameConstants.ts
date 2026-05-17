@@ -326,6 +326,30 @@ export const SNIPER_B_FLASH_OFFSET = { x: -16, y: 22 } as const;
  */
 export const RAIDER_FLASH_OFFSET = { x: -2, y: 60 } as const;
 
+// ─── Tank Turret (Phase 5 G5) ─────────────────────────────────────────────────
+
+export const TANK_FIRE_DAMAGE_RATIO = 0.30;
+export const TANK_FIRE_RATE_MS = 6000;
+export const TANK_FIRE_RANGE_PX = 450;
+export const TANK_COLLISION_RADIUS = 80;
+export const TANK_PROJECTILE_SPEED_PX_PER_SEC = 300;
+export const TANK_SPRITE_SCALE = 2;
+export const TANK_MIN_DISTANCE_FROM_PLAYER = 1500;
+
+/**
+ * Muzzle flash offsets in sprite-local space (1 sprite-pixel = 2 rendered units).
+ * Applied inside the tower Group (after tower rotate), so no angle math needed.
+ */
+export const BTR_FLASH_OFFSET = { x: 0, y: -40 } as const;
+export const PANZER_FLASH_OFFSET = { x: 0, y: -44 } as const;
+
+/**
+ * Fire origin offsets from tower center, in world space (after angle math).
+ * Used to spawn the projectile at the barrel tip rather than the tower pivot.
+ */
+export const BTR_FIRE_OFFSET = { x: 0, y: -40 } as const;
+export const PANZER_FIRE_OFFSET = { x: 0, y: -44 } as const;
+
 // ─── Throwables ───────────────────────────────────────────────────────────────
 
 /**

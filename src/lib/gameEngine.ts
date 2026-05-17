@@ -91,6 +91,7 @@ import {
   WORLD_WIDTH,
   WORLD_HEIGHT,
   CAMERA_ZOOM,
+  TANK_FIRE_RATE_MS,
 } from '../data/gameConstants';
 import type { CrateTier } from '../data/gameConstants';
 import type { SkillId } from '../data/skills';
@@ -103,6 +104,8 @@ import { tickPickups } from './pickupEngine';
 import { tickProgression, tickRegen } from './progressionEngine';
 import { tickThrowables, tickEffectZones, tickThrowableSkills } from './throwableEngine';
 import { tickCrateSpawn } from './crateEngine';
+import type { TankPlacement, TankVariant } from '../data/mapTypes';
+import { tickTank } from './tankEngine';
 
 export type PlayerState = {
   x: number;
@@ -229,6 +232,22 @@ export type EnemyState = {
    * 0 at spawn. Read by the 100ms timer to compute per-slot flash frame index.
    * Always 0 for scav and raider.
    */
+  lastFiredAtMs: number;
+};
+
+/**
+ * Runtime tank entity. One per map, placed at map-gen time.
+ * Not part of enemies[] — auto-aim and contact damage are inapplicable.
+ */
+export type TankState = {
+  variant: TankVariant;
+  x: number;
+  y: number;
+  /** Current tower facing angle in radians. Tracked per-frame by tankEngine. */
+  towerAngle: number;
+  /** ms remaining until the tank can fire again. Decremented each tick. */
+  fireCooldownMs: number;
+  /** Timestamp (elapsedMs) when the tank last fired. Used for muzzle flash duration. */
   lastFiredAtMs: number;
 };
 
@@ -467,6 +486,12 @@ export type GameState = {
   crateRevealWeaponId: string | null;
   /** Tier of the rolled weapon — drives tier color display in the modal. */
   crateRevealTier: CrateTier | null;
+  /** Tank turret — one per map, null if placement failed at map-gen time. */
+  tank: TankState | null;
+  /** Tank projectiles — kept separate from player projectiles[] to avoid auto-aim interference. */
+  tankProjectiles: ProjectileState[];
+  /** Monotonically increasing counter — ensures every tank projectile has a unique id. */
+  nextTankProjectileId: number;
   /** Canvas (screen) dimensions — needed for camera offset math in GameCanvas. */
   canvasWidth: number;
   canvasHeight: number;
@@ -477,7 +502,7 @@ export type GameState = {
   frameCount: number; // total fixed-step frames processed
 };
 
-export function createInitialGameState(canvasWidth: number, canvasHeight: number): GameState {
+export function createInitialGameState(canvasWidth: number, canvasHeight: number, tankPlacement: TankPlacement | null): GameState {
   'worklet';
   const emptyEnemies: Array<EnemyState | null> = [];
   for (let i = 0; i < ENEMY_SOFT_CAP; i++) { emptyEnemies.push(null); }
@@ -555,6 +580,16 @@ export function createInitialGameState(canvasWidth: number, canvasHeight: number
     pendingCrateReveal: false,
     crateRevealWeaponId: null,
     crateRevealTier: null,
+    tank: tankPlacement ? {
+      variant: tankPlacement.variant,
+      x: tankPlacement.x,
+      y: tankPlacement.y,
+      towerAngle: 0,
+      fireCooldownMs: TANK_FIRE_RATE_MS,
+      lastFiredAtMs: -9999,
+    } : null,
+    tankProjectiles: [],
+    nextTankProjectileId: 0,
     canvasWidth,
     canvasHeight,
     worldWidth: WORLD_WIDTH,
@@ -671,7 +706,8 @@ export function updateGameState(state: GameState, dtMs: number, collData: Collis
 
   const stateAfterEnemies = tickEnemies(stateAfterPlayer, dtMs, collData);
   const stateAfterCombat = tickCombat(stateAfterEnemies, dtMs);
-  const stateAfterPickups = tickPickups(stateAfterCombat, dtMs);
+  const stateAfterTank = tickTank(stateAfterCombat, dtMs);
+  const stateAfterPickups = tickPickups(stateAfterTank, dtMs);
   const stateAfterCrates = tickCrateSpawn(stateAfterPickups, dtMs);
   const stateAfterThrowables = tickThrowables(stateAfterCrates, dtMs);
   const stateAfterZones = tickEffectZones(stateAfterThrowables, dtMs);

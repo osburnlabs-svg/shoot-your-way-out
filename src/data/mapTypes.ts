@@ -35,6 +35,14 @@ export type PlacedEntity = {
   rotation?: number;
 };
 
+export type TankVariant = 'btr' | 'panzer';
+
+export type TankPlacement = {
+  x: number;
+  y: number;
+  variant: TankVariant;
+};
+
 export type MapData = {
   seed: number;
   weather: WeatherType;
@@ -50,4 +58,6 @@ export type MapData = {
   vegetation: PlacedEntity[];
   /** 2–5 barrels/boxes per building, clustered near structures. G3 renders; G4 adds hard collision. */
   barrels: PlacedEntity[];
+  /** Single tank per map, placed ≥1500px from player spawn. Null if placement failed. */
+  tank: TankPlacement | null;
 };

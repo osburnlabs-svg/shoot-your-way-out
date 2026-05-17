@@ -89,6 +89,9 @@ const CIRCLE_COLLIDER_RADIUS: Record<string, number> = {
   env_tree_large_2:       50,
   env_tree_large_3:       50,
   env_tree_large_4:       50,
+  // Tank turrets (Phase 5 G5)
+  tank_btr:               80,
+  tank_panzer:            80,
 };
 
 // ─── Helpers (JS-thread only) ─────────────────────────────────────────────────
@@ -169,6 +172,10 @@ export function buildCollisionData(mapData: MapData): CollisionData {
     else addEntity(ent);
   }
   // mapData.barrels intentionally skipped — all passable
+
+  if (mapData.tank) {
+    addCircle({ x: mapData.tank.x, y: mapData.tank.y, assetKey: `tank_${mapData.tank.variant}`, width: 128, height: 128 });
+  }
 
   return { rects, grid, circles, circleGrid, cellSize, cols, rows };
 }
