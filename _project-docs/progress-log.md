@@ -1097,54 +1097,78 @@ Both passes run every frame; pools never overlap.
 
 ## Phase 5 — Group 4: Sniper class + muzzle flash
 
-**Status:** 🟡 In Progress — device tested; G4 close-out next session
+**Status:** ✅ Complete
 **Date:** 2026-05-15 → 2026-05-16
-**Commits:** 81a0cbd (bullet sprite swap) → 832828a (raider visual swap) → 1e94df5 (raider body overlay fix) → ee1e503 (sniper class original impl) → 345c364 (G4 redesign: visual-only fire) → eb0ceec (muzzle flash z-order fix + strip projectiles) → 384566a (tech debt [L] + revert frame freeze) → fb1f99d (scav/raider sprite swap) → 1029ab4 (raider muzzle flash) → 40cb8bb (flash offset y:60) → 5937a47 (flash offset x:1) → d18dc5a (flash offset x:−2 final)
+**Commits:** 81a0cbd (bullet sprite swap) → 832828a (raider visual swap) → 1e94df5 (raider body overlay fix) → ee1e503 (sniper class original impl) → 345c364 (G4 redesign: visual-only fire) → eb0ceec (muzzle flash z-order fix + strip projectiles) → 384566a (tech debt [L] + revert frame freeze) → fb1f99d (scav/raider three-way sprite swap) → 1029ab4 (raider muzzle flash) → 40cb8bb→5937a47→d18dc5a (raider flash offset tuning) → 13b7b48 (close: stage NoGunScav.png)
 
-### What shipped
+---
 
-**Completed sub-tasks:**
-- **Player bullet sprite swap** (81a0cbd): replaced Skia `<Circle>` projectile rendering with GunnerBullet sprite image. All non-rocket weapons render the GunnerBullet asset; rockets render rocket-f1. Closes the Phase 4c tech debt entry on projectile Circle vs Rect.
-- **Grenade launcher rocket sprite** (part of 81a0cbd): rocket-f1.png wired for gp25 weapon projectiles.
-- **Raider visual swap** (832828a): Raider class now renders Gunner (spec ops) sprite, resolving the "soldier with rocket launcher meleeing" mismatch identified at G3 device test.
-- **Raider body overlay fix** (1e94df5): two-layer compositing for Raider (legs + body overlay) was broken after the sprite swap. Fixed to follow the same pattern as Scav and SniperA.
-- **Sniper class — original impl** (ee1e503): two sniper variants spawned via standard wave pipeline with SNIPER_MAX_ACTIVE=5 cap. sniperA uses Sniper kit sprite; sniperB uses Soldier02. Both walked toward player and dealt melee contact damage. Original spec: sniperB fired rocket projectiles. Enemy-projectile collision detection against player was wired.
-- **G4 redesign** (345c364): scrapped enemy projectiles entirely. Root cause: both variants rendered the same bullet sprite (isRocket flag was never set), and the collision detection against the player was incorrectly routing through the enemy hit path. Decision: make enemy fire visual-only. All enemy projectile code removed from combatEngine.ts. Muzzle flash EffectZones added as the sole visual fire feedback. HP bumped: sniperA 30→50 (2.5× scav), sniperB 30→40 (2× scav).
-- **Muzzle flash z-order fix** (eb0ceec): EffectZones render inside the camera Group (JSX first) but enemy sprites render outside it (JSX after). Result: flash zones were drawn behind enemy sprites — complete occlusion. Fix: abandoned EffectZone approach for muzzle flash. Added `lastFiredAtMs` to EnemyState; fire trigger sets it instead of spawning a zone. 100ms timer computes per-slot flash frame index from `lastFiredAtMs` and pushes it to `enemySlotFlashFrames` React state. Flash image renders inside each sniper's own enemy Group — correct Z-order, guaranteed above the sprite. MUZZLE_FLASH_DURATION_MS bumped 150→200 to ensure the 100ms timer always catches a fresh fire event.
+### Goal
 
-### Current state (pending device verification)
+Enemy visual upgrades and an initial attempt at a full ranged fire mechanic for sniper variants. Entering G4 the enemy roster had two visual mismatches — Raider used the Soldier02 (bazooka soldier) sprite despite being a melee class, and Scav used the Gunner sprite despite being the basic grunt — and no enemy fired a weapon of any kind. The session's target was to resolve both mismatches, add two sniper variants with genuine ranged fire (travel, hit detection, player damage), and show a muzzle flash to emphasize the event.
 
-- Snipers spawn correctly via wave pipeline, count capped at SNIPER_MAX_ACTIVE=5
-- sniperA visually distinct (Sniper kit sprite + body overlay)
-- sniperB visually distinct (Soldier02 — no body overlay, full-character sprite)
-- Both variants walk toward player and deal melee contact damage on overlap
-- Muzzle flashes trigger at sniper position when fire cooldown resets and player is within SNIPER_FIRE_RANGE_PX
-- sniperA flash uses Sniper/Effects/1–3.png; sniperB flash uses Gunner/Effect/1–3.png
-- No projectile travels from either sniper variant
-- `isEnemyProjectile` field fully removed from ProjectileState and all combat/enemy engine code
+---
 
-### Known issue (partially resolved)
+### Player projectile sprite swap
 
-**Muzzle flash position:** per-variant offsets now implemented (`SNIPER_A_FLASH_OFFSET = {x:-13, y:34}`, `SNIPER_B_FLASH_OFFSET = {x:-16, y:22}`, `RAIDER_FLASH_OFFSET = {x:-2, y:60}`). Variant B and raider confirmed at barrel on device. Variant A offset confirmed near rifle area; exact position varies across walk frames due to lateral body movement in SW_01–07 — logged as tech debt [L]. Frame-accurate fix would require moving sprite frame selection off the React-state/100ms-timer pathway; deferred.
+First commit (81a0cbd) closed a Phase 4c tech debt entry by replacing Skia `<Circle>` player-projectile rendering with sprite-based images:
 
-### Updates this session (2026-05-15 → 2026-05-16)
+- **Standard bullets (all non-rocket weapons):** `GunnerBullet` sprite (kit 1b)
+- **Rockets (GP-25 / grenade launcher):** `rocket-f1.png` from the kit effects folder
 
-- **Muzzle flash position (partially resolved):** per-variant barrel offsets added. Variant B confirmed at barrel on device. Variant A: attempted frame freeze at 200ms (0970763) then 600ms (3d45dfe) — both failed; React state + 100ms timer pathway can't reliably commit intermediate frame states before subsequent ticks override them. Commits reverted; accepted as tech debt [L]. Current behavior: flash spawns near rifle area, position varies per frame.
-- **Scav/Raider sprite swap** (fb1f99d): scav body updated to `NoGunScav.png` (weaponless Gunner body overlay). Raider rebaselined to Soldier kit — `Soldier.png` body + SW_01–07 walk legs + SD_01–04 die frames. Former Gunner sprite files parked as `EnemySprites.gunner` (dormant, unreferenced). No behavior changes.
-- **Raider muzzle flash** (1029ab4 + tuning commits 40cb8bb, 5937a47, d18dc5a): 3-frame visual flash fires every 3.5s (`RAIDER_FIRE_COOLDOWN_MS = 3500`). No projectile, no range check, no player damage — visual only. Gunner flash frames (`gunner_1-3.png`) used as fallback — Soldier kit has no standalone flash overlay. Final `RAIDER_FLASH_OFFSET = {x:-2, y:60}` confirmed at barrel on device.
-- **50 enemy cap investigation:** PARKED by design. `ENEMY_SOFT_CAP = 50` retained.
+`isRocket: boolean` on `ProjectileState` drives the renderer branch. Circle rendering is fully removed from `GameCanvas.tsx`.
 
-### Remaining for G4 close (next session)
+---
 
-1. Strip any remaining diagnostic logging
-2. Write G4 narrative entry (finalize this section)
-3. Add binding patterns to context-v3
-4. Confirm tech debt [L] captured (already in file)
+### Ranged fire attempt — original design and why it was scrapped
 
-### Next major work after G4 close
+**Original spec (ee1e503):** Two sniper variants spawned via the standard wave pipeline, count capped at `SNIPER_MAX_ACTIVE=5`. Both walked toward the player and dealt melee contact damage. sniperB (Soldier02) was additionally supposed to fire rocket projectiles on cooldown. Enemy-to-player hit detection was wired.
 
-- **G5: Tank turret class** — stationary, 3 visual variants (Humvee/BTR/Panzer), fires rocket-shaped projectiles on cooldown, spawns after 2 minutes, drops guaranteed crate. Now the ONLY enemy with genuine ranged damage (G4 became fully visual-only). Reuses sniper fire trigger pattern but with actual player-hit projectiles.
-- **Camera zoom lock** — CAMERA_ZOOM=1.0 is a placeholder. Final value locked once tiles + enemies + HUD are visible together in G5.
+**What went wrong:** On device both variants rendered the same bullet sprite — the `isRocket` flag on enemy-originated projectiles was never set, so intended rockets rendered as bullets. More critically, the enemy-to-player collision path was incorrectly routing through the *enemy-hit* path (the path that detects the player's projectiles hitting enemies). Projectiles traveled and were visually detectable but dealt no player damage and produced no feedback.
+
+**Decision (345c364):** Rather than debug the projectile routing, enemy projectiles were scrapped entirely for v1. The genre precedent is strong — Vampire Survivors and Brotato have minimal enemy ranged mechanics; atmosphere comes from visual density, not enemy bullets tracking the player. Making enemy fire visual-only is the right call for launch. This cleared significant architectural complexity: `isEnemyProjectile` removed from `ProjectileState` and all combat/enemy engine code; all enemy-projectile spawn/travel/hit-detection code removed from `combatEngine.ts`. HP bumped to compensate: sniperA 30→50, sniperB 30→40.
+
+---
+
+### Muzzle flash — two-attempt implementation
+
+**First approach — EffectZones (scrapped):** Flash spawned `EffectZone` objects at the firing enemy's position. Problem: EffectZones render inside the camera Group (JSX first in the tree), while enemy sprites render outside it (JSX after). Flash zones were drawn behind every enemy sprite — complete visual occlusion.
+
+**Second approach — per-slot React state (shipped, eb0ceec):** Added `lastFiredAtMs` to `EnemyState`; the fire trigger sets the timestamp instead of spawning a zone. A 100ms `setInterval` polls each enemy slot's `lastFiredAtMs` and computes a flash frame index (0–2 during the 200ms flash window, -1 otherwise), pushing results into `enemySlotFlashFrames` React state. The flash image renders inside each enemy's own Skia Group — correct z-order, guaranteed above the sprite. `MUZZLE_FLASH_DURATION_MS` bumped 150→200 to ensure the 100ms timer always catches a fresh fire event before it expires.
+
+**Flash position tuning:** Per-variant offset constants in `gameConstants.ts` (`SNIPER_A_FLASH_OFFSET`, `SNIPER_B_FLASH_OFFSET`, `RAIDER_FLASH_OFFSET`) expressed in sprite-local space (auto-rotates with entity facing via parent Group). 1 sprite-pixel = 2 rendered units.
+
+- **Variant B and Raider:** Confirmed at barrel on device. Offsets are stable because both classes render from consistent firing-pose frames.
+- **Variant A:** Flash spawns near the rifle area, but position varies across the 7-frame walk cycle. SW_01–07 (Sniper kit walk frames) have the rifle in different lateral positions per frame. A fixed offset cannot align across all 7 frames.
+
+**Frame freeze override — attempted and abandoned:** Two commits tried to freeze sniperA at a stable frame during the flash window: 200ms freeze (0970763) then 600ms (3d45dfe). Both failed. The 100ms timer pathway cannot commit an intermediate frame state before the next tick fires — React reconciliation batches the intermediate update and the override is overwritten before the next paint. Both commits reverted. Accepted as tech debt [L] (see tech debt table). Fundamental fix requires moving frame selection off React state into a worklet-readable SharedValue.
+
+---
+
+### Three-way sprite swap (fb1f99d)
+
+Mid-session the full enemy visual identity was rationalized:
+
+| Class | Before G4 | After G4 | Notes |
+|---|---|---|---|
+| Scav | Gunner sprite (inappropriate for basic grunt) | NoGunScav body overlay + Soldier kit legs | NoGunScav is a weaponless Gunner body export — reads as basic infantry |
+| Raider | Soldier02 (bazooka — wrong for melee class) | Soldier.png body + Soldier kit legs + SD die frames | More armored look, correct for harder melee class |
+| Sniper B | — | Soldier02 (bazooka) | Bazooka sprite freed from Raider; now correctly visual for a "ranged-feeling" variant |
+| Gunner | Used by Scav | `EnemySprites.gunner` registered, unreferenced | Parked — available for future reuse without removing the asset hooks |
+
+Raider also received a visual-only muzzle flash on a 3.5s cooldown (1029ab4 + offset tuning). No projectile, no range check, no player damage. Gunner flash frames used as fallback — Soldier kit has no standalone flash overlay.
+
+---
+
+### Final state
+
+- **5 mechanical enemy classes:** Scav (mobile melee, basic), Raider (mobile melee, harder), Sniper A (walk + melee + flash), Sniper B (walk + melee + flash), Tank Turret arriving in G5
+- **6 visual identities:** NoGunScav-body Scav, Soldier-body Raider, Sniper kit Sniper A, Soldier02 Sniper B, plus 3 Tank visual variants (Humvee/BTR/Panzer) in G5
+- **Enemy fire is visual-only in v1.** All enemy "fire" is muzzle flash only — no projectile travel, no player damage from enemy ranged attacks. Tank Turret (G5) is the sole exception and the only enemy with genuine ranged damage.
+- **50 enemy cap (`ENEMY_SOFT_CAP = 50`) parked by design.** No perf issue found at current scale; cap retained.
+- **Player projectile sprites wired:** GunnerBullet for standard fire, rocket-f1 for GP-25 / grenade launcher.
+
+**Next:** G5 — Tank Turret class (stationary, 3 visual variants, fires actual damaging rocket projectiles on cooldown, spawns after 2 minutes, drops guaranteed crate on kill). Camera zoom lock (`CAMERA_ZOOM=1.0` placeholder) confirmed once Tank + HUD are visible together.
 
 ---
 
