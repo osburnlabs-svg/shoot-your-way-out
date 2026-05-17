@@ -487,16 +487,10 @@ function buildTanks(
   const allProps = [...buildings, ...obstacles, ...vehicleWrecks];
 
   const acs = placeTankAt('acs', rng, allProps, []);
-  if (!acs) {
-    console.warn('[mapGenerator] ACS placement failed — no tanks this map');
-    return [];
-  }
+  if (!acs) return [];
 
   const panzer = placeTankAt('panzer', rng, allProps, [{ x: acs.x, y: acs.y }]);
-  if (!panzer) {
-    console.warn('[mapGenerator] Panzer placement failed — ACS only');
-    return [acs];
-  }
+  if (!panzer) return [acs];
 
   return [acs, panzer];
 }
