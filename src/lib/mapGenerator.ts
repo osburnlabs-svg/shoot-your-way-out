@@ -415,6 +415,7 @@ function buildBarrels(rng: () => number, buildings: PlacedEntity[]): PlacedEntit
   for (const building of buildings) {
     const clusterCount = 3 + Math.floor(rng() * 3); // 3–5 per building
     const scaledHalf = scaledHalfSize(building);
+    const clusterPlaced: PlacedEntity[] = [];
     let barrelPlaced = 0;
     let attempts = 0;
     while (barrelPlaced < clusterCount && attempts < 80) {
@@ -423,6 +424,8 @@ function buildBarrels(rng: () => number, buildings: PlacedEntity[]): PlacedEntit
       const dist = scaledHalf + BARREL_EDGE_MIN + rng() * (BARREL_EDGE_MAX - BARREL_EDGE_MIN);
       const x = Math.round(building.x + Math.cos(angle) * dist);
       const y = Math.round(building.y + Math.sin(angle) * dist);
+      const def = BARREL_POOL[Math.floor(rng() * BARREL_POOL.length)]!;
+      const candidate: PlacedEntity = { x, y, ...def };
       const inOtherBuilding = buildings.some(other => {
         if (other.x === building.x && other.y === building.y) return false;
         const halfSize = scaledHalfSize(other);
@@ -430,9 +433,13 @@ function buildBarrels(rng: () => number, buildings: PlacedEntity[]): PlacedEntit
         const dy = y - other.y;
         return dx * dx + dy * dy < halfSize * halfSize;
       });
-      if (!isNearSpawn(x, y) && !inOtherBuilding) {
-        const def = BARREL_POOL[Math.floor(rng() * BARREL_POOL.length)]!;
-        placed.push({ x, y, ...def });
+      if (
+        !isNearSpawn(x, y) &&
+        !inOtherBuilding &&
+        clusterPlaced.every(prev => !tooCloseScaled(candidate, prev, 5))
+      ) {
+        placed.push(candidate);
+        clusterPlaced.push(candidate);
         barrelPlaced++;
       }
     }
