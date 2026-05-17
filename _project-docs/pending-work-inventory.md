@@ -7,7 +7,6 @@ Canonical source for all forward-looking work on Shoot Your Way Out. Reference t
 Gameplay-affecting tech debt and feature work. Must be complete before polish phases. Principle: no UI/sound/menu work until gameplay is at final state.
 
 ### Bugs and tech debt
-- **Crate spawn validity.** Crates spawn on top of solid props (buildings, wrecks) and outside playable area when player is near map edge. Needs on-prop check + PLAYABLE_MARGIN bounds check before placement. (PLAYABLE_MARGIN does not currently exist in mapGenerator.)
 - **Stuttering investigation.** Persistent since map generation phase. Multiple times deferred. Attempt targeted object pooling first (projectiles, pickups, damage numbers, hit effects). If stutter doesn't resolve, escalate to full UI-thread GC allocation refactor.
 - **File refactor decision.** GameCanvas.tsx ~30k tokens drives CC context bloat (~40-50% of per-prompt token cost). Targeted split (extract derived-value hooks and timer logic into separate files) or full code organization pass. Decide approach and execute.
 
@@ -18,6 +17,13 @@ Gameplay-affecting tech debt and feature work. Must be complete before polish ph
 ### Feature work
 - **Weapon variant tiers.** Common/Uncommon/Rare/Legendary per weapon. Requires: rarity data definitions, crate roll logic, equip logic (rarity comparison), visual borders on icon cards, stat scaling per tier.
 - **Skill clones (5 items).** Heavy Plate, Knee Pads, FMJ Ammo, ACOG, Energy Bar. Each is one PNG drop + one data row in skills.ts + one icon mapping in sprites.ts.
+
+### Closed this session (Session 1, 2026-05-17)
+
+- **Crate spawn validity** (was in original inventory) — commit f0856d1. On-prop exclusion via `solidPropExclusions` in `GameState`; world-edge bounds derived from `viewHalfW`/`viewHalfH` to match player wall exactly.
+- **Decorative barrel/crate overlap with buildings** (discovered mid-session) — commit 4d8b093. Fixed orbit from native-space center distance to scaled-edge-relative gap (`BARREL_EDGE_MIN = 10`, `BARREL_EDGE_MAX = 90`).
+- **Within-cluster prop-on-prop overlap** (discovered mid-session) — commit 00850f4. Added `clusterPlaced` tracking per building; `tooCloseScaled` check with gap = 5 against already-placed cluster siblings.
+- **Vegetation density bump** (design change, not a bug) — commit 8972100. 50–80 → 70–100. Also corrected five stale `MapData` docstrings in `mapTypes.ts`.
 
 ### Triaged tech debt items from progress-log.md (reference original entries)
 - **[F] CC context bloat** — covered by file refactor decision above
@@ -47,7 +53,7 @@ After gameplay completion. Visual-only items.
 - **Transition tiles.** GrassToRoad, SandToRoad, DirtToRoad + road decals (_0005_RoadDecals.png).
 - **Sandbags.** Oriented placement near building doors (not random scatter). Collision.
 - **Pristine parked civilian cars along roads.** Visual-only.
-- **Cluster tree spawning.** Trees currently spawn individually; clustering reads more natural.
+- **Cluster tree spawning.** Resolved via v1 density bump (commit 8972100) — at 70–100 trees, random placement produces natural Poisson clumping without explicit cluster logic. Intentional cluster logic deferred to v1.1+ only if post-launch visual feel surfaces it as a real problem.
 - **Water as centerpiece prop.** Map variety.
 - **Water border at map edge.** Visual map boundary.
 
@@ -121,6 +127,13 @@ Per strategy-monetization-v1.md.
 - Login bonus logic (free $50/day, paid $300/day — placeholders)
 - Paywall gate
 - Balance pass
+
+## Doc Hygiene
+
+Items needed to keep project docs accurate and trustworthy. Not gameplay work; not blocked on any phase.
+
+- **v3 context doc audit.** Compare key v3 statements against current code; identify and correct drifts. Known drifts already confirmed this session: vegetation budget values (v3 says 0–20, code says 70–100) and rain-suppression rule (v3 says active, code removed it in Phase 5 G3). These two are explicitly known-stale until the audit happens. Other drifts likely exist; that's what the audit is for. Do not partially fix just the known items before running the full audit — partial fixes while unknown drifts exist can create new inconsistencies.
+- **Close-out doc process improvement.** Codify a tighter end-of-session/end-of-phase doc update protocol so v3 doesn't drift from code again. Probably a new section in v3 or a working rule in the collaboration model. Draft in strategy chat before committing to docs.
 
 ## Open Brainstorm Items (Need Decision Before Relevant Phase)
 

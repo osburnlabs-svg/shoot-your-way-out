@@ -1436,6 +1436,80 @@ Design decisions captured 2026-05-14. Apply when the relevant phase work begins.
 
 ---
 
+## Phase 5.5 — Gameplay Completion
+
+**Goal:** Close all gameplay-affecting tech debt and feature work before polish phases begin. No UI/sound/menu work until gameplay is at final state.
+
+**Status:** 🟡 In Progress
+
+---
+
+### Phase 5.5 — Session 1 (2026-05-17)
+
+**Commits:** f0856d1 | 4d8b093 | 00850f4 | 8972100
+
+---
+
+#### f0856d1 — Crate spawn validity (Bug 1)
+
+Weapon crates (runtime entities from `crateEngine.ts`) were placing outside the player-reachable area and on top of solid props (buildings, wrecks, rocks). Two-part fix.
+
+**Edge bounds — device-dependent wall, not a constant:**
+Initial implementation used `PLAYABLE_MARGIN = 200` as the world-edge clamp. On-device testing showed crates still landing past the invisible wall. The wall is device-dependent — defined in `gameEngine.ts` as `canvasWidth / (2 * CAMERA_ZOOM)`, which varies by screen size. `PLAYABLE_MARGIN = 200` happened to be smaller than the wall on the test device. Fix replaced `PLAYABLE_MARGIN` with `viewHalfW`/`viewHalfH` (already computed three lines above for the viewport calculation in the same function). Same expression as the player wall — zero drift, device-aware. `PLAYABLE_MARGIN` removed entirely.
+
+**On-prop check — worklet constraint forced a new data structure:**
+`tickCrateSpawn` is a `'worklet'` running on the Reanimated UI thread. It can only read data inside `GameState`. Prop positions live in `initialMapData` (React state) — unreachable. Solution: new `solidPropExclusions: Array<{x, y, r}>` computed at map gen time in `mapGenerator.ts` using the existing `scaledHalfSize()` function. Covers buildings, obstacles (rocks), vehicleWrecks. Vegetation and barrels excluded — they're passable and too small to visually block a crate. `CRATE_EXCLUSION_CLEARANCE = 30` adds gap beyond the scaled edge. Array added to `MapData`, threaded into `GameState` via new `createInitialGameState` parameter, read in `tickCrateSpawn` as worklet-accessible exclusion check. Re-rolls up to 10 times; skips cycle if all attempts fail (timer advances regardless). Array is read-only mid-run — `{ ...state }` spread copies the reference cheaply.
+
+**Files:** `mapTypes.ts`, `mapGenerator.ts`, `gameEngine.ts`, `GameCanvas.tsx` (both `createInitialGameState` call sites), `crateEngine.ts`.
+
+---
+
+#### 4d8b093 — Decorative barrel/crate overlap with buildings (Bug 2)
+
+Not in original Phase 5.5 inventory. Surfaced on device after Bug 1 was verified.
+
+`buildBarrels()` orbited props at fixed distances from building centers: `BARREL_BUILDING_MIN_DIST = 50` to `BARREL_CLUSTER_RADIUS = 150` world pixels. After the Phase 5 G2 sprite scale bump (`STRUCTURE_SPRITE_SCALE = 3`), scaled half-sizes of all three building types exceeded the orbit band — barrels and boxes rendered inside building footprints:
+- `env_house01` (132px native) → 198px scaled half-size — entire 50–150px orbit is inside
+- `env_house02` (263px native, max dim) → ~395px scaled half-size — entirely engulfed
+- `env_watchtower` (72px native) → 108px scaled half-size — partially overlaps at 50–108px
+
+"Crates" Mo saw on device are `env_box_*` entries in the same `BARREL_POOL` — not a separate placement system. One fix covers both.
+
+Fix replaced fixed orbit constants with edge-relative gaps: `BARREL_EDGE_MIN = 10`, `BARREL_EDGE_MAX = 90`. Orbit distance computed as `scaledHalfSize(building) + gap` — starts just outside the rendered edge, regardless of building type or scale. Uniform across all three building types; no per-building overrides. Mo chose `BARREL_EDGE_MIN = 10` deliberately: barrels at 10px clearance read as tucked under awnings (houses) or under watchtower stilts. Visual ambiguity intentional — props feel placed in a world, not diagrammatically separated. Matches the v3 binding rule on scaled footprint dimensions.
+
+---
+
+#### 00850f4 — Within-cluster prop-on-prop overlap (Bug 3)
+
+Not in original inventory. Surfaced after Bug 2 fix exposed clusters previously hidden inside building footprints.
+
+`buildBarrels()` placed each prop independently with no inter-prop spacing check. The `inOtherBuilding` guard only checks against other buildings' footprints — not against sibling props already placed in the same cluster. Each prop was independently placed on an orbit arc with no memory of its siblings.
+
+Fix added `clusterPlaced: PlacedEntity[]` per building. Each candidate checked against all previously placed cluster siblings via `tooCloseScaled(candidate, prev, 5)`. Gap = 5px on Mo's call: gap = 0 allows edges-almost-touching which reads as a visual glitch; 5px breathing room reads intentional. Outer attempt cap stays at 80 — if a cluster exhausts valid positions, remaining props silently don't place (fewer barrels in that cluster, acceptable). `def` moved before the acceptance check so `tooCloseScaled` has a full `PlacedEntity` for scaled footprint math. This changes PRNG consumption on failed attempts, which shifts barrel cluster layouts for all seeds — expected for a bug fix. `buildBarrels` runs last in `generateMap` so no other prop category is affected.
+
+---
+
+#### 8972100 — Vegetation density bump + stale MapData docstrings
+
+**Doc drift caught before writing code:** Task was specified as "bump min from 0 to 15, max from 20 to 40." Diagnosis found the `mapTypes.ts:57` docstring ("0–20 trees/bushes, 0 when rain") was stale relative to actual code, which already had 50–80 trees with rain suppression removed since Phase 5 G3. Mo's expected starting values came from the stale doc. Applying the task as written would have reduced vegetation from 50–80 to 15–40.
+
+Actual change: bumped from `50 + Math.floor(rng() * 31)` (50–80) to `70 + Math.floor(rng() * 31)` (70–100). At higher density, random placement naturally produces Poisson-style clumping without explicit cluster logic — v1 solution to the tree-clustering tech debt. Cluster logic deferred to v1.1+ if visual feel post-launch surfaces it as a real problem.
+
+Five stale `MapData` docstrings corrected in same commit (all had drifted during Phase 5 G3):
+- `buildings`: "2–3 structures" → "8–12 structures (1 house02, 3–5 house01, 4–6 watchtowers)"
+- `obstacles`: "20–40 rocks" → "30–60"
+- `vehicleWrecks`: "0–1 bus + 4–14 scatter" → "1 heli + 1 bomber + 2–3 buses + 12–32 scatter = 16–37 total"
+- `vegetation`: "0–20 / 0 when rain" → "70–100, rain has no effect"
+- `barrels`: "2–5 per building" → "3–5 per building"
+
+---
+
+### Tech debt note — v3 context doc drift confirmed
+
+Two known drifts confirmed this session: vegetation budget values (v3 says 0–20, code says 70–100) and rain-suppression rule (v3 says active, code says removed since Phase 5 G3). Both flagged as known-stale; being tracked in pending-work-inventory.md under "Doc Hygiene." Do not correct these two v3 statements until the full audit runs — partial fixes while other drifts are unknown can create new inconsistencies.
+
+---
+
 ## Phase 6 — Audio + atmospheric effects
 
 **Goal:** Audio engine fully implemented (music + SFX channels), all 25 SFX wired and playing, 4 music tracks looping correctly, fog-of-war, rain particles + drifting clouds (rain runs only — no lightning, no thunder), vignette, muzzle flashes, bullet origin correction, explosion and smoke effects rendering.

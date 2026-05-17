@@ -944,6 +944,12 @@ With `PROP_SPRITE_SCALE = 2` and `STRUCTURE_SPRITE_SCALE = 3`, the rendered foot
 
 *Fix pattern:* Any spacing or exclusion check involving scaled entities must compute `max(width, height) × scale / 2` as the effective exclusion radius. Applied in Phase 5 G2 via `scaledHalfSize()` in `mapGenerator.ts` — looks up the appropriate scale (STRUCTURE vs PROP) by assetKey, computes the rendered half-size, and feeds it into `tooCloseScaled()` for all cross-category placement checks. Keep `scaledHalfSize()` and the `STRUCTURE_ASSET_KEYS` set in sync with the renderer's scale logic (`scaleFor()` in `propAtlasData` useMemo) — if a new structure type is added, both sets must be updated together.
 
+**Spawn bounds must derive from the same expression as the player wall, not duplicate it as a constant**
+
+The player movement wall is defined at runtime in `gameEngine.ts` as `canvasWidth / (2 * CAMERA_ZOOM)` and `canvasHeight / (2 * CAMERA_ZOOM)` — device-dependent values that vary by screen size. A separate margin constant that approximates the wall distance on the development device will silently fail on devices with different canvas dimensions: a constant of 200px may sit inside the playable area on a small phone while sitting outside it on a tablet, or vice versa.
+
+*Binding rule:* Runtime entity spawners that place entities in world space must compute their world-edge bounds using `viewHalfW = canvasWidth / (2 * CAMERA_ZOOM)` and `viewHalfH = canvasHeight / (2 * CAMERA_ZOOM)` — the same expression the player wall uses — not a separate constant. Applied in Phase 5.5 Session 1 (commit f0856d1): `crateEngine.ts` replaced a hardcoded `PLAYABLE_MARGIN = 200` with `viewHalfW`/`viewHalfH`, which are already computed in the same function for viewport math. Any future spawner placing runtime entities in the world (pickups, hazards, spawned props) must follow the same pattern.
+
 **useImage diagnostic instrumentation must account for async load timing**
 
 `useImage()` returns `null` synchronously on first render. A `console.log` that fires at component mount will always report `null` for every image, even when all images are loading correctly and will resolve 1–2 frames later. The null log is a false negative — it looks like an image load failure but the image is fine. Discovered in Phase 5 G2 when `[DIAG-HELI]` logged `imgEnvHelicopterWreck: null` during a session where the helicopter was visually rendering correctly on device.
