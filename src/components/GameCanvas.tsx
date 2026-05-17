@@ -100,7 +100,7 @@ import {
   SNIPER_A_FLASH_OFFSET,
   SNIPER_B_FLASH_OFFSET,
   RAIDER_FLASH_OFFSET,
-  BTR_FLASH_OFFSET,
+  ACS_FLASH_OFFSET,
   PANZER_FLASH_OFFSET,
   TANK_SPRITE_SCALE,
   TANK_PROJECTILE_SCALE,
@@ -573,18 +573,14 @@ export default function GameCanvas({ width, height }: Props) {
   const muzzleFlashRaider1 = useImage(EffectSprites.muzzle_flash_raider[1]);
   const muzzleFlashRaider2 = useImage(EffectSprites.muzzle_flash_raider[2]);
   const muzzleFlashRaiderImages = [muzzleFlashRaider0, muzzleFlashRaider1, muzzleFlashRaider2];
-  // Tank muzzle flash frames (Phase 5 G5).
-  const muzzleFlashBtr0 = useImage(EffectSprites.muzzle_flash_btr[0]);
-  const muzzleFlashBtr1 = useImage(EffectSprites.muzzle_flash_btr[1]);
-  const muzzleFlashBtr2 = useImage(EffectSprites.muzzle_flash_btr[2]);
-  const muzzleFlashBtrImages = [muzzleFlashBtr0, muzzleFlashBtr1, muzzleFlashBtr2];
+  // Tank muzzle flash frames (Phase 5 G5). ACS reuses panzer flash frames.
   const muzzleFlashPanzer0 = useImage(EffectSprites.muzzle_flash_panzer[0]);
   const muzzleFlashPanzer1 = useImage(EffectSprites.muzzle_flash_panzer[1]);
   const muzzleFlashPanzer2 = useImage(EffectSprites.muzzle_flash_panzer[2]);
   const muzzleFlashPanzerImages = [muzzleFlashPanzer0, muzzleFlashPanzer1, muzzleFlashPanzer2];
   // Tank base + tower sprites.
-  const btrBaseImage  = useImage(EnemySprites.btr.base);
-  const btrTowerImage = useImage(EnemySprites.btr.tower);
+  const acsBaseImage  = useImage(EnemySprites.acs.base);
+  const acsTowerImage = useImage(EnemySprites.acs.tower);
   const panzerBaseImage  = useImage(EnemySprites.panzer.base);
   const panzerTowerImage = useImage(EnemySprites.panzer.tower);
 
@@ -1865,12 +1861,12 @@ export default function GameCanvas({ width, height }: Props) {
           {(() => {
             const mapTank = initialMapData.tank;
             if (!mapTank) return null;
-            const isBaseReady = mapTank.variant === 'btr' ? !!btrBaseImage : !!panzerBaseImage;
-            const isTowerReady = mapTank.variant === 'btr' ? !!btrTowerImage : !!panzerTowerImage;
-            const baseImg = mapTank.variant === 'btr' ? btrBaseImage : panzerBaseImage;
-            const towerImg = mapTank.variant === 'btr' ? btrTowerImage : panzerTowerImage;
-            const flashImages = mapTank.variant === 'btr' ? muzzleFlashBtrImages : muzzleFlashPanzerImages;
-            const flashOffset = mapTank.variant === 'btr' ? BTR_FLASH_OFFSET : PANZER_FLASH_OFFSET;
+            const isBaseReady = mapTank.variant === 'acs' ? !!acsBaseImage : !!panzerBaseImage;
+            const isTowerReady = mapTank.variant === 'acs' ? !!acsTowerImage : !!panzerTowerImage;
+            const baseImg = mapTank.variant === 'acs' ? acsBaseImage : panzerBaseImage;
+            const towerImg = mapTank.variant === 'acs' ? acsTowerImage : panzerTowerImage;
+            const flashImages = muzzleFlashPanzerImages;
+            const flashOffset = mapTank.variant === 'acs' ? ACS_FLASH_OFFSET : PANZER_FLASH_OFFSET;
             const flashImg = tankFlashFrame >= 0 ? (flashImages[tankFlashFrame] ?? null) : null;
             if (!isBaseReady || !isTowerReady) return null;
             const bw = baseImg!.width() * TANK_SPRITE_SCALE;

@@ -90,7 +90,7 @@ const CIRCLE_COLLIDER_RADIUS: Record<string, number> = {
   env_tree_large_3:       50,
   env_tree_large_4:       50,
   // Tank turrets (Phase 5 G5)
-  tank_btr:               80,
+  tank_acs:               80,
   tank_panzer:            80,
 };
 

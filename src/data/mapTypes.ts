@@ -35,7 +35,7 @@ export type PlacedEntity = {
   rotation?: number;
 };
 
-export type TankVariant = 'btr' | 'panzer';
+export type TankVariant = 'acs' | 'panzer';
 
 export type TankPlacement = {
   x: number;

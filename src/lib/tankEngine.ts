@@ -26,7 +26,7 @@ import {
   TANK_FIRE_RATE_MS,
   TANK_FIRE_RANGE_PX,
   TANK_PROJECTILE_SPEED_PX_PER_SEC,
-  BTR_FIRE_OFFSET,
+  ACS_FIRE_OFFSET,
   PANZER_FIRE_OFFSET,
   PLAYER_COLLISION_RADIUS_PX,
 } from '../data/gameConstants';
@@ -55,7 +55,7 @@ export function tickTank(state: GameState, dtMs: number): GameState {
 
   // Fire when in range and cooldown expired
   if (newCooldown === 0 && distSq <= TANK_FIRE_RANGE_PX * TANK_FIRE_RANGE_PX) {
-    const fireOffset = tank.variant === 'btr' ? BTR_FIRE_OFFSET : PANZER_FIRE_OFFSET;
+    const fireOffset = tank.variant === 'acs' ? ACS_FIRE_OFFSET : PANZER_FIRE_OFFSET;
     const cos = Math.cos(towerAngle);
     const sin = Math.sin(towerAngle);
     const spawnX = tank.x + cos * fireOffset.y - sin * fireOffset.x;

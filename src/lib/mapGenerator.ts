@@ -444,7 +444,7 @@ function buildTank(
   obstacles: PlacedEntity[],
   vehicleWrecks: PlacedEntity[],
 ): TankPlacement | null {
-  const variant: TankVariant = rng() < 0.5 ? 'btr' : 'panzer';
+  const variant: TankVariant = rng() < 0.5 ? 'acs' : 'panzer';
   const margin = 400;
   const minFromSpawnSq = TANK_MIN_DISTANCE_FROM_PLAYER * TANK_MIN_DISTANCE_FROM_PLAYER;
 

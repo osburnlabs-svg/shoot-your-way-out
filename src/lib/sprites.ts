@@ -8,7 +8,7 @@
  * Consuming modules import HeroSprites and pass values directly to Skia's useImage().
  *
  * This file grows with each phase — future registries follow the same pattern:
- *   Phase 3+5: EnemySprites  (scav, raider, gunner, sniper, humvee, btr, panzer, acs)
+ *   Phase 3+5: EnemySprites  (scav, raider, gunner, sniper, humvee, acs, panzer)
  *   Phase 4a:  PickupSprites (hp, armor, speed, ammo, money, crate)
  *   Phase 6:   EffectSprites (explode, flame, smoke, muzzle_flashes, rocket)
  *   Phase 7:   GuiSprites    (menu, hud, upgrade, pause, settings, mission_failed, etc.)
@@ -138,10 +138,10 @@ export const EnemySprites = {
       require('../../assets/sprites/enemies/scav/die/SD_04.png'),
     ],
   },
-  /** BTR armored vehicle — base (static) and rotating tower. Phase 5 G5. */
-  btr: {
-    base:  require('../../assets/sprites/enemies/tank/btr/BTR_Base.png'),
-    tower: require('../../assets/sprites/enemies/tank/btr/BTR_Tower.png'),
+  /** ACS armored vehicle — base (static) and rotating tower. Phase 5 G5. */
+  acs: {
+    base:  require('../../assets/sprites/enemies/tank/acs/ACS_Base.png'),
+    tower: require('../../assets/sprites/enemies/tank/acs/ACS_Tower.png'),
   },
   /** Panzer tank — base (static) and rotating tower. Phase 5 G5. */
   panzer: {
@@ -299,11 +299,6 @@ export const EffectSprites = {
     require('../../assets/effects/muzzle_flash/gunner_1.png'),
     require('../../assets/effects/muzzle_flash/gunner_2.png'),
     require('../../assets/effects/muzzle_flash/gunner_3.png'),
-  ],
-  muzzle_flash_btr: [
-    require('../../assets/effects/muzzle_flash/btr_fire_1.png'),
-    require('../../assets/effects/muzzle_flash/btr_fire_2.png'),
-    require('../../assets/effects/muzzle_flash/btr_fire_3.png'),
   ],
   muzzle_flash_panzer: [
     require('../../assets/effects/muzzle_flash/panzer_fire_1.png'),
