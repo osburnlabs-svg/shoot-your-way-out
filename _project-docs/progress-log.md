@@ -1172,6 +1172,101 @@ Raider also received a visual-only muzzle flash on a 3.5s cooldown (1029ab4 + of
 
 ---
 
+## Phase 5 — Group 5: Tank turret
+
+**Status:** ✅ Complete
+**Date:** 2026-05-16
+**Commits:** 25bdb9f (initial G5 — BTR/Panzer, tower track, rocket fire) → 6b97271 (fix flash + rocket offsets to barrel tip) → 4a0ccec (BTR → ACS swap; rocket 0.85x) → 338f884 (rocket 0.7x) → 5cf5883 (two tanks per map: ACS + Panzer) → 7c05592 (close: strip diagnostics)
+
+---
+
+### Goal
+
+Tank turret as the only genuine ranged-damage enemy in v1. All other enemy fire is visual-only (muzzle flash, no projectile travel, no player damage). The tank breaks this rule deliberately — rockets travel, have hit detection, and deal 30% maxHP on contact. The contrast provides weight to the encounter and rewards positional play.
+
+---
+
+### Initial spec and why it was scrapped
+
+Original G5 design called for a destructible tank: fixed HP pool, death animation, guaranteed crate drop on kill, and a spawn timer (first appearance at 2:00). Each mechanic was straightforward in isolation but together they added up to a full enemy lifecycle (healthbar rendering, death state, crate-drop trigger, wave-gate logic) for a single entity. Against the Vampire Survivors precedent — hazards, not kill targets — the engineering cost was hard to justify for what was effectively visual polish.
+
+**Decision:** make the tank an invincible permanent map fixture. No HP, no death, no drop, no spawn timer. Present at x:00. This cuts the lifecycle to zero and shifts player interaction from "kill the tank" to "manage the threat zone."
+
+---
+
+### Final spec
+
+- **Two tanks per map:** one ACS, one Panzer — placed at map generation, present from minute zero
+- **Placement:** ≥1500px from player spawn, ≥1500px from each other; 15 attempts per variant; falls back to 1 or 0 tanks if terrain blocks placement
+- **Tower:** always tracks player via `atan2`; rotates every frame
+- **Fire:** rocket spawns at barrel tip, constant speed, 30% maxHP damage on hit, 6s cooldown, 450px range
+- **Invincible:** no HP pool, not in `enemies[]`, excluded from auto-aim automatically
+
+---
+
+### Two-layer compositing
+
+First rotating-overlay-on-static pattern in this project. The base sprite (`ACS_Base.png` / `PanzerBase.png`) renders in a static Skia Group — no per-frame update needed. The tower sprite (`ACS_Tower.png` / `PanzerTower.png`) renders in a sibling animated Group whose transform includes translate-to-center + rotate.
+
+The flash `<Image>` lives inside the tower Group, not beside it. This gives the flash automatic rotation with the tower and correct z-order above both base and tower sprites — same approach as enemy flash in G4, extended to a two-layer compositing context.
+
+Animated Group wrapping a static Group caused stutter (known quirk from G4). Sibling Groups with independent transforms eliminate it.
+
+---
+
+### BTR → ACS swap
+
+Initial implementation used a BTR variant alongside Panzer. On device the BTR's twin-barrel geometry made the barrel-tip offsets ambiguous — flash and rocket both initiated at tower center before tuning, and once the offset was dialed in it still read as slightly off-center relative to the visual. The ACS (single prominent barrel, clean tip geometry) made the offset derivation unambiguous and the visual result cleaner. BTR assets deleted; ACS wired. ACS reuses Panzer muzzle flash frames — no standalone ACS flash set needed.
+
+---
+
+### Per-variant offset constants
+
+Four constants in `gameConstants.ts`:
+
+| Constant | Value | Notes |
+|---|---|---|
+| `ACS_FLASH_OFFSET` | `{x:0, y:54}` | Sprite-pixel space; auto-rotates with tower Group |
+| `ACS_FIRE_OFFSET` | `{x:0, y:108}` | World-pixel space; applied to world coords at spawn |
+| `PANZER_FLASH_OFFSET` | `{x:0, y:57}` | Sprite-pixel space |
+| `PANZER_FIRE_OFFSET` | `{x:0, y:114}` | World-pixel space |
+
+`y` is the forward (barrel) axis in sprite-local space — positive y points toward barrel tip when the tower faces up in texture. `TANK_SPRITE_SCALE=2` converts sprite pixels to world pixels for flash render; fire offset is already in world pixels.
+
+---
+
+### Collision + auto-aim
+
+Tank placed in the solid circle collision pool at map-gen time (radius 80 world-px). Player and enemies resolve against it the same as any wreck collider — no special casing. Tank is not in `enemies[]`, so all enemies-indexed logic (auto-aim target selection, combat tick, slot rendering) excludes it automatically. No `isAutoAimTarget` flag needed.
+
+---
+
+### Final state
+
+- **5 mechanical enemy classes:** Scav, Raider, Sniper A, Sniper B, Tank Turret
+- **6 distinct visual identities:** NoGunScav-body Scav, Soldier-body Raider, Sniper kit Sniper A, Soldier02 Sniper B, ACS tank, Panzer tank
+- Tank is the sole enemy with genuine ranged fire and player damage in v1
+- `CAMERA_ZOOM` locked at 1.0; reviewed against tank + HUD visibility and retained
+
+---
+
+### Phase 5 — Complete
+
+**G3** — Static-prop collision: spatial grid (AABB + circle), player + enemy resolution, worklet-safe.
+**G4** — Sniper class + muzzle flash: visual enemy upgrades, flash-only ranged fire for all non-tank classes.
+**G5** — Tank turret: two-layer compositing, genuine rocket fire, two permanent map fixtures.
+
+**Tech debt logged this phase:** I (per-slot `useDerivedValue` scaling limit), J (JSI SharedValue field restrictions), K (animated-inside-animated stutter), L (walk-frame freeze via React state unreliable — flash position drifts on sniperA across walk cycle).
+
+**Phase 6 brainstorm items carried forward:**
+- Bullet sprite color change (`GunnerBullet` reads too dark against map)
+- Grenade launcher sprite swap (dedicated grenade asset exists in kit)
+- Optional scav muzzle flash (deferred — conceptually a melee class)
+- File refactor decision (`GameCanvas.tsx` + `gameEngine.ts` approaching size threshold)
+- 50 enemy cap (`ENEMY_SOFT_CAP`) investigation — no perf issue observed, retained as is
+
+---
+
 ## Phase 5/6 Brainstorm Decisions — Locked
 
 Design decisions captured 2026-05-14. Apply when the relevant phase work begins.
