@@ -369,7 +369,7 @@ function buildVehicleWrecks(
   return { helicopter, bomber, buses, scatter };
 }
 
-// 50–80 trees/bushes on every run (rain no longer suppresses vegetation).
+// 70–100 trees/bushes on every run (rain no longer suppresses vegetation).
 // Placed last among scatter props so it can exclude structures, wrecks, and rocks.
 function buildVegetation(
   rng: () => number,
@@ -377,7 +377,7 @@ function buildVegetation(
   allWrecks: PlacedEntity[],
   obstacles: PlacedEntity[],
 ): PlacedEntity[] {
-  const count = 50 + Math.floor(rng() * 31); // 50–80
+  const count = 70 + Math.floor(rng() * 31); // 70–100
   const placed: PlacedEntity[] = [];
   let attempts = 0;
 

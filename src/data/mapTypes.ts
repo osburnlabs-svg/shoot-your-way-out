@@ -48,15 +48,15 @@ export type MapData = {
   weather: WeatherType;
   /** [row][col] — 94 rows × 94 cols. */
   tileGrid: TileCell[][];
-  /** 2–3 structures (house_01, house_02, watchtower). G3 renders; G4 spawns snipers here. */
+  /** 8–12 structures (1 house02, 3–5 house01, 4–6 watchtowers). G3 renders; G4 spawns snipers here. */
   buildings: PlacedEntity[];
-  /** 20–40 rocks (large/medium/small). G3 renders; G4 adds hard collision. */
+  /** 30–60 rocks (large/medium/small). G3 renders; G4 adds hard collision. */
   obstacles: PlacedEntity[];
-  /** 0–1 bus centerpiece + 4–14 scatter car/truck wrecks. G3 renders; G4 adds hard collision. */
+  /** 1 helicopter + 1 bomber + 2–3 buses + 12–32 scatter wrecks = 16–37 total. G3 renders; G4 adds hard collision. */
   vehicleWrecks: PlacedEntity[];
-  /** 0–20 trees/bushes (0 when weather === 'rain'). G3 renders; soft cover only. */
+  /** 70–100 trees/bushes. Rain has no effect on vegetation count. G3 renders; soft cover only. */
   vegetation: PlacedEntity[];
-  /** 2–5 barrels/boxes per building, clustered near structures. G3 renders; G4 adds hard collision. */
+  /** 3–5 barrels/boxes per building, clustered just outside the building's scaled footprint. G3 renders. */
   barrels: PlacedEntity[];
   /** One ACS + one Panzer per map, each ≥1500px from player spawn and from each other. */
   tanks: TankPlacement[];
