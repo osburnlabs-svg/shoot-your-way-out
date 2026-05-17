@@ -30,7 +30,7 @@ Status legend:
 | 4a — Stat skills + level-up | 🟢 Complete | 2026-05-10 | G1: c4daad8 G2: a095517 G3: f297b4b G3-polish: 461b25b→d90aedf→ba505fc G4: ee7f7d5 G4-cleanup: 5690324 | G1 ✅ G2 ✅ G3 ✅ G4 ✅ | Full progression loop closed. G4: weapon unlocks L4/8/12/16 + all 8 weapon renames |
 | 4b — Ability skills + crates | 🟢 Complete | 2026-05-10 | G1: 5411988 Slot-fix: 8ff2533 G2: 18b44e3 G3: e2a1deb G4: 8c31b42 G4-polish: 9cb7762 G5: b4091c6 Smoke: 2438bb4 | G1 ✅ G2 ✅ G3 ✅ G4 ✅ G5 ✅ | All 20 v1 skills shipped; throwable system; revive; bloom-hold-dissipate smoke animation |
 | 4c — Crate weapons | 🟢 Complete | 2026-05-11 | G1: 75dc967 Fix: 68f5ef3 266fbd6 G2: d6f1c1c G3: 8c390b3 Polish: cd2d2d8 5a29a3e 2daeffd a0b7e61 4eca404 Close: cb8bddb | G1 ✅ G2 ✅ G3 ✅ | World-spawn crates; weapon roll + reveal modal; Shotgun/Rocket Launcher/Flamethrower active; custom weapon icons; debug scaffold cleaned up |
-| 5 — Maps + obstacles + vehicle enemies | 🟡 In Progress | 2026-05-13 → 2026-05-16 | G1: 99bf87d→3c17fac G2: 86c1a33→44cb822 G3: 6ed8a3c→b391493→30fb59c→2c04ed9→656fddf→c979729→93bc790→289a832→f9c30e7→74b6376→a311bdb→c3450b7 G4: 81a0cbd→832828a→1e94df5→ee1e503→345c364→eb0ceec→384566a→fb1f99d→1029ab4→40cb8bb→5937a47→d18dc5a | G1 ✅ G2 ✅ G3 ✅ G4 🟡 close-out next session | Collision complete; G4 sniper class + muzzle flash + raider flash + sprite swaps done; G4 close-out next session |
+| 5 — Maps + obstacles + vehicle enemies | 🟢 Complete | 2026-05-13 → 2026-05-17 | G1: 99bf87d→3c17fac G2: 86c1a33→44cb822 G3: 6ed8a3c→b391493→30fb59c→2c04ed9→656fddf→c979729→93bc790→289a832→f9c30e7→74b6376→a311bdb→c3450b7 G4: 81a0cbd→832828a→1e94df5→ee1e503→345c364→eb0ceec→384566a→fb1f99d→1029ab4→40cb8bb→5937a47→d18dc5a G5: 25bdb9f→6b97271→4a0ccec→338f884→5cf5883→7c05592 Flyover: 7bac617→1677616→e985445 | G1 ✅ G2 ✅ G3 ✅ G4 ✅ G5 ✅ Flyover ✅ | G5 tank turret (ACS + Panzer, genuine rocket fire); ambient helicopter flyover system |
 | 6 — Audio + atmospheric effects | ⚪ | | | | |
 | 7 — UI + persistence + analytics | ⚪ | | | | |
 | 8 — Helicopter boss + hazards | ⚪ | | | | |
@@ -67,7 +67,7 @@ Status legend:
 | **RN `<Image>` filtering — pattern established** — RN `<Image>` defaults to bilinear filtering, which blurs pixel-art and AI-sourced sprite icons. All Skia `<Image>` sprites in `GameCanvas.tsx` already use `sampling={{ filter: FilterMode.Nearest, mipmap: MipmapMode.None }}`. RN modal components must mirror this with `filterQuality="none"`. Applied to `LevelUpModal` and `CrateRevealModal` (commit 48be14b). **Pattern:** any future modal or screen using RN `<Image>` to render a sprite icon must include `filterQuality="none"`. | 2026-05-12 | `filterQuality="none"` on both affected components | ✅ Fixed — pattern to follow for all future RN `<Image>` sprite renders |
 
 | ~~**Phase 5 G2 Step 3 — device-test blockers 2+3 remaining**~~ — Commit f12a73d shipped scatter props. Three blockers found. Blocker 1 (stutter): diagnosed to JS-thread GC pressure from `Array.from()` per 100ms tick + UI-thread worklet allocation churn. JS-thread fix shipped (5187d0d — timer buffer mutation pattern, ~90% young-gen reduction). UI-thread churn unchanged; stutter reduced but not eliminated; **accepted for v1**. Half-dist Atlas A/B test (b2e6e88) disproved the camera-Group child-count theory — Option D is not the fix; reverted. **Diagnostic value for Phase 9:** distributing 12 atlases into their own camera-Group wrappers produced no improvement vs keeping them in the shared Group — confirming the stutter is NOT caused by child count inside an animated Skia Group. Any future render-pipeline investigation should not re-test this vector; the cause is worklet GC churn (see UI-thread tech debt entry), not Skia Group structure. Blocker 2 (houses and most vehicle wrecks not appearing): **current focus** — candidate: assetKey mismatch between mapGenerator pools and EnvSprites registry. Blocker 3 (prop sprites near native size): need `PROP_SPRITE_SCALE` constant in propAtlasData useMemo. | Phase 5 G2 Step 3 (2026-05-13) | Game playable; props partially visible; stutter bounded | ✅ Closed — all blockers resolved 2026-05-14 |
-| **G4 sniper count cap needed — rooftop availability ≠ spawn budget** — map density increase (2026-05-14) raised buildings to 4–6 houses + 4–6 watchtowers = 8–12 structures per run. With 2–3 sniper rooftop positions per building, each run will have 16–36 valid rooftop slots. G4 sniper enemy class must define its own `MAX_ACTIVE_SNIPERS` cap independent of rooftop availability — otherwise sniper density scales with building count in ways that can feel punishing on high-building-count seeds. Cap must be set before wiring sniper placement logic. | Phase 5 G2 density increase (2026-05-14) | No snipers implemented yet | Phase 5 G3 sniper design — define `MAX_ACTIVE_SNIPERS` cap before writing spawn logic |
+| ~~**G4 sniper count cap needed — rooftop availability ≠ spawn budget**~~ — map density increase (2026-05-14) raised buildings to 4–6 houses + 4–6 watchtowers = 8–12 structures per run. With 2–3 sniper rooftop positions per building, each run will have 16–36 valid rooftop slots. G4 sniper enemy class must define its own `MAX_ACTIVE_SNIPERS` cap independent of rooftop availability — otherwise sniper density scales with building count in ways that can feel punishing on high-building-count seeds. Cap must be set before wiring sniper placement logic. | Phase 5 G2 density increase (2026-05-14) | No snipers implemented yet | ✅ Closed Phase 5 G3 — `SNIPER_MAX_ACTIVE = 5` in `gameConstants.ts`; enforced in `enemyEngine.ts` |
 | **Loading screen needed** — At 6000×6000 with 250+ scatter props and 31+ `useImage` assets, initial mount produces a noticeable blank frame (~1–3s) before the canvas is ready. A loading screen (static image or progress bar) must intercept this gap. A blank screen on launch reads as a crash to new players. | Phase 5 G2 (2026-05-14) | Blank frame on mount; game loads correctly | Phase 7 — implement before user-testing |
 | **Projectile rendering: bullets as Circle vs Rect** — Bullets render as Skia `<Circle>` primitives (4px warm yellow). A `<Rect>` oriented with velocity (~2×8px) reads more convincingly as a traveling projectile. Low visual priority at current size but worth bundling with Phase 6 projectile-path work since muzzle flash, bullet origin, and bullet shape all touch the same render path. | Phase 5 G2 close-out (2026-05-14) | Circle renders acceptably | Phase 6 — bundle with muzzle flash + bullet origin correction + projectile rect shape change |
 | **Camera Group child count threshold** — Phase 5 G2 A/B test (b2e6e88, reverted c5c1e5c) confirmed that 28 Atlas children inside an animated Skia camera Group does NOT cause measurable stutter. The stutter is UI-thread worklet GC churn, not Group child count. Any future render-pipeline investigation should not re-test this vector. Re-evaluate only if child count grows significantly post-launch. | Phase 5 G2 A/B test (2026-05-13) | 28 Atlas children; performance acceptable at current count | Post-launch — re-evaluate if child count grows significantly |
@@ -926,7 +926,7 @@ Phase 4 transformed the engine from a static survival loop (Phase 3) into a full
 
 **Goal:** Single dynamic procedural map generator (runs at game start, every run is unique), parameterized asset budgets (buildings, vehicles, props, vegetation), seeded random placement with spacing constraints, building metadata for sniper rooftop positions, world camera system, all 8 enemy types working including Humvee/BTR/Panzer/ACS vehicle enemies, enemy ranged fire, single consistent military theme.
 
-**Status:** G1 complete 🟢 — G2 complete 🟢 — G3 complete 🟢 — G4 in progress 🟡
+**Status:** 🟢 Complete — G1 ✅ G2 ✅ G3 ✅ G4 ✅ G5 ✅ Flyover ✅
 
 ---
 
@@ -1250,11 +1250,64 @@ Tank placed in the solid circle collision pool at map-gen time (radius 80 world-
 
 ---
 
+---
+
+## Phase 5 — Helicopter Flyover (atmospheric)
+
+**Status:** ✅ Complete
+**Date:** 2026-05-17
+**Commits:** 7bac617 (implementation) → 1677616 (scale 1.2, duration 6500ms) → e985445 (scale 1.5)
+
+---
+
+### Goal
+
+Ambient helicopter flyover as atmospheric texture — no attacks, no health pool. A helicopter visually crosses the screen on a randomized trajectory every 60–120 seconds, reinforcing the active combat zone feel without adding a gameplay mechanic. Ships as a Phase 5 deliverable per the Scope Cuts decision (2026-05-13) that replaced the full helicopter boss with an ambient flyby.
+
+---
+
+### What shipped
+
+**Assets** (`assets/sprites/boss/helicopter/`):
+- `heli_body.png` — 288×288 body sprite (no rotor)
+- `rotor_1.png`, `rotor_2.png`, `rotor_3.png` — 288×288 rotor overlay frames (4x Smooth kit)
+
+**Constants** (appended to `gameConstants.ts`):
+- `HELI_SPRITE_SCALE = 1.5` — device-tuned: started 0.6, doubled to 1.2, then +25% to 1.5
+- `HELI_ROTOR_FRAME_MS = 40`
+- `HELI_FLYOVER_DURATION_MS = 6500` — device-tuned: started 4500ms, slowed to 6500ms
+- `HELI_SPAWN_MIN_MS = 60000` / `HELI_SPAWN_MAX_MS = 120000`
+
+**Animation system:**
+- `heliProgress` SharedValue driven 0→1 by `withTiming({ duration: HELI_FLYOVER_DURATION_MS })`
+- `heliFlightSV` SharedValue carries `{ active, startX, startY, endX, endY, angle }` for the current pass
+- `heliTransform` useDerivedValue: interpolates world → screen position per frame, emits `translateX/Y + rotate`
+- 8 randomized routes (L→R, R→L, T→B, B→T, and 4 diagonals); angle = `atan2(dy, dx) + SPRITE_ROTATION_OFFSET`
+- `withTiming` completion callback (`runOnJS(scheduleNext)`) sets the next random delay then fires the next pass
+
+**Rendering (viewport-relative — outside camera Group):**
+- Helicopter renders in screen coordinates, not world coordinates — not affected by map scroll
+- Two-layer compositing: static body `<Image>` + animated rotor `<Image>` at same center (sibling Groups pattern from G5 tanks)
+- `heliActive` / `heliRotorFrame` React state driven by 100ms setInterval (only advances frame counter when `heliActive = true`)
+- `FilterMode.Nearest, MipmapMode.None` sampling on both layers
+
+---
+
+### Architectural decisions
+
+- **Viewport-relative rendering.** The helicopter flies across the screen, not the world — screen-space coordinates are correct. Rendering inside the camera Group would make the helicopter appear to orbit the map at a fixed world position.
+- **`withTiming` for smooth flight instead of SharedValue per-frame mutation.** Linear interpolation over a fixed duration is exactly what `withTiming` does; no per-frame worklet math needed for position. The completion callback schedules the next pass without a polling loop.
+- **Per-frame `runOnJS` prohibition maintained.** Only the `withTiming` completion (fires once per pass) uses `runOnJS`. No `runOnJS` inside `useFrameCallback`.
+- **Sibling Groups, not nested animated Groups.** Body in a static Group; rotor in an animated sibling Group — same binding pattern as G5 tank two-layer compositing.
+
+---
+
 ### Phase 5 — Complete
 
 **G3** — Static-prop collision: spatial grid (AABB + circle), player + enemy resolution, worklet-safe.
 **G4** — Sniper class + muzzle flash: visual enemy upgrades, flash-only ranged fire for all non-tank classes.
 **G5** — Tank turret: two-layer compositing, genuine rocket fire, two permanent map fixtures.
+**Flyover** — Ambient helicopter flyover: `withTiming`-driven viewport-relative pass, two-layer rotor compositing, 60–120s randomized spawn cadence. Device-tuned scale and flight duration.
 
 **Tech debt logged this phase:** I (per-slot `useDerivedValue` scaling limit), J (JSI SharedValue field restrictions), K (animated-inside-animated stutter), L (walk-frame freeze via React state unreliable — flash position drifts on sniperA across walk cycle).
 
@@ -1399,9 +1452,9 @@ Design decisions captured 2026-05-14. Apply when the relevant phase work begins.
 
 ---
 
-## Phase 8 — Helicopter boss + hazards
+## Phase 8 — [TBD — original content cut]
 
-**Goal:** Helicopter boss spawning every 2 minutes with both phases (normal + enraged), Gas Bomb hazard randomly spawning, Bomber strafe events between bosses, hero death animation polish.
+**Goal:** ~~Helicopter boss spawning every 2 minutes with both phases (normal + enraged), Gas Bomb hazard randomly spawning, Bomber strafe events between bosses, hero death animation polish.~~ All cut per Scope Cuts 2026-05-13: helicopter boss replaced by ambient flyover (shipped Phase 5); bomber strafe replaced by static prop (shipped Phase 5 G2); Gas Bomb cut entirely with no replacement. Phase 8 scope to be redetermined during Phase 7 planning.
 
 **Status:** Not started
 
