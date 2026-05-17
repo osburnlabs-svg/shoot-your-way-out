@@ -144,7 +144,7 @@ export const SKILLS: Record<SkillId, SkillDefinition> = {
   },
   optics_pso_scope: {
     id: 'optics_pso_scope',
-    displayName: 'Holographic Sight',
+    displayName: 'Holographic',
     description: '+30% range, -10% fire rate',
     category: 'optics',
     maxStacks: 2,
