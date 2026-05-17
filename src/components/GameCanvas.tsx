@@ -67,11 +67,12 @@ import {
   useDerivedValue,
   useFrameCallback,
   useSharedValue,
+  withTiming,
   type SharedValue,
 } from 'react-native-reanimated';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 
-import { HeroSprites, EnemySprites, PickupSprites, EffectSprites, TileSprites, EnvSprites } from '../lib/sprites';
+import { HeroSprites, EnemySprites, PickupSprites, EffectSprites, TileSprites, EnvSprites, FlyoverSprites } from '../lib/sprites';
 import type { HeroWeaponPose } from '../lib/sprites';
 import { loadMap } from '../lib/mapLoader';
 import { SKILLS, SKILL_IDS, getEffectiveStats } from '../data/skills';
@@ -136,6 +137,11 @@ import {
   TILE_SIZE,
   TILE_COLS,
   TILE_ROWS,
+  HELI_SPRITE_SCALE,
+  HELI_ROTOR_FRAME_MS,
+  HELI_FLYOVER_DURATION_MS,
+  HELI_SPAWN_MIN_MS,
+  HELI_SPAWN_MAX_MS,
 } from '../data/gameConstants';
 import type { CrateTier } from '../data/gameConstants';
 import type { EnemyType } from '../data/enemies';
@@ -583,6 +589,12 @@ export default function GameCanvas({ width, height }: Props) {
   const acsTowerImage = useImage(EnemySprites.acs.tower);
   const panzerBaseImage  = useImage(EnemySprites.panzer.base);
   const panzerTowerImage = useImage(EnemySprites.panzer.tower);
+  // Helicopter flyover sprites (Phase 5 atmospheric).
+  const heliBodyImage  = useImage(FlyoverSprites.heliBody);
+  const heliRotor0     = useImage(FlyoverSprites.rotorFrames[0]);
+  const heliRotor1     = useImage(FlyoverSprites.rotorFrames[1]);
+  const heliRotor2     = useImage(FlyoverSprites.rotorFrames[2]);
+  const heliRotorImages = [heliRotor0, heliRotor1, heliRotor2];
 
   // ─── Map data (generated once per mount; reused on redeploy in Phase 5) ──────
   // Phase 7 will generate a fresh map on each run restart via the menu flow.
@@ -702,6 +714,15 @@ export default function GameCanvas({ width, height }: Props) {
   const fpsAccumMs = useSharedValue(0);
   const fpsFrameCount = useSharedValue(0);
 
+  // ─── Helicopter flyover state (UI thread) ────────────────────────────────────
+  const heliFlightSV = useSharedValue<{
+    active: boolean;
+    startX: number; startY: number;
+    endX: number;   endY: number;
+    angle: number;
+  }>({ active: false, startX: 0, startY: 0, endX: 0, endY: 0, angle: 0 });
+  const heliProgress = useSharedValue(0);
+
   // ─── Debug display (React state, ~once/sec) ────────────────────────────────
   const [displayFps, setDisplayFps] = useState(0);
   const [displayElapsed, setDisplayElapsed] = useState(0);
@@ -753,6 +774,8 @@ export default function GameCanvas({ width, height }: Props) {
     () => Array.from({ length: ENEMY_SOFT_CAP }, () => -1),
   );
   const [tankFlashFrames, setTankFlashFrames] = useState<[number, number]>([-1, -1]);
+  const [heliActive, setHeliActive] = useState(false);
+  const [heliRotorFrame, setHeliRotorFrame] = useState(0);
 
   // ─── Player vitals + death flag + level (React, updated by 100ms timer) ──
   const [displayHp, setDisplayHp] = useState(100);
@@ -1001,6 +1024,69 @@ export default function GameCanvas({ width, height }: Props) {
     return () => clearInterval(id);
   }, [gameState]);
 
+  // ─── Helicopter flyover scheduler ────────────────────────────────────────────
+  // Viewport-relative: paths defined in screen coords. 8 routes (4 cardinal + 4 diagonal).
+  // withTiming drives heliProgress 0→1; completion callback fires runOnJS to schedule next.
+  useEffect(() => {
+    let cancelled = false;
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
+
+    function scheduleNext() {
+      if (cancelled) return;
+      const delay = HELI_SPAWN_MIN_MS + Math.random() * (HELI_SPAWN_MAX_MS - HELI_SPAWN_MIN_MS);
+      timeoutId = setTimeout(launch, delay);
+    }
+
+    function launch() {
+      if (cancelled) return;
+      const margin = 80;
+      const hw = width / 2;
+      const hh = height / 2;
+      // 8 paths: route index 0-7
+      const route = Math.floor(Math.random() * 8);
+      let startX: number, startY: number, endX: number, endY: number;
+      switch (route) {
+        case 0: startX = -margin;       startY = hh;           endX = width + margin;  endY = hh;           break; // L→R
+        case 1: startX = width + margin; startY = hh;           endX = -margin;         endY = hh;           break; // R→L
+        case 2: startX = hw;            startY = -margin;       endX = hw;              endY = height+margin; break; // T→B
+        case 3: startX = hw;            startY = height+margin; endX = hw;              endY = -margin;      break; // B→T
+        case 4: startX = -margin;       startY = -margin;       endX = width+margin;    endY = height+margin; break; // TL→BR
+        case 5: startX = width+margin;  startY = -margin;       endX = -margin;         endY = height+margin; break; // TR→BL
+        case 6: startX = -margin;       startY = height+margin; endX = width+margin;    endY = -margin;      break; // BL→TR
+        default: startX = width+margin; startY = height+margin; endX = -margin;         endY = -margin;      break; // BR→TL
+      }
+      const dx = endX - startX;
+      const dy = endY - startY;
+      const angle = Math.atan2(dy, dx) + SPRITE_ROTATION_OFFSET;
+      heliFlightSV.value = { active: true, startX, startY, endX, endY, angle };
+      heliProgress.value = 0;
+      heliProgress.value = withTiming(1, { duration: HELI_FLYOVER_DURATION_MS }, (finished) => {
+        if (finished) {
+          heliFlightSV.value = { ...heliFlightSV.value, active: false };
+          runOnJS(setHeliActive)(false);
+          runOnJS(scheduleNext)();
+        }
+      });
+      setHeliActive(true);
+    }
+
+    scheduleNext();
+    return () => {
+      cancelled = true;
+      if (timeoutId) clearTimeout(timeoutId);
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // ─── Helicopter rotor animation (only runs while flyover is active) ───────────
+  useEffect(() => {
+    if (!heliActive) return;
+    const id = setInterval(() => {
+      setHeliRotorFrame((f) => (f + 1) % 3);
+    }, HELI_ROTOR_FRAME_MS);
+    return () => clearInterval(id);
+  }, [heliActive]);
+
   // ─── Per-slot enemy transforms (UI thread, no runOnJS) ────────────────────
   // One useDerivedValue per slot. Only slots with an active enemy are rendered
   // in JSX, so only those create Skia animated-prop subscriptions.
@@ -1206,6 +1292,16 @@ export default function GameCanvas({ width, height }: Props) {
     ];
   });
   const tankProjectileTransforms = [tankProjectileTransform0, tankProjectileTransform1];
+
+  // ─── Helicopter flyover transform (viewport-relative, UI thread) ───────────
+  const heliTransform = useDerivedValue(() => {
+    const f = heliFlightSV.value;
+    if (!f.active) return [{ translateX: -9999 }, { translateY: -9999 }, { rotate: 0 }];
+    const prog = heliProgress.value;
+    const x = f.startX + (f.endX - f.startX) * prog;
+    const y = f.startY + (f.endY - f.startY) * prog;
+    return [{ translateX: x }, { translateY: y }, { rotate: f.angle }];
+  });
 
   // ─── Per-slot projectile transforms (UI thread, no runOnJS) ──────────────
   // 30 pre-allocated slots. Always rendered — inactive slots go to (-9999, -9999)
@@ -2065,6 +2161,37 @@ export default function GameCanvas({ width, height }: Props) {
               />
             )}
           </Group>
+
+          {/* Helicopter ambient flyover — viewport-relative, above player/enemies, below UI.
+              Two-layer composite: static body + animated rotor overlay at same center.
+              Spawns off-screen edge, crosses viewport in ~4.5s, despawns at far edge. */}
+          {heliActive && heliBodyImage && (() => {
+            const rotorImg = heliRotorImages[heliRotorFrame] ?? null;
+            const hw = heliBodyImage.width() * HELI_SPRITE_SCALE;
+            const hh = heliBodyImage.height() * HELI_SPRITE_SCALE;
+            return (
+              <Group transform={heliTransform}>
+                <Image
+                  image={heliBodyImage}
+                  x={-hw / 2}
+                  y={-hh / 2}
+                  width={hw}
+                  height={hh}
+                  sampling={{ filter: FilterMode.Nearest, mipmap: MipmapMode.None }}
+                />
+                {rotorImg && (
+                  <Image
+                    image={rotorImg}
+                    x={-hw / 2}
+                    y={-hh / 2}
+                    width={hw}
+                    height={hh}
+                    sampling={{ filter: FilterMode.Nearest, mipmap: MipmapMode.None }}
+                  />
+                )}
+              </Group>
+            );
+          })()}
 
         </Canvas>
 

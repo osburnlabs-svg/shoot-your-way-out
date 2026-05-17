@@ -566,3 +566,15 @@ export const TIER_COLORS: Record<CrateTier, string> = {
   rare:      '#4a8fff',
   legendary: '#ff9a3c',
 };
+
+// ─── Helicopter ambient flyover ───────────────────────────────────────────────
+
+/** Render scale for the ambient helicopter flyover sprite (288×288 source). */
+export const HELI_SPRITE_SCALE = 0.6;
+/** ms per rotor animation frame (3 frames → ~120ms cycle). */
+export const HELI_ROTOR_FRAME_MS = 40;
+/** Duration in ms for the helicopter to cross the viewport. */
+export const HELI_FLYOVER_DURATION_MS = 4500;
+/** Min/max gap between flyover spawns (ms). */
+export const HELI_SPAWN_MIN_MS = 60000;
+export const HELI_SPAWN_MAX_MS = 120000;

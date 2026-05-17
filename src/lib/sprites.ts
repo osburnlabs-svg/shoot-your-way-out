@@ -424,3 +424,14 @@ export const GuiSprites = {
     throwables_molotov:       require('../../assets/ui/icons/Molotov.png'),
   },
 } as const;
+
+// ─── Flyover sprites ──────────────────────────────────────────────────────────
+
+export const FlyoverSprites = {
+  heliBody: require('../../assets/sprites/boss/helicopter/heli_body.png'),
+  rotorFrames: [
+    require('../../assets/sprites/boss/helicopter/rotor_1.png'),
+    require('../../assets/sprites/boss/helicopter/rotor_2.png'),
+    require('../../assets/sprites/boss/helicopter/rotor_3.png'),
+  ],
+} as const;
