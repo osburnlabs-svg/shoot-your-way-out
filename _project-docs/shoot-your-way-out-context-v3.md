@@ -986,6 +986,34 @@ Sprite asset files can be registered in `sprites.ts` (creating active `useImage`
 
 Current example: `EnemySprites.gunner` is fully registered in `sprites.ts` with walk/body/die frames and flash frames, but is unreferenced after the Phase 5 G4 Scav/Raider sprite swap freed the Gunner visual for future use. The asset hooks exist; the render path does not. Any future enemy class can bind to `EnemySprites.gunner` by referencing it in `GameCanvas.tsx` without touching `sprites.ts`.
 
+**Rotating-overlay two-layer compositing (Phase 5 G5)**
+
+When a sprite has a static base layer and a rotating tower overlay, use two sibling Skia Groups — not nested Groups. The base Group has no per-frame transform (or a static initial transform); the tower Group's `useDerivedValue` computes `[translateX, translateY, rotate]`. Any child of the tower Group (flash image, barrel tip effect) automatically rotates with the tower because it inherits the Group transform. Animated-wrapping-static is permitted; animated-wrapping-animated causes the intermediate-frame stutter described above.
+
+*First use:* `GameCanvas.tsx` tank render — `tankBaseTransform` (static Group) + `tankTowerTransform` (animated sibling Group with flash inside). Applicable to any future entity with a rotating subcomponent over a fixed body.
+
+**Auto-aim exclusion via array membership**
+
+Entities that should be excluded from auto-aim targeting, combat tick, wave counting, and slot rendering do not need an `isAutoAimTarget: false` flag or explicit exclusion check. Simply do not add them to `enemies[]`. All auto-aim, combat, and wave logic iterates `enemies[]` — entities outside the array are excluded automatically. Use separate state arrays (e.g. `state.tanks[]`) for entities that need their own tick logic.
+
+*Applied in G5:* Tank turrets live in `state.tanks[]` and are ticked by `tickTank` after the main combat pass. No `enemies[]` entry, no flag, no filter. Extend this pattern to any future non-enemy entity that needs per-frame simulation but must not participate in the player-shooting loop.
+
+**Enemy-vs-prop hybrid entity wiring**
+
+Stationary damaging entities (turrets, future hazards) combine prop-like and enemy-like properties. Wire as:
+1. NOT in `enemies[]` — excluded from auto-aim, combat tick, slot rendering, wave accounting
+2. Added to the circle collision pool at map-gen time — player and enemies resolve against it like any wreck
+3. State in a separate `GameState` array (e.g. `state.tanks: TankState[]`) — tick function called inline in `updateGameState` after the main combat pass
+4. Rendered in `GameCanvas.tsx` via a separate JSX block with its own derived values — separate from the `enemies` slot render loop
+
+*Applied in G5:* `buildCollisionData` adds each tank to `circleGrid` via `addCircle`; `tickTank` ticks all tanks; GameCanvas renders tanks in a separate `initialMapData.tanks.map(...)` block.
+
+**Multi-instance entities with bounded useDerivedValue per slot**
+
+React hooks require a stable call count across renders. For entities whose count is small and bounded (e.g., always exactly 2 tanks), declare one `useDerivedValue` per slot per transform type unconditionally at component mount — never inside a condition or loop. Skip rendering when a slot is inactive by returning `null` from the JSX map; the hook still runs cheaply with no Skia subscriber.
+
+*Applied in G5:* 2 tanks × 3 transform types (base, tower, projectile) = 6 fixed `useDerivedValue` calls at mount, regardless of how many tanks actually spawned. `tankBaseTransforms[ti]`, `tankTowerTransforms[ti]`, `tankProjectileTransforms[ti]` are accessed by index. If a tank didn't spawn, the derived values compute a position at `(0, 0)` and the JSX map returns `null` for that slot.
+
 ---
 
 ## Collision Architecture (Phase 5 G3)
