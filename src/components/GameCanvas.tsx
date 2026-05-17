@@ -589,7 +589,7 @@ export default function GameCanvas({ width, height }: Props) {
   const [initialMapData] = useState(() => loadMap(Date.now()));
 
   // ─── Game state ────────────────────────────────────────────────────────────
-  const gameState = useSharedValue(createInitialGameState(width, height, initialMapData.tank));
+  const gameState = useSharedValue(createInitialGameState(width, height, initialMapData.tanks));
 
   // ─── Collision data (static; built from map, never mutated after mount) ─────
   // Stored in a SharedValue so worklets can read it on the UI thread. Written
@@ -752,7 +752,7 @@ export default function GameCanvas({ width, height }: Props) {
   const [enemySlotFlashFrames, setEnemySlotFlashFrames] = useState<number[]>(
     () => Array.from({ length: ENEMY_SOFT_CAP }, () => -1),
   );
-  const [tankFlashFrame, setTankFlashFrame] = useState(-1);
+  const [tankFlashFrames, setTankFlashFrames] = useState<[number, number]>([-1, -1]);
 
   // ─── Player vitals + death flag + level (React, updated by 100ms timer) ──
   const [displayHp, setDisplayHp] = useState(100);
@@ -902,20 +902,21 @@ export default function GameCanvas({ width, height }: Props) {
       }
       setEnemySlotFlashFrames(ff.slice());
 
-      // Tank muzzle flash frame — -1 when not flashing.
-      if (state.tank && state.tank.lastFiredAtMs > 0) {
-        const tankFlashElapsed = state.elapsedMs - state.tank.lastFiredAtMs;
-        if (tankFlashElapsed >= 0 && tankFlashElapsed < MUZZLE_FLASH_DURATION_MS) {
-          setTankFlashFrame(Math.min(
-            Math.floor(tankFlashElapsed / MUZZLE_FLASH_FRAME_DURATION_MS),
-            MUZZLE_FLASH_FRAME_COUNT - 1,
-          ));
-        } else {
-          setTankFlashFrame(-1);
+      // Tank muzzle flash frames — -1 when not flashing, per tank index.
+      const newTankFlashFrames: [number, number] = [-1, -1];
+      for (let ti = 0; ti < 2; ti++) {
+        const t = state.tanks[ti];
+        if (t && t.lastFiredAtMs > 0) {
+          const elapsed = state.elapsedMs - t.lastFiredAtMs;
+          if (elapsed >= 0 && elapsed < MUZZLE_FLASH_DURATION_MS) {
+            newTankFlashFrames[ti] = Math.min(
+              Math.floor(elapsed / MUZZLE_FLASH_FRAME_DURATION_MS),
+              MUZZLE_FLASH_FRAME_COUNT - 1,
+            );
+          }
         }
-      } else {
-        setTankFlashFrame(-1);
       }
+      setTankFlashFrames(newTankFlashFrames);
 
       // Pickup slot active flags — buffer pattern.
       const pa = timerBuffers.current.pickupActive;
@@ -1133,10 +1134,10 @@ export default function GameCanvas({ width, height }: Props) {
   ];
 
   // ─── Tank transforms (UI thread, no runOnJS) ──────────────────────────────
-  // Base: translate only (no rotation — base is static). Tower: translate + rotate.
-  // Both sibling Groups sit at the same world position; only tower rotates.
-  const tankBaseTransform = useDerivedValue(() => {
-    const tank = gameState.value.tank;
+  // One base + one tower derived value per tank slot (always 2 — hooks must be unconditional).
+  // Base: translate only. Tower: translate + rotate. Off-screen when slot is empty.
+  const tankBaseTransform0 = useDerivedValue(() => {
+    const tank = gameState.value.tanks[0];
     const px = gameState.value.player.x;
     const py = gameState.value.player.y;
     if (!tank) return [{ translateX: -9999 }, { translateY: -9999 }];
@@ -1145,8 +1146,8 @@ export default function GameCanvas({ width, height }: Props) {
       { translateY: height / 2 + (tank.y - py) * CAMERA_ZOOM },
     ];
   });
-  const tankTowerTransform = useDerivedValue(() => {
-    const tank = gameState.value.tank;
+  const tankTowerTransform0 = useDerivedValue(() => {
+    const tank = gameState.value.tanks[0];
     const px = gameState.value.player.x;
     const py = gameState.value.player.y;
     if (!tank) return [{ translateX: -9999 }, { translateY: -9999 }, { rotate: 0 }];
@@ -1156,11 +1157,33 @@ export default function GameCanvas({ width, height }: Props) {
       { rotate: tank.towerAngle + SPRITE_ROTATION_OFFSET },
     ];
   });
+  const tankBaseTransform1 = useDerivedValue(() => {
+    const tank = gameState.value.tanks[1];
+    const px = gameState.value.player.x;
+    const py = gameState.value.player.y;
+    if (!tank) return [{ translateX: -9999 }, { translateY: -9999 }];
+    return [
+      { translateX: width / 2 + (tank.x - px) * CAMERA_ZOOM },
+      { translateY: height / 2 + (tank.y - py) * CAMERA_ZOOM },
+    ];
+  });
+  const tankTowerTransform1 = useDerivedValue(() => {
+    const tank = gameState.value.tanks[1];
+    const px = gameState.value.player.x;
+    const py = gameState.value.player.y;
+    if (!tank) return [{ translateX: -9999 }, { translateY: -9999 }, { rotate: 0 }];
+    return [
+      { translateX: width / 2 + (tank.x - px) * CAMERA_ZOOM },
+      { translateY: height / 2 + (tank.y - py) * CAMERA_ZOOM },
+      { rotate: tank.towerAngle + SPRITE_ROTATION_OFFSET },
+    ];
+  });
+  const tankBaseTransforms = [tankBaseTransform0, tankBaseTransform1];
+  const tankTowerTransforms = [tankTowerTransform0, tankTowerTransform1];
 
-  // ─── Tank projectile transform (UI thread, no runOnJS) ───────────────────
-  // Max 1 active tank projectile at a time (6s cooldown, ~2.25s flight time).
-  // Reads tankProjectiles[0]; renders off-screen if empty.
-  const tankProjectileTransform = useDerivedValue(() => {
+  // ─── Tank projectile transforms (UI thread, no runOnJS) ──────────────────
+  // Max 2 active tank projectiles (one per tank, 6s cooldown ~2.25s flight).
+  const tankProjectileTransform0 = useDerivedValue(() => {
     const proj = gameState.value.tankProjectiles[0];
     const px = gameState.value.player.x;
     const py = gameState.value.player.y;
@@ -1171,6 +1194,18 @@ export default function GameCanvas({ width, height }: Props) {
       { rotate: Math.atan2(proj.vyPxPerSec, proj.vxPxPerSec) + SPRITE_ROTATION_OFFSET },
     ];
   });
+  const tankProjectileTransform1 = useDerivedValue(() => {
+    const proj = gameState.value.tankProjectiles[1];
+    const px = gameState.value.player.x;
+    const py = gameState.value.player.y;
+    if (!proj) return [{ translateX: -9999 }, { translateY: -9999 }, { rotate: 0 }];
+    return [
+      { translateX: width / 2 + (proj.x - px) * CAMERA_ZOOM },
+      { translateY: height / 2 + (proj.y - py) * CAMERA_ZOOM },
+      { rotate: Math.atan2(proj.vyPxPerSec, proj.vxPxPerSec) + SPRITE_ROTATION_OFFSET },
+    ];
+  });
+  const tankProjectileTransforms = [tankProjectileTransform0, tankProjectileTransform1];
 
   // ─── Per-slot projectile transforms (UI thread, no runOnJS) ──────────────
   // 30 pre-allocated slots. Always rendered — inactive slots go to (-9999, -9999)
@@ -1472,7 +1507,7 @@ export default function GameCanvas({ width, height }: Props) {
   const handleRedeploy = useCallback(() => {
     // Reuses the same map data — Phase 7 will generate a fresh map per restart
     // via the proper menu flow.
-    gameState.value = createInitialGameState(width, height, initialMapData.tank);
+    gameState.value = createInitialGameState(width, height, initialMapData.tanks);
   }, [gameState, width, height, initialMapData]);
 
   // ─── Virtual joystick gesture ──────────────────────────────────────────────
@@ -1855,29 +1890,28 @@ export default function GameCanvas({ width, height }: Props) {
             );
           })}
 
-          {/* ── Tank turret (Phase 5 G5) ─────────────────────────────────── */}
-          {/* Two sibling animated Groups (not nested) — avoids animated-    */}
-          {/* wrapping-animated stutter. Base uses translate only (no rotate).*/}
-          {(() => {
-            const mapTank = initialMapData.tank;
-            if (!mapTank) return null;
-            const isBaseReady = mapTank.variant === 'acs' ? !!acsBaseImage : !!panzerBaseImage;
-            const isTowerReady = mapTank.variant === 'acs' ? !!acsTowerImage : !!panzerTowerImage;
-            const baseImg = mapTank.variant === 'acs' ? acsBaseImage : panzerBaseImage;
+          {/* ── Tank turrets (Phase 5 G5) ─────────────────────────────────── */}
+          {/* One ACS + one Panzer. Two sibling animated Groups per tank      */}
+          {/* (base + tower) — avoids animated-wrapping-animated stutter.     */}
+          {initialMapData.tanks.map((mapTank, ti) => {
+            const baseTransform  = tankBaseTransforms[ti]!;
+            const towerTransform = tankTowerTransforms[ti]!;
+            const projTransform  = tankProjectileTransforms[ti]!;
+            const baseImg  = mapTank.variant === 'acs' ? acsBaseImage  : panzerBaseImage;
             const towerImg = mapTank.variant === 'acs' ? acsTowerImage : panzerTowerImage;
-            const flashImages = muzzleFlashPanzerImages;
+            if (!baseImg || !towerImg) return null;
             const flashOffset = mapTank.variant === 'acs' ? ACS_FLASH_OFFSET : PANZER_FLASH_OFFSET;
-            const flashImg = tankFlashFrame >= 0 ? (flashImages[tankFlashFrame] ?? null) : null;
-            if (!isBaseReady || !isTowerReady) return null;
-            const bw = baseImg!.width() * TANK_SPRITE_SCALE;
-            const bh = baseImg!.height() * TANK_SPRITE_SCALE;
-            const tw = towerImg!.width() * TANK_SPRITE_SCALE;
-            const th = towerImg!.height() * TANK_SPRITE_SCALE;
+            const flashFrame  = tankFlashFrames[ti] ?? -1;
+            const flashImg    = flashFrame >= 0 ? (muzzleFlashPanzerImages[flashFrame] ?? null) : null;
+            const bw = baseImg.width()  * TANK_SPRITE_SCALE;
+            const bh = baseImg.height() * TANK_SPRITE_SCALE;
+            const tw = towerImg.width()  * TANK_SPRITE_SCALE;
+            const th = towerImg.height() * TANK_SPRITE_SCALE;
             return (
-              <>
-                <Group transform={tankBaseTransform}>
+              <React.Fragment key={`tank-${ti}`}>
+                <Group transform={baseTransform}>
                   <Image
-                    image={baseImg!}
+                    image={baseImg}
                     x={-bw / 2}
                     y={-bh / 2}
                     width={bw}
@@ -1885,9 +1919,9 @@ export default function GameCanvas({ width, height }: Props) {
                     sampling={{ filter: FilterMode.Nearest, mipmap: MipmapMode.None }}
                   />
                 </Group>
-                <Group transform={tankTowerTransform}>
+                <Group transform={towerTransform}>
                   <Image
-                    image={towerImg!}
+                    image={towerImg}
                     x={-tw / 2}
                     y={-th / 2}
                     width={tw}
@@ -1905,9 +1939,9 @@ export default function GameCanvas({ width, height }: Props) {
                     />
                   )}
                 </Group>
-                <Group transform={tankProjectileTransform}>
+                <Group transform={projTransform}>
                   {rocket0 && (() => {
-                    const rw = rocket0.width() * TANK_PROJECTILE_SCALE;
+                    const rw = rocket0.width()  * TANK_PROJECTILE_SCALE;
                     const rh = rocket0.height() * TANK_PROJECTILE_SCALE;
                     return (
                       <Image
@@ -1921,9 +1955,9 @@ export default function GameCanvas({ width, height }: Props) {
                     );
                   })()}
                 </Group>
-              </>
+              </React.Fragment>
             );
-          })()}
+          })}
 
           {/* ── Enemies ──────────────────────────────────────────────────── */}
           {/* Screen-coord derived values — outside camera Group.            */}

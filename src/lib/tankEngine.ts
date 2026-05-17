@@ -3,15 +3,19 @@
  * Runs on the Reanimated UI thread (worklet) as step 3.5 of updateGameState
  * (after tickCombat, before tickPickups).
  *
- * Responsibilities:
- *   1. If tank is null, return state unchanged.
- *   2. Compute towerAngle via atan2 toward player (always tracks, even out of range).
- *   3. Decrement fireCooldownMs by dtMs.
- *   4. If player is within TANK_FIRE_RANGE_PX and cooldown ≤ 0: spawn a tank projectile
+ * Iterates state.tanks[] — each tank rotates, fires, and manages cooldown independently.
+ * All tanks share the same tankProjectiles[] array.
+ *
+ * Per-tank responsibilities:
+ *   1. Compute towerAngle via atan2 toward player (always tracks, even out of range).
+ *   2. Decrement fireCooldownMs by dtMs.
+ *   3. If player is within TANK_FIRE_RANGE_PX and cooldown ≤ 0: spawn a projectile
  *      at the barrel tip (fire offset rotated by towerAngle), reset cooldown, set lastFiredAtMs.
- *   5. Advance all tankProjectiles (straight-line constant speed).
- *   6. Despawn tankProjectiles that exceeded maxRangePx.
- *   7. For each remaining tankProjectile: circle-vs-circle check vs player.
+ *
+ * Shared projectile responsibilities:
+ *   4. Advance all tankProjectiles (straight-line constant speed).
+ *   5. Despawn tankProjectiles that exceeded maxRangePx.
+ *   6. For each remaining tankProjectile: circle-vs-circle check vs player.
  *      On hit: apply 30% maxHp damage, set invulnerableUntilMs, despawn projectile.
  *      isDead set if hp reaches 0.
  *
@@ -20,7 +24,7 @@
 
 'worklet';
 
-import type { GameState, ProjectileState } from './gameEngine';
+import type { GameState, TankState, ProjectileState } from './gameEngine';
 import {
   TANK_FIRE_DAMAGE_RATIO,
   TANK_FIRE_RATE_MS,
@@ -37,44 +41,54 @@ const INVULN_DURATION_MS = 800;
 
 export function tickTank(state: GameState, dtMs: number): GameState {
   'worklet';
-  if (!state.tank) return state;
+  if (state.tanks.length === 0) return state;
 
-  const tank = state.tank;
   const px = state.player.x;
   const py = state.player.y;
-
-  const dx = px - tank.x;
-  const dy = py - tank.y;
-  const distSq = dx * dx + dy * dy;
-  const towerAngle = Math.atan2(dy, dx);
-
-  const newCooldown = Math.max(0, tank.fireCooldownMs - dtMs);
-  let lastFiredAtMs = tank.lastFiredAtMs;
   let nextTankProjectileId = state.nextTankProjectileId;
   const newProjectiles: ProjectileState[] = [...state.tankProjectiles];
+  const updatedTanks: TankState[] = [];
 
-  // Fire when in range and cooldown expired
-  if (newCooldown === 0 && distSq <= TANK_FIRE_RANGE_PX * TANK_FIRE_RANGE_PX) {
-    const fireOffset = tank.variant === 'acs' ? ACS_FIRE_OFFSET : PANZER_FIRE_OFFSET;
-    const cos = Math.cos(towerAngle);
-    const sin = Math.sin(towerAngle);
-    const spawnX = tank.x + cos * fireOffset.y - sin * fireOffset.x;
-    const spawnY = tank.y + sin * fireOffset.y + cos * fireOffset.x;
-    newProjectiles.push({
-      id: nextTankProjectileId++,
-      x: spawnX,
-      y: spawnY,
-      vxPxPerSec: cos * TANK_PROJECTILE_SPEED_PX_PER_SEC,
-      vyPxPerSec: sin * TANK_PROJECTILE_SPEED_PX_PER_SEC,
-      speedPxPerSec: TANK_PROJECTILE_SPEED_PX_PER_SEC,
-      distanceTraveledPx: 0,
-      maxRangePx: TANK_PROJECTILE_MAX_RANGE,
-      damage: 0,
-      pierceRemaining: 0,
-      hitEnemyIds: [],
-      isRocket: true,
+  for (const tank of state.tanks) {
+    const dx = px - tank.x;
+    const dy = py - tank.y;
+    const distSq = dx * dx + dy * dy;
+    const towerAngle = Math.atan2(dy, dx);
+
+    const newCooldown = Math.max(0, tank.fireCooldownMs - dtMs);
+    let lastFiredAtMs = tank.lastFiredAtMs;
+    let fired = false;
+
+    if (newCooldown === 0 && distSq <= TANK_FIRE_RANGE_PX * TANK_FIRE_RANGE_PX) {
+      const fireOffset = tank.variant === 'acs' ? ACS_FIRE_OFFSET : PANZER_FIRE_OFFSET;
+      const cos = Math.cos(towerAngle);
+      const sin = Math.sin(towerAngle);
+      const spawnX = tank.x + cos * fireOffset.y - sin * fireOffset.x;
+      const spawnY = tank.y + sin * fireOffset.y + cos * fireOffset.x;
+      newProjectiles.push({
+        id: nextTankProjectileId++,
+        x: spawnX,
+        y: spawnY,
+        vxPxPerSec: cos * TANK_PROJECTILE_SPEED_PX_PER_SEC,
+        vyPxPerSec: sin * TANK_PROJECTILE_SPEED_PX_PER_SEC,
+        speedPxPerSec: TANK_PROJECTILE_SPEED_PX_PER_SEC,
+        distanceTraveledPx: 0,
+        maxRangePx: TANK_PROJECTILE_MAX_RANGE,
+        damage: 0,
+        pierceRemaining: 0,
+        hitEnemyIds: [],
+        isRocket: true,
+      });
+      lastFiredAtMs = state.elapsedMs;
+      fired = true;
+    }
+
+    updatedTanks.push({
+      ...tank,
+      towerAngle,
+      fireCooldownMs: fired ? TANK_FIRE_RATE_MS : newCooldown,
+      lastFiredAtMs,
     });
-    lastFiredAtMs = state.elapsedMs;
   }
 
   // Advance projectiles and check player collision
@@ -94,7 +108,6 @@ export function tickTank(state: GameState, dtMs: number): GameState {
 
     if (moved.distanceTraveledPx >= moved.maxRangePx) continue;
 
-    // Player invulnerability window from previous hits
     if (state.elapsedMs < state.player.invulnerableUntilMs) {
       survivingProjectiles.push(moved);
       continue;
@@ -108,7 +121,6 @@ export function tickTank(state: GameState, dtMs: number): GameState {
       playerHp = Math.max(0, playerHp - damage);
       invulnerableUntilMs = state.elapsedMs + INVULN_DURATION_MS;
       if (playerHp <= 0) isDead = true;
-      // projectile consumed — do not push
       continue;
     }
 
@@ -117,14 +129,7 @@ export function tickTank(state: GameState, dtMs: number): GameState {
 
   return {
     ...state,
-    tank: {
-      ...tank,
-      towerAngle,
-      fireCooldownMs: newCooldown === 0 && lastFiredAtMs !== tank.lastFiredAtMs
-        ? TANK_FIRE_RATE_MS
-        : newCooldown,
-      lastFiredAtMs,
-    },
+    tanks: updatedTanks,
     tankProjectiles: survivingProjectiles,
     nextTankProjectileId,
     player: {

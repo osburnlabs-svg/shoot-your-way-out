@@ -29,7 +29,7 @@
  */
 
 import { createNoise2D } from 'simplex-noise';
-import type { MapData, TileCell, TileType, WeatherType, PlacedEntity, TankPlacement, TankVariant } from '../data/mapTypes';
+import type { MapData, TileCell, TileType, WeatherType, PlacedEntity, TankPlacement } from '../data/mapTypes';
 import {
   TILE_SIZE, TILE_COLS, TILE_ROWS, WORLD_WIDTH, WORLD_HEIGHT,
   PROP_SPRITE_SCALE, STRUCTURE_SPRITE_SCALE,
@@ -438,15 +438,14 @@ function buildBarrels(rng: () => number, buildings: PlacedEntity[]): PlacedEntit
 const PLAYER_SPAWN_X = WORLD_WIDTH / 2;
 const PLAYER_SPAWN_Y = WORLD_HEIGHT / 2;
 
-function buildTank(
+function placeTankAt(
+  variant: TankPlacement['variant'],
   rng: () => number,
-  buildings: PlacedEntity[],
-  obstacles: PlacedEntity[],
-  vehicleWrecks: PlacedEntity[],
+  allProps: PlacedEntity[],
+  exclusionPoints: Array<{ x: number; y: number }>,
 ): TankPlacement | null {
-  const variant: TankVariant = rng() < 0.5 ? 'acs' : 'panzer';
   const margin = 400;
-  const minFromSpawnSq = TANK_MIN_DISTANCE_FROM_PLAYER * TANK_MIN_DISTANCE_FROM_PLAYER;
+  const minDistSq = TANK_MIN_DISTANCE_FROM_PLAYER * TANK_MIN_DISTANCE_FROM_PLAYER;
 
   for (let attempt = 0; attempt < 15; attempt++) {
     const x = margin + Math.floor(rng() * (WORLD_WIDTH - margin * 2));
@@ -454,9 +453,16 @@ function buildTank(
 
     const dxSpawn = x - PLAYER_SPAWN_X;
     const dySpawn = y - PLAYER_SPAWN_Y;
-    if (dxSpawn * dxSpawn + dySpawn * dySpawn < minFromSpawnSq) continue;
+    if (dxSpawn * dxSpawn + dySpawn * dySpawn < minDistSq) continue;
 
-    const allProps = [...buildings, ...obstacles, ...vehicleWrecks];
+    let tooClose = false;
+    for (const pt of exclusionPoints) {
+      const dx = x - pt.x;
+      const dy = y - pt.y;
+      if (dx * dx + dy * dy < minDistSq) { tooClose = true; break; }
+    }
+    if (tooClose) continue;
+
     const overlaps = allProps.some(prop => {
       const halfSize = scaledHalfSize(prop);
       const minDist = halfSize + TANK_COLLISION_RADIUS + 20;
@@ -470,6 +476,29 @@ function buildTank(
   }
 
   return null;
+}
+
+function buildTanks(
+  rng: () => number,
+  buildings: PlacedEntity[],
+  obstacles: PlacedEntity[],
+  vehicleWrecks: PlacedEntity[],
+): TankPlacement[] {
+  const allProps = [...buildings, ...obstacles, ...vehicleWrecks];
+
+  const acs = placeTankAt('acs', rng, allProps, []);
+  if (!acs) {
+    console.warn('[mapGenerator] ACS placement failed — no tanks this map');
+    return [];
+  }
+
+  const panzer = placeTankAt('panzer', rng, allProps, [{ x: acs.x, y: acs.y }]);
+  if (!panzer) {
+    console.warn('[mapGenerator] Panzer placement failed — ACS only');
+    return [acs];
+  }
+
+  return [acs, panzer];
 }
 
 // ─── Entry point ──────────────────────────────────────────────────────────────
@@ -487,7 +516,7 @@ export function generateMap(seed: number): MapData {
   const obstacles = buildObstacles(rng, buildings, vehicleWrecks);
   const vegetation = buildVegetation(rng, buildings, vehicleWrecks, obstacles);
   const barrels = buildBarrels(rng, buildings);
-  const tank = buildTank(rng, buildings, obstacles, vehicleWrecks);
+  const tanks = buildTanks(rng, buildings, obstacles, vehicleWrecks);
 
-  return { seed, weather, tileGrid, buildings, obstacles, vehicleWrecks, vegetation, barrels, tank };
+  return { seed, weather, tileGrid, buildings, obstacles, vehicleWrecks, vegetation, barrels, tanks };
 }

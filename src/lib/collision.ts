@@ -173,8 +173,8 @@ export function buildCollisionData(mapData: MapData): CollisionData {
   }
   // mapData.barrels intentionally skipped — all passable
 
-  if (mapData.tank) {
-    addCircle({ x: mapData.tank.x, y: mapData.tank.y, assetKey: `tank_${mapData.tank.variant}`, width: 128, height: 128 });
+  for (const t of mapData.tanks) {
+    addCircle({ x: t.x, y: t.y, assetKey: `tank_${t.variant}`, width: 128, height: 128 });
   }
 
   return { rects, grid, circles, circleGrid, cellSize, cols, rows };

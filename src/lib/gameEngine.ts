@@ -486,8 +486,8 @@ export type GameState = {
   crateRevealWeaponId: string | null;
   /** Tier of the rolled weapon — drives tier color display in the modal. */
   crateRevealTier: CrateTier | null;
-  /** Tank turret — one per map, null if placement failed at map-gen time. */
-  tank: TankState | null;
+  /** Tank turrets — one ACS + one Panzer per map (empty if all placements failed). */
+  tanks: TankState[];
   /** Tank projectiles — kept separate from player projectiles[] to avoid auto-aim interference. */
   tankProjectiles: ProjectileState[];
   /** Monotonically increasing counter — ensures every tank projectile has a unique id. */
@@ -502,7 +502,7 @@ export type GameState = {
   frameCount: number; // total fixed-step frames processed
 };
 
-export function createInitialGameState(canvasWidth: number, canvasHeight: number, tankPlacement: TankPlacement | null): GameState {
+export function createInitialGameState(canvasWidth: number, canvasHeight: number, tankPlacements: TankPlacement[]): GameState {
   'worklet';
   const emptyEnemies: Array<EnemyState | null> = [];
   for (let i = 0; i < ENEMY_SOFT_CAP; i++) { emptyEnemies.push(null); }
@@ -580,14 +580,14 @@ export function createInitialGameState(canvasWidth: number, canvasHeight: number
     pendingCrateReveal: false,
     crateRevealWeaponId: null,
     crateRevealTier: null,
-    tank: tankPlacement ? {
-      variant: tankPlacement.variant,
-      x: tankPlacement.x,
-      y: tankPlacement.y,
+    tanks: tankPlacements.map(tp => ({
+      variant: tp.variant,
+      x: tp.x,
+      y: tp.y,
       towerAngle: 0,
       fireCooldownMs: TANK_FIRE_RATE_MS,
       lastFiredAtMs: -9999,
-    } : null,
+    })),
     tankProjectiles: [],
     nextTankProjectileId: 0,
     canvasWidth,
