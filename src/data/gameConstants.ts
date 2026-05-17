@@ -570,7 +570,7 @@ export const TIER_COLORS: Record<CrateTier, string> = {
 // ─── Helicopter ambient flyover ───────────────────────────────────────────────
 
 /** Render scale for the ambient helicopter flyover sprite (288×288 source). */
-export const HELI_SPRITE_SCALE = 1.2;
+export const HELI_SPRITE_SCALE = 1.5;
 /** ms per rotor animation frame (3 frames → ~120ms cycle). */
 export const HELI_ROTOR_FRAME_MS = 40;
 /** Duration in ms for the helicopter to cross the viewport. */
