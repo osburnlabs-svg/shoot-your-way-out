@@ -400,11 +400,13 @@ function buildVegetation(
   return placed;
 }
 
-// 3–5 barrels/boxes per building, clustered within 50–150px of each structure.
+// 3–5 barrels/boxes per building, orbiting just outside the building's scaled footprint.
 // If no buildings were placed (rare, <1% of seeds), returns empty — no isolated
 // barrels without a logical reason to be there.
-const BARREL_CLUSTER_RADIUS = 150;
-const BARREL_BUILDING_MIN_DIST = 50;
+// Gap is from the scaled edge, not the center, so it stays correct across building sizes/scales.
+// Min of 10px lets barrels read as tucked under awnings/stilts — desirable visual ambiguity.
+const BARREL_EDGE_MIN = 10;
+const BARREL_EDGE_MAX = 90;
 
 function buildBarrels(rng: () => number, buildings: PlacedEntity[]): PlacedEntity[] {
   if (buildings.length === 0) return [];
@@ -412,12 +414,13 @@ function buildBarrels(rng: () => number, buildings: PlacedEntity[]): PlacedEntit
   const placed: PlacedEntity[] = [];
   for (const building of buildings) {
     const clusterCount = 3 + Math.floor(rng() * 3); // 3–5 per building
+    const scaledHalf = scaledHalfSize(building);
     let barrelPlaced = 0;
     let attempts = 0;
     while (barrelPlaced < clusterCount && attempts < 80) {
       attempts++;
       const angle = rng() * Math.PI * 2;
-      const dist = BARREL_BUILDING_MIN_DIST + rng() * (BARREL_CLUSTER_RADIUS - BARREL_BUILDING_MIN_DIST);
+      const dist = scaledHalf + BARREL_EDGE_MIN + rng() * (BARREL_EDGE_MAX - BARREL_EDGE_MIN);
       const x = Math.round(building.x + Math.cos(angle) * dist);
       const y = Math.round(building.y + Math.sin(angle) * dist);
       const inOtherBuilding = buildings.some(other => {
