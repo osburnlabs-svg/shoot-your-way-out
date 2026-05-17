@@ -374,18 +374,14 @@ This is acceptable for v1. Generating 20 unique pixel-art icons isn't necessary 
 
 ### Enemies
 
-> **Phase 5 stats TBD.** Gunner is renamed to **Spec Ops**. Humvee/BTR/Panzer/ACS collapse into a single **Tank** class with 3 visual variants (Light/Medium/Heavy). This table will be rewritten as 6 rows (Scav, Raider, Spec Ops, Sniper, Tank, Helicopter boss) once Phase 5 balance stats are locked.
-
 | Enemy | Sprite Source | HP | Speed | Damage | XP | Wave Tier | Notes |
 |---|---|---|---|---|---|---|---|
 | Scav | Soldier (kit 1a) | 15 | 1.2 | 5 | 3 | 1+ | Basic foot soldier |
 | Raider | Soldier 02 (kit 1a) | 40 | 1.8 | 12 | 8 | 2+ | Faster, more dangerous |
 | Gunner → **Spec Ops** | Gunner (kit 1b) | 60 | 0.9 | 8/tick | 12 | 3+ | Stationary fire bursts |
 | Sniper | Sniper (kit 1b) | 40–50 | — | 40–50 | 0 | Run start | Stationary rooftop turret — see design note below |
-| **Humvee** *(Tank-Light)* | Humvee | 80 | 1.5 | 15 | 18 | 5+ | *stale — merging into Tank class* |
-| **BTR** *(Tank-Medium)* | BTR | 150 | 1.0 | 18 | 30 | 6+ | *stale — merging into Tank class* |
-| **Panzer** *(Tank-Heavy)* | Panzer | 250 | 0.6 | 25 | 50 | 7+ | *stale — merging into Tank class* |
-| **ACS** *(Tank-Heavy alt)* | ACS | 200 | 0.7 | 20 | 40 | 7+ | *stale — merging into Tank class* |
+| **Panzer** | Panzer (kit 1b) | invincible | — | 30% maxHP/rocket | 0 | Run start | Permanent map fixture; tower tracks player; 6s rocket cooldown, 450px range |
+| **ACS** | ACS (kit 1b) | invincible | — | 30% maxHP/rocket | 0 | Run start | Permanent map fixture; tower tracks player; 6s rocket cooldown, 450px range |
 
 ### Sniper — Design Note (rooftop turret, Phase 5)
 
@@ -458,11 +454,6 @@ This is the only environmental hazard in v1. All other hazard concepts (toxic pu
 - Common enemy: 0%
 - Raider: 1%
 - Spec Ops/Sniper: 3%
-- ~~Humvee: 8%~~ *(stale — collapsing into Tank)*
-- ~~BTR: 15%~~ *(stale — collapsing into Tank)*
-- ~~Panzer/ACS: 25%~~ *(stale — collapsing into Tank)*
-- **Tank (all variants):** TBD% — Phase 5 balance
-- Helicopter boss: 100% guaranteed
 
 **Crate weapon roll table (when player walks over crate):**
 - 50% Common: shotgun, pistol-tier alt
@@ -524,8 +515,7 @@ Per-map tints layer on top via Skia color matrix.
 
 **Rain atmospheric components (Phase 6 implementation work):**
 - Rain particle visual — falling rain rendered over the scene
-- Lightning flash — full-screen white overlay, ~100ms duration, fires at random intervals every 5–30 seconds during rain runs
-- Thunder SFX — plays paired with each flash, 0.5–2 second delay after the flash to simulate distance
+- Drifting clouds — slow-moving cloud overlay during rain runs
 - No additional fields needed in `MapData` — Phase 6 reads `weather === 'rain'` directly from the existing field
 
 ---
@@ -834,7 +824,7 @@ Each phase = one focused CC session. Commit to GitHub after each phase. Test on 
 | 5 | Procedural map generator (in progress) + 3 new enemy types: Spec Ops (mobile), Sniper turret (stationary rooftop), Tank turret (stationary, 3 visual variants) + enemy ranged fire + camera zoom lock | Single dynamic map generates each run; full 5-type enemy roster active; camera/zoom locked |
 | 6 | Audio + simplified atmospheric effects (rain particles + drifting clouds only — no lightning/thunder) + muzzle flashes + bullet origin correction + impact effects | Game feels and sounds complete |
 | 7 | Custom UI rebuild (all screens, Phase 4b direction) + persistence layer (high score, stats, flea_currency, last_claim_date) + analytics + loading screen | Production-ready menu flow |
-| 8 | Helicopter ambient flyby + late-discovery polish items (small scope — may fold into Phase 7 or 9 depending on timing) | Helicopter flyby working |
+| 8 | Folded into Phase 9 — buffer space for late-discovery polish if needed, otherwise unused. Helicopter flyby shipped Phase 5. See `_project-docs/pending-work-inventory.md` for canonical scope. | Unused / folded into Phase 9 |
 | 9 | IAP SDK + Ad SDK integration + entitlement caching + App Store and Google Play submission prep | Ready to submit |
 | 10 | Flea market UI + daily login bonus logic (free: $50/day, paid: $300/day) + balance pass | Monetization meta-game live |
 
