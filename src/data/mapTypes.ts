@@ -60,4 +60,11 @@ export type MapData = {
   barrels: PlacedEntity[];
   /** One ACS + one Panzer per map, each ≥1500px from player spawn and from each other. */
   tanks: TankPlacement[];
+  /**
+   * Exclusion circles for solid props (buildings, obstacles, vehicleWrecks).
+   * Pre-computed in mapGenerator; threaded into GameState so tickCrateSpawn
+   * (a worklet) can reject candidate positions that land on top of a prop.
+   * r = scaledHalfSize(prop) + clearance.
+   */
+  solidPropExclusions: Array<{ x: number; y: number; r: number }>;
 };

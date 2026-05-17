@@ -166,6 +166,10 @@ const BARREL_POOL = [
 // Margin from world edge where buildings won't spawn.
 const BUILDING_EDGE_MARGIN = 200;
 
+// Extra gap added to scaledHalfSize when computing crate exclusion circles.
+// Keeps crates visually clear of prop edges.
+const CRATE_EXCLUSION_CLEARANCE = 30;
+
 function randomWorldPos(rng: () => number, margin: number): { x: number; y: number } {
   return {
     x: margin + Math.floor(rng() * (WORLD_WIDTH - margin * 2)),
@@ -512,5 +516,11 @@ export function generateMap(seed: number): MapData {
   const barrels = buildBarrels(rng, buildings);
   const tanks = buildTanks(rng, buildings, obstacles, vehicleWrecks);
 
-  return { seed, weather, tileGrid, buildings, obstacles, vehicleWrecks, vegetation, barrels, tanks };
+  const solidPropExclusions = [...buildings, ...obstacles, ...vehicleWrecks].map(prop => ({
+    x: prop.x,
+    y: prop.y,
+    r: scaledHalfSize(prop) + CRATE_EXCLUSION_CLEARANCE,
+  }));
+
+  return { seed, weather, tileGrid, buildings, obstacles, vehicleWrecks, vegetation, barrels, tanks, solidPropExclusions };
 }

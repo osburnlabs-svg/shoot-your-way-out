@@ -488,6 +488,12 @@ export type GameState = {
   crateRevealTier: CrateTier | null;
   /** Tank turrets — one ACS + one Panzer per map (empty if all placements failed). */
   tanks: TankState[];
+  /**
+   * Exclusion circles for solid props (buildings, obstacles, vehicleWrecks).
+   * Read-only after init — never modified during a run. Used by tickCrateSpawn
+   * to reject candidate positions that land on top of a solid prop.
+   */
+  solidPropExclusions: Array<{ x: number; y: number; r: number }>;
   /** Tank projectiles — kept separate from player projectiles[] to avoid auto-aim interference. */
   tankProjectiles: ProjectileState[];
   /** Monotonically increasing counter — ensures every tank projectile has a unique id. */
@@ -502,7 +508,7 @@ export type GameState = {
   frameCount: number; // total fixed-step frames processed
 };
 
-export function createInitialGameState(canvasWidth: number, canvasHeight: number, tankPlacements: TankPlacement[]): GameState {
+export function createInitialGameState(canvasWidth: number, canvasHeight: number, tankPlacements: TankPlacement[], solidPropExclusions: Array<{ x: number; y: number; r: number }>): GameState {
   'worklet';
   const emptyEnemies: Array<EnemyState | null> = [];
   for (let i = 0; i < ENEMY_SOFT_CAP; i++) { emptyEnemies.push(null); }
@@ -590,6 +596,7 @@ export function createInitialGameState(canvasWidth: number, canvasHeight: number
     })),
     tankProjectiles: [],
     nextTankProjectileId: 0,
+    solidPropExclusions,
     canvasWidth,
     canvasHeight,
     worldWidth: WORLD_WIDTH,

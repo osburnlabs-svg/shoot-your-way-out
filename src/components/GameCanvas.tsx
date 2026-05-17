@@ -601,7 +601,7 @@ export default function GameCanvas({ width, height }: Props) {
   const [initialMapData] = useState(() => loadMap(Date.now()));
 
   // ─── Game state ────────────────────────────────────────────────────────────
-  const gameState = useSharedValue(createInitialGameState(width, height, initialMapData.tanks));
+  const gameState = useSharedValue(createInitialGameState(width, height, initialMapData.tanks, initialMapData.solidPropExclusions));
 
   // ─── Collision data (static; built from map, never mutated after mount) ─────
   // Stored in a SharedValue so worklets can read it on the UI thread. Written
@@ -1603,7 +1603,7 @@ export default function GameCanvas({ width, height }: Props) {
   const handleRedeploy = useCallback(() => {
     // Reuses the same map data — Phase 7 will generate a fresh map per restart
     // via the proper menu flow.
-    gameState.value = createInitialGameState(width, height, initialMapData.tanks);
+    gameState.value = createInitialGameState(width, height, initialMapData.tanks, initialMapData.solidPropExclusions);
   }, [gameState, width, height, initialMapData]);
 
   // ─── Virtual joystick gesture ──────────────────────────────────────────────
