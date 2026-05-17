@@ -335,8 +335,8 @@ export const TANK_COLLISION_RADIUS = 80;
 export const TANK_PROJECTILE_SPEED_PX_PER_SEC = 300;
 export const TANK_SPRITE_SCALE = 2;
 export const TANK_MIN_DISTANCE_FROM_PLAYER = 1500;
-/** Render scale for the tank rocket projectile sprite (0.85× = ~15×59 px). */
-export const TANK_PROJECTILE_SCALE = 0.85;
+/** Render scale for the tank rocket projectile sprite (0.7× = ~13×48 px). */
+export const TANK_PROJECTILE_SCALE = 0.7;
 
 /**
  * Muzzle flash offsets in sprite-local space (sprite-pixels from tower center).
