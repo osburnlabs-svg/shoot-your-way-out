@@ -103,6 +103,7 @@ import {
   BTR_FLASH_OFFSET,
   PANZER_FLASH_OFFSET,
   TANK_SPRITE_SCALE,
+  TANK_PROJECTILE_SCALE,
   WALK_FRAME_COUNT,
   WALK_FRAME_DURATION_MS,
   ENEMY_DIE_FRAME_COUNT,
@@ -1910,8 +1911,8 @@ export default function GameCanvas({ width, height }: Props) {
                 </Group>
                 <Group transform={tankProjectileTransform}>
                   {rocket0 && (() => {
-                    const rw = rocket0.width() * TANK_SPRITE_SCALE;
-                    const rh = rocket0.height() * TANK_SPRITE_SCALE;
+                    const rw = rocket0.width() * TANK_PROJECTILE_SCALE;
+                    const rh = rocket0.height() * TANK_PROJECTILE_SCALE;
                     return (
                       <Image
                         image={rocket0}

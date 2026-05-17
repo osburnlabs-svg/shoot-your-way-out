@@ -335,20 +335,27 @@ export const TANK_COLLISION_RADIUS = 80;
 export const TANK_PROJECTILE_SPEED_PX_PER_SEC = 300;
 export const TANK_SPRITE_SCALE = 2;
 export const TANK_MIN_DISTANCE_FROM_PLAYER = 1500;
+/** Render scale for the tank rocket projectile sprite (1× = 18×69 px — small, visible). */
+export const TANK_PROJECTILE_SCALE = 1;
 
 /**
- * Muzzle flash offsets in sprite-local space (1 sprite-pixel = 2 rendered units).
- * Applied inside the tower Group (after tower rotate), so no angle math needed.
+ * Muzzle flash offsets in sprite-local space (sprite-pixels from tower center).
+ * +y = toward barrel tip (sprite drawn barrel-down). Applied inside the rotating
+ * tower Group — auto-rotates with the turret, no per-angle math needed.
+ * Initial values from sprite inspection; tune on device.
+ *   BTR:   barrel tip ≈ y+34 from center (twin stubs, y≈98 in 128px sprite)
+ *   Panzer: barrel tip ≈ y+57 from center (long barrel, y≈121 in 128px sprite)
  */
-export const BTR_FLASH_OFFSET = { x: 0, y: -40 } as const;
-export const PANZER_FLASH_OFFSET = { x: 0, y: -44 } as const;
+export const BTR_FLASH_OFFSET = { x: 0, y: 34 } as const;
+export const PANZER_FLASH_OFFSET = { x: 0, y: 57 } as const;
 
 /**
- * Fire origin offsets from tower center, in world space (after angle math).
- * Used to spawn the projectile at the barrel tip rather than the tower pivot.
+ * Fire origin offsets from tower center in world units (sprite-px × TANK_SPRITE_SCALE).
+ * Applied in tankEngine after towerAngle rotation — places rocket at barrel tip.
+ * Must match FLASH_OFFSET × TANK_SPRITE_SCALE so rocket spawns where flash appears.
  */
-export const BTR_FIRE_OFFSET = { x: 0, y: -40 } as const;
-export const PANZER_FIRE_OFFSET = { x: 0, y: -44 } as const;
+export const BTR_FIRE_OFFSET = { x: 0, y: 68 } as const;
+export const PANZER_FIRE_OFFSET = { x: 0, y: 114 } as const;
 
 // ─── Throwables ───────────────────────────────────────────────────────────────
 
