@@ -252,43 +252,24 @@ export default function GameCanvas({ width, height }: Props) {
     const rowMin = Math.max(0, playerTileRow - halfRows);
     const rowMax = Math.min(TILE_ROWS - 1, playerTileRow + halfRows);
 
-    const pool = tileObjectPool.current!;
     const dirtSrc:   { x: number; y: number; width: number; height: number }[] = [];
     const sandSrc:   { x: number; y: number; width: number; height: number }[] = [];
     const grassSrc:  { x: number; y: number; width: number; height: number }[] = [];
-    const dirtXform: { scos: number; ssin: number; tx: number; ty: number }[] = [];
-    const sandXform: { scos: number; ssin: number; tx: number; ty: number }[] = [];
-    const grassXform: { scos: number; ssin: number; tx: number; ty: number }[] = [];
+    const dirtXform: ReturnType<typeof Skia.RSXform>[] = [];
+    const sandXform: ReturnType<typeof Skia.RSXform>[] = [];
+    const grassXform: ReturnType<typeof Skia.RSXform>[] = [];
 
     for (let row = rowMin; row <= rowMax; row++) {
       for (let col = colMin; col <= colMax; col++) {
         const cell = initialMapData.tileGrid[row]![col]!;
         const srcX = (cell.variantIndex % 5) * TILE_SIZE;
         const srcY = Math.floor(cell.variantIndex / 5) * TILE_SIZE;
-        const wtx = col * TILE_SIZE;
-        const wty = row * TILE_SIZE;
+        const src  = { x: srcX, y: srcY, width: TILE_SIZE, height: TILE_SIZE };
+        const xform = Skia.RSXform(1, 0, col * TILE_SIZE, row * TILE_SIZE);
         switch (cell.type) {
-          case 'dirt': {
-            const di = dirtSrc.length;
-            const s = pool.dirtSprites[di]!;  s.x = srcX; s.y = srcY;
-            const x = pool.dirtXforms[di]!;   x.tx = wtx; x.ty = wty;
-            dirtSrc.push(s); dirtXform.push(x);
-            break;
-          }
-          case 'sand': {
-            const si = sandSrc.length;
-            const s = pool.sandSprites[si]!;  s.x = srcX; s.y = srcY;
-            const x = pool.sandXforms[si]!;   x.tx = wtx; x.ty = wty;
-            sandSrc.push(s); sandXform.push(x);
-            break;
-          }
-          case 'grass': {
-            const gi = grassSrc.length;
-            const s = pool.grassSprites[gi]!;  s.x = srcX; s.y = srcY;
-            const x = pool.grassXforms[gi]!;   x.tx = wtx; x.ty = wty;
-            grassSrc.push(s); grassXform.push(x);
-            break;
-          }
+          case 'dirt':  dirtSrc.push(src);  dirtXform.push(xform);  break;
+          case 'sand':  sandSrc.push(src);  sandXform.push(xform);  break;
+          case 'grass': grassSrc.push(src); grassXform.push(xform); break;
         }
       }
     }
@@ -453,34 +434,6 @@ export default function GameCanvas({ width, height }: Props) {
   const lastLoggedTileRef = useRef({ col: -1, row: -1 });
   // Tracks the tile position at the last Atlas rebuild, for coarsened rebuild gating.
   const lastRebuildTileRef = useRef({ col: Math.floor(TILE_COLS / 2), row: Math.floor(TILE_ROWS / 2) });
-
-  // Pre-allocated tile sprite + xform object pools — mutated in-place on each Atlas
-  // rebuild so the useMemo body never allocates SkRect or RSXform objects at runtime.
-  // Outer arrays (one per tile type) are still recreated each rebuild to give React
-  // a new prop reference; the objects they point to are reused. Risk 1: plain JS
-  // objects are used instead of Skia.RSXform() — verify tiles render on first device test.
-  const tileObjectPool = useRef<{
-    dirtSprites:  { x: number; y: number; width: number; height: number }[];
-    dirtXforms:   { scos: number; ssin: number; tx: number; ty: number }[];
-    sandSprites:  { x: number; y: number; width: number; height: number }[];
-    sandXforms:   { scos: number; ssin: number; tx: number; ty: number }[];
-    grassSprites: { x: number; y: number; width: number; height: number }[];
-    grassXforms:  { scos: number; ssin: number; tx: number; ty: number }[];
-  } | null>(null);
-  if (tileObjectPool.current === null) {
-    const maxHalfCols = Math.ceil(width / 2 / CAMERA_ZOOM / TILE_SIZE) + 4;
-    const maxHalfRows = Math.ceil(height / 2 / CAMERA_ZOOM / TILE_SIZE) + 4;
-    const max = (2 * maxHalfCols + 1) * (2 * maxHalfRows + 1);
-    const makeSprites = (n: number) =>
-      Array.from({ length: n }, () => ({ x: 0, y: 0, width: TILE_SIZE, height: TILE_SIZE }));
-    const makeXforms = (n: number) =>
-      Array.from({ length: n }, () => ({ scos: 1, ssin: 0, tx: 0, ty: 0 }));
-    tileObjectPool.current = {
-      dirtSprites:  makeSprites(max), dirtXforms:   makeXforms(max),
-      sandSprites:  makeSprites(max), sandXforms:   makeXforms(max),
-      grassSprites: makeSprites(max), grassXforms:  makeXforms(max),
-    };
-  }
 
   const timerBuffers = useRef({
     enemyTypes:   new Array<EnemyType | null>(ENEMY_SOFT_CAP).fill(null),
