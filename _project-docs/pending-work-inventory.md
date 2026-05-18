@@ -7,7 +7,9 @@ Canonical source for all forward-looking work on Shoot Your Way Out. Reference t
 Gameplay-affecting tech debt and feature work. Must be complete before polish phases. Principle: no UI/sound/menu work until gameplay is at final state.
 
 ### Bugs and tech debt
-- **Stuttering investigation.** Persistent since map generation phase. Multiple times deferred. Attempt targeted object pooling first (projectiles, pickups, damage numbers, hit effects). If stutter doesn't resolve, escalate to full UI-thread GC allocation refactor.
+- **Stuttering investigation — primary v1 blocker.** Mo's position: would not ship in current state. Across sessions 2 and 3, ruled out: tile rebuild allocation (Options A and B last night, tile pre-comp today), engine-wide spread allocation (5-commit ping-pong refactor today), JS-thread React reconciliation (DevTools profile today). Camera-snap stutter is movement-correlated and visible only on the world (tiles/props) — hero and enemies are immune due to perceptual asymmetry. Diagnostic instrumentation (c36019e) is still in the codebase.
+  Next session approach: Android Studio System Trace (Perfetto). Mo installing Android Studio this evening. Remaining suspects are all on the UI thread / worklet runtime / Skia rendering — invisible to JS-side profilers. System Trace is the only tool that can definitively identify what's running during a long frame.
+  Do not re-attempt: tile rebuild fixes (allocation or frequency), engine spread refactors, any "diagnose from logs and fix" attempt without profiling data first.
 - **File refactor decision.** GameCanvas.tsx ~30k tokens drives CC context bloat (~40-50% of per-prompt token cost). Targeted split (extract derived-value hooks and timer logic into separate files) or full code organization pass. Decide approach and execute.
 
 ### Gameplay polish
@@ -72,6 +74,7 @@ All UI work. Persistence decisions made here.
 - **Pistol and SMG weapon icons at 64×64 vs others at 80×80** — slight modal size mismatch. Fix sizing or accept.
 
 ### Run management
+- **Modal mount/unmount render hitch (~94ms).** Crate reveal modal mount/unmount produces 94ms React commit, observed in session 3 DevTools profile. Visible but separate from sustained-movement camera-snap stutter. Investigate during Phase 7 UI rebuild.
 - **Pause menu.** New UI screen. Game state freeze (enemies, projectiles, timers). Buttons: resume, end run.
 - **End-run flow.** Stop timers, clean up state, transition to main menu.
 - **Death screen polish.** Add "return to main menu" alongside existing redeploy button.
@@ -134,6 +137,7 @@ Items needed to keep project docs accurate and trustworthy. Not gameplay work; n
 
 - **v3 context doc audit.** Compare key v3 statements against current code; identify and correct drifts. Known drifts already confirmed this session: vegetation budget values (v3 says 0–20, code says 70–100) and rain-suppression rule (v3 says active, code removed it in Phase 5 G3). These two are explicitly known-stale until the audit happens. Other drifts likely exist; that's what the audit is for. Do not partially fix just the known items before running the full audit — partial fixes while unknown drifts exist can create new inconsistencies.
 - **Close-out doc process improvement.** Codify a tighter end-of-session/end-of-phase doc update protocol so v3 doesn't drift from code again. Probably a new section in v3 or a working rule in the collaboration model. Draft in strategy chat before committing to docs.
+- **Sniper rooftop spawning (v3 stale).** Sniper rooftop spawning was removed as a Phase 5 G3 scope reduction; v3 context doc still describes it as active behavior. Confirmed stale during session 3 testing. Catch during v3 audit.
 
 ## Open Brainstorm Items (Need Decision Before Relevant Phase)
 

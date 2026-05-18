@@ -1510,6 +1510,135 @@ Two known drifts confirmed this session: vegetation budget values (v3 says 0–2
 
 ---
 
+### Phase 5.5 — Session 2 (2026-05-17) — Stutter Investigation + File Refactoring
+
+**Surviving commits:** c36019e | 3aa9e7f | f109561 | 33db759 | a7d9568 | 03f007c → 6c689ff | b736633 | ffc2812 | cb2e165
+
+**Net change to codebase:** slotHooks.ts extraction (3aa9e7f) survived. All four tile atlas fix commits reverted. HEAD at end of session: cb2e165.
+
+---
+
+#### File refactoring — GameCanvas context reduction
+
+Two file extractions from GameCanvas.tsx to reduce CC context token cost:
+
+**3aa9e7f — slotHooks.ts extraction (survived):** Extracted slot hook factory functions to `src/lib/slotHooks.ts`. Committed correctly; file tracked in git history.
+
+**64501c8 — useGameSprites extraction (git hygiene incident — file never committed):** Extracted all `useImage` calls to `src/lib/useGameSprites.ts` (271 lines removed from GameCanvas). Commit only modified `GameCanvas.tsx` — the new file was written to disk but never `git add`-ed before committing. File existed only on local disk through end of session. Discovered lost in Session 3 during `git reset --hard`. Recovered by reverting the commit (see Session 3 below). **This commit is a known bad state in history.**
+
+---
+
+#### Stutter investigation — tile atlas experiments
+
+Camera-snap stutter described as movement-correlated and visible on world tiles/props only (hero and enemies unaffected — perceptual asymmetry). STUTTER-DIAG instrumentation added (c36019e) to log `timeSincePreviousFrame > 20ms` from the Reanimated UI-thread frame callback.
+
+Two approaches tested against the tile atlas `useMemo` rebuild, which fires on every 64px tile boundary crossing:
+
+**Option A — f109561: Coarsen rebuild trigger to every 3 tiles.** Changed `setPlayerTileCol`/`setPlayerTileRow` to only fire when the player crosses a 3-tile boundary. Result: STUTTER-DIAG logs showed ~50% reduction in reported long-frame count. Felt improvement on device: **zero** — Mo reported stutter unchanged. Conclusion: throttling rebuild frequency is not the fix.
+
+**Option B — 33db759 + a7d9568 + 03f007c: Pre-allocate tile atlas objects via mutable pool.** Replaced per-rebuild `Skia.RSXform()` allocation with a pre-allocated pool of mutable `SkRSXform` objects, mutated via `.set()` each rebuild. Eliminated per-rebuild JS object allocation entirely. Felt improvement on device: **zero** — Mo reported stutter unchanged. Conclusion: tile atlas JS object allocation is not the primary stutter driver.
+
+Both approaches reverted (6c689ff through cb2e165). HEAD returned to baseline.
+
+**Session 2 conclusions:**
+- Tile rebuild frequency reduction → no felt improvement. Do not re-attempt.
+- Tile rebuild object allocation elimination → no felt improvement. Do not re-attempt.
+- Half-dist Atlas child count (Phase 5 G2, commit b2e6e88) → already in do-not-retry list from G2; not re-attempted here.
+- All three tile atlas vector attacks are ruled out. STUTTER-DIAG log correlation between tile crossings and long frames is likely indirect; tile atlas is not the root cause.
+
+---
+
+### Phase 5.5 — Session 3 (2026-05-18) — Stutter Investigation Continued + Recovery
+
+**Net commits to main history:** f565abe (recovery revert only)
+
+**Commits attempted and reverted/reset (not in current history):**
+- 703dc2b: ping-pong viability spike (validated pattern only, not shipped)
+- 3617398 | 5e9f522 | 81a37df | af6cb24 | 940af63: five-commit ping-pong refactor (all removed by `git reset --hard cb2e165`)
+- 9ce511e: tile atlas full-map pre-computation fix (removed by second `git reset --hard cb2e165`)
+
+---
+
+#### Engine-wide ping-pong refactor (5 commits, fully reverted)
+
+**Background — why this was reasonable:** The Open Issues table in this document (entry added 2026-05-14) documented a Phase 9 tech debt theory: the spread-based update pattern (`{...state, ...}`) in all five tick functions produces ~36k–60k object allocations/sec on the Reanimated UI-thread heap, causing 2–4ms GC pauses. This was a documented theory with supporting allocation math, never experimentally tested. Session 3 tested it.
+
+**What was done:** All five engine files (`gameEngine`, `pickupEngine`, `throwableEngine`, `enemyEngine`, `combatEngine`) converted from immutable spread pattern to in-place mutation. A two-buffer ping-pong was implemented (`copyGameState` field-copy into pre-allocated buf0/buf1) to satisfy Reanimated v4's requirement that `useDerivedValue` fire on reference changes. `applyAOEDamage` signature simplified to void in-place mutator. A pre-existing bug (missing `nextTankProjectileId` in `copyGameState`) caught and fixed during planning.
+
+**Result:** Felt improvement: **zero**. STUTTER-DIAG logs after all five commits showed **more** long frames than the pre-refactor baseline. Traced to element-wise copy loops added to `copyGameState` for enemies/pickups/crates — 1,090 field assignments per tick of unconditional CPU overhead that negated any GC reduction. All five commits removed via `git reset --hard cb2e165`.
+
+**Conclusion:** Engine-wide spread allocation is not the primary cause of felt stutter. The documented Phase 9 tech debt theory (36k–60k objects/sec → GC pauses → camera snap) is **disproved by direct experiment**. Do not re-attempt this refactor as a stutter fix. The two-buffer ping-pong pattern itself was validated and is available if a future fix requires it, but it does not address the stutter root cause.
+
+---
+
+#### Tile atlas full-map pre-computation (attempted, reverted)
+
+After the ping-pong revert, STUTTER-DIAG log analysis showed near-1:1 correlation between `tileAtlas rebuild` log entries and long-frame entries. Proposed as a fix: change the tile atlas `useMemo` to pre-compute all 94×94 tiles at mount (deps `[initialMapData]` only), eliminating per-crossing rebuilds entirely.
+
+This collided with the Session 2 Option B finding: that approach eliminated the per-rebuild JS allocation entirely via mutable pooling, with zero felt improvement. If allocation elimination did not help, then pre-computing at mount (which also eliminates allocation) cannot be the cause either. The STUTTER-DIAG log correlation between tile crossings and long frames is real but not causal — the tile rebuild is a bystander, not the driver.
+
+Reverted via second `git reset --hard cb2e165`.
+
+**Conclusion:** Tile atlas fixes ruled out across Sessions 2 and 3 (allocation, frequency, elimination). Do not re-attempt.
+
+---
+
+#### React DevTools profile — JS thread ruled out
+
+Mo recorded a 24.9-second React DevTools Profiler trace during active gameplay with sustained movement.
+
+**Results:**
+- 231 React commits in 24.9s = 9.3 commits/sec, matching the 100ms timer cadence (this is JS-thread React reconciliation, not the 60fps Reanimated worklet)
+- GameCanvas render durations: 27% under 8ms, 54% between 8–12ms, 16% between 12–16ms, 5 commits over 16ms
+- All 5 slow commits coincide with modal open/close events (crate reveal, level-up) — worst single commit: 94ms during crate reveal modal mount/unmount
+- Steady-state renders (no modal events): consistent 8–12ms, well within the 100ms timer budget
+
+**Conclusion:** JS-thread React reconciliation is not the primary cause of camera-snap stutter during sustained movement. Steady-state JS renders are healthy. The stutter occurs between React commits, in the Reanimated worklet on the UI thread, which React DevTools cannot observe.
+
+**Side finding:** Modal mount/unmount produces ~94ms React commits. Visible as a hitch when opening/closing the crate reveal modal. Separate from the sustained-movement stutter. Logged as tech debt for Phase 7 (see pending-work-inventory.md).
+
+---
+
+#### Git hygiene incident — useGameSprites.ts lost and recovered
+
+Session 2's commit 64501c8 had only modified `GameCanvas.tsx` — the new `src/lib/useGameSprites.ts` was written to disk but never `git add`-ed before committing. The file existed only on local disk through all of Session 2 testing. Session 3's `git reset --hard cb2e165` removed it permanently (not recoverable from git history).
+
+**Symptom:** Game failed to launch. `GameCanvas.tsx` imports from `'../lib/useGameSprites'` which no longer exists.
+
+**Recovery:** `git revert 64501c8` → commit f565abe. The 271 lines of `useImage` calls are back inline in `GameCanvas.tsx`. The slotHooks.ts extraction (3aa9e7f) survived correctly.
+
+**Net result:** GameCanvas file refactoring is at partial state — extraction #1 (slotHooks.ts) complete, extraction #2 (useGameSprites) reverted and unrecoverable. Can be re-attempted in a future session.
+
+**Workflow rule established for all future extractions:** Write new file → `git status` (verify it shows as untracked) → `git add` → `git commit`. Committing without the middle two steps ships a broken state silently. This rule applies to all future new-file extractions.
+
+---
+
+#### Ruled out across Sessions 2 and 3
+
+| Vector | Approach | Result | Do not re-attempt |
+|---|---|---|---|
+| Tile rebuild allocation | Session 2 Option B (mutable pool) | Zero felt improvement | ✅ |
+| Tile rebuild frequency | Session 2 Option A (3-tile coarsening) | ~50% log reduction, zero felt improvement | ✅ |
+| Tile rebuild elimination | Session 3 full-map pre-computation | Zero felt improvement | ✅ |
+| Half-dist Atlas child count | Phase 5 G2 b2e6e88 | Already in do-not-retry list | ✅ |
+| Engine-wide spread allocation | Session 3 5-commit ping-pong refactor | Zero felt improvement (worse with element-wise copy overhead) | ✅ |
+| JS-thread React reconciliation | Session 3 React DevTools profile | Healthy steady-state; not the cause | ✅ |
+
+---
+
+#### Current state and next steps
+
+- **HEAD:** f565abe
+- STUTTER-DIAG instrumentation (c36019e) still present. Strip before production build.
+- All stutter-fix work from Sessions 2 and 3 reverted. Game is at the engine-spread + tile-rebuild baseline.
+- Two-buffer ping-pong pattern validated but not in use.
+
+**Next session:** Android Studio System Trace (Perfetto). Mo installing Android Studio this evening. All ruled-out vectors attacked the JS thread or JS-allocated objects. The camera-snap stutter is measured on the UI thread; remaining suspects (worklet GC, worklet CPU cost, Skia rendering, JSI bridge overhead) are all UI-thread or native-layer phenomena invisible to JS-side profilers. System Trace sees all threads simultaneously and is the only remaining diagnostic approach that can directly answer "what was executing on the UI thread during a long frame."
+
+**Do not re-attempt** any ruled-out vector. Do not run another diagnose-from-inference fix attempt without profiling data first. Four such attempts (Sessions 2 and 3) have exhausted this approach.
+
+---
+
 ## Phase 6 — Audio + atmospheric effects
 
 **Goal:** Audio engine fully implemented (music + SFX channels), all 25 SFX wired and playing, 4 music tracks looping correctly, fog-of-war, rain particles + drifting clouds (rain runs only — no lightning, no thunder), vignette, muzzle flashes, bullet origin correction, explosion and smoke effects rendering.
