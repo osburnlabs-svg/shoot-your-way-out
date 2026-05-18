@@ -236,6 +236,7 @@ export default function GameCanvas({ width, height }: Props) {
   // RSXforms are world-space; camera Group handles all scrolling.
   const { dirtSprites, sandSprites, grassSprites,
           dirtTransforms, sandTransforms, grassTransforms } = useMemo(() => {
+    console.log(`[STUTTER-DIAG] tileAtlas rebuild col=${playerTileCol} row=${playerTileRow}`);
     const halfCols = Math.ceil(width / 2 / CAMERA_ZOOM / TILE_SIZE) + 1;
     const halfRows = Math.ceil(height / 2 / CAMERA_ZOOM / TILE_SIZE) + 1;
     const colMin = Math.max(0, playerTileCol - halfCols);
@@ -275,6 +276,7 @@ export default function GameCanvas({ width, height }: Props) {
   // Rendered in z-order: vegetation → obstacles → barrels → wrecks → buildings.
   // RSXforms are world-space (centered on entity); camera Group handles scrolling.
   const propAtlasData = useMemo(() => {
+    console.log('[STUTTER-DIAG] propAtlasData rebuild');
     // Structure assets use STRUCTURE_SPRITE_SCALE; per-asset map handles individual
     // exceptions where a native size is already large enough at the category default.
     const STRUCTURE_ASSETS = new Set(['env_house01', 'env_house02', 'env_watchtower']);
@@ -356,6 +358,11 @@ export default function GameCanvas({ width, height }: Props) {
     [],
   );
 
+  // [STUTTER-DIAG] Long-frame logger — called via runOnJS from the UI-thread worklet.
+  const logLongFrame = useCallback((dtMs: number, gameElapsedMs: number) => {
+    console.log(`[STUTTER-DIAG] long frame dt=${dtMs.toFixed(1)}ms gameElapsed=${gameElapsedMs}ms`);
+  }, []);
+
   // ─── Hero sprite state (React, updated by the 100ms timer alongside enemy slots)
   const [spriteState, setSpriteState] = useState<{
     isMoving: boolean;
@@ -415,6 +422,9 @@ export default function GameCanvas({ width, height }: Props) {
   // Avoids Array.from() per-tick GC pressure — confirmed JS-thread GC spike source.
   // Each buffer is mutated in place; setState receives .slice() for re-render trigger.
   // Remove this block only if the entire timer is refactored away.
+  // [STUTTER-DIAG] Tracks last logged tile position to detect boundary crossings.
+  const lastLoggedTileRef = useRef({ col: -1, row: -1 });
+
   const timerBuffers = useRef({
     enemyTypes:   new Array<EnemyType | null>(ENEMY_SOFT_CAP).fill(null),
     enemyStatus:  new Array<'alive' | 'dying' | null>(ENEMY_SOFT_CAP).fill(null),
@@ -633,8 +643,16 @@ export default function GameCanvas({ width, height }: Props) {
 
       // Tile viewport culling: update player tile position so useMemo rebuilds
       // Atlas arrays for the visible window when the player crosses a tile boundary.
-      setPlayerTileCol(Math.floor(state.player.x / TILE_SIZE));
-      setPlayerTileRow(Math.floor(state.player.y / TILE_SIZE));
+      const newTileCol = Math.floor(state.player.x / TILE_SIZE);
+      const newTileRow = Math.floor(state.player.y / TILE_SIZE);
+      // [STUTTER-DIAG] Log tile boundary crossings.
+      const lt = lastLoggedTileRef.current;
+      if (lt.col !== -1 && (newTileCol !== lt.col || newTileRow !== lt.row)) {
+        console.log(`[STUTTER-DIAG] tile crossing (${lt.col},${lt.row})→(${newTileCol},${newTileRow})`);
+      }
+      lastLoggedTileRef.current = { col: newTileCol, row: newTileRow };
+      setPlayerTileCol(newTileCol);
+      setPlayerTileRow(newTileRow);
     }, 100);
     return () => clearInterval(id);
   }, [gameState]);
@@ -1287,6 +1305,11 @@ export default function GameCanvas({ width, height }: Props) {
     // Cap at 50ms so a backgrounded-app resume doesn't produce a giant physics jump.
     state = updateGameState(state, Math.min(dtMs, 50), collisionDataShared.value);
     gameState.value = state;
+
+    // [STUTTER-DIAG] Detect long frames (>20ms = stutter candidate).
+    if (dtMs > 20) {
+      runOnJS(logLongFrame)(dtMs, state.elapsedMs);
+    }
 
     // FPS + debug counters — bridge to React once per second.
     fpsAccumMs.value += dtMs;
