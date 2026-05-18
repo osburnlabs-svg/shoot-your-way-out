@@ -60,7 +60,6 @@ import {
   Image,
   MipmapMode,
   Skia,
-  useImage,
 } from '@shopify/react-native-skia';
 import {
   runOnJS,
@@ -72,8 +71,8 @@ import {
 } from 'react-native-reanimated';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 
-import { HeroSprites, EnemySprites, PickupSprites, EffectSprites, TileSprites, EnvSprites, FlyoverSprites } from '../lib/sprites';
 import type { HeroWeaponPose } from '../lib/sprites';
+import { useGameSprites } from '../lib/useGameSprites';
 import { loadMap } from '../lib/mapLoader';
 import { SKILLS, SKILL_IDS, getEffectiveStats } from '../data/skills';
 import type { SkillId } from '../data/skills';
@@ -196,275 +195,21 @@ type Props = {
 };
 
 export default function GameCanvas({ width, height }: Props) {
-  // ─── Hero sprite images (loaded once at mount) ────────────────────────────
-  const walk0 = useImage(HeroSprites.walk[0]);
-  const walk1 = useImage(HeroSprites.walk[1]);
-  const walk2 = useImage(HeroSprites.walk[2]);
-  const walk3 = useImage(HeroSprites.walk[3]);
-  const walk4 = useImage(HeroSprites.walk[4]);
-  const walk5 = useImage(HeroSprites.walk[5]);
-  const walk6 = useImage(HeroSprites.walk[6]);
-  const walkImages = [walk0, walk1, walk2, walk3, walk4, walk5, walk6];
-
-  const pistolImage = useImage(HeroSprites.pistol.idle);
-  const rifleImage = useImage(HeroSprites.rifle.idle);
-  const machinegunImage = useImage(HeroSprites.machinegun.idle);
-  const grenadeLauncherImage = useImage(HeroSprites.grenade_launcher.idle);
-  const flamethrowerImage = useImage(HeroSprites.flamethrower.idle);
-  const weaponIdleImages: Record<HeroWeaponPose, ReturnType<typeof useImage>> = {
-    pistol: pistolImage,
-    rifle: rifleImage,
-    machinegun: machinegunImage,
-    grenade_launcher: grenadeLauncherImage,
-    flamethrower: flamethrowerImage,
-  };
-
-  // ─── Enemy sprite images (loaded once at mount, all unconditional) ────────
-  // Scav walk: 7 frames (SW_01–07)
-  const scavWalk0 = useImage(EnemySprites.scav.walk[0]);
-  const scavWalk1 = useImage(EnemySprites.scav.walk[1]);
-  const scavWalk2 = useImage(EnemySprites.scav.walk[2]);
-  const scavWalk3 = useImage(EnemySprites.scav.walk[3]);
-  const scavWalk4 = useImage(EnemySprites.scav.walk[4]);
-  const scavWalk5 = useImage(EnemySprites.scav.walk[5]);
-  const scavWalk6 = useImage(EnemySprites.scav.walk[6]);
-  const scavWalkImages = [scavWalk0, scavWalk1, scavWalk2, scavWalk3, scavWalk4, scavWalk5, scavWalk6];
-
-  // Scav upper body — NoGunScav (weaponless Gunner body), composited over Soldier kit legs
-  const scavBodyImage = useImage(EnemySprites.scav.body);
-
-  // Scav shot (staged; used in G3+)
-  const scavShot0 = useImage(EnemySprites.scav.shot[0]);
-  void scavShot0;
-
-  // Scav die: 4 frames
-  const scavDie0 = useImage(EnemySprites.scav.die[0]);
-  const scavDie1 = useImage(EnemySprites.scav.die[1]);
-  const scavDie2 = useImage(EnemySprites.scav.die[2]);
-  const scavDie3 = useImage(EnemySprites.scav.die[3]);
-  const scavDieImages = [scavDie0, scavDie1, scavDie2, scavDie3];
-
-  // Raider walk: 7 frames (SW_01–07, Soldier kit legs — same frames as Scav)
-  const raiderWalk0 = useImage(EnemySprites.raider.walk[0]);
-  const raiderWalk1 = useImage(EnemySprites.raider.walk[1]);
-  const raiderWalk2 = useImage(EnemySprites.raider.walk[2]);
-  const raiderWalk3 = useImage(EnemySprites.raider.walk[3]);
-  const raiderWalk4 = useImage(EnemySprites.raider.walk[4]);
-  const raiderWalk5 = useImage(EnemySprites.raider.walk[5]);
-  const raiderWalk6 = useImage(EnemySprites.raider.walk[6]);
-  const raiderWalkImages = [raiderWalk0, raiderWalk1, raiderWalk2, raiderWalk3, raiderWalk4, raiderWalk5, raiderWalk6];
-
-  // Raider die: 4 frames (SD_01–04, Soldier kit die — same frames as Scav)
-  const raiderDie0 = useImage(EnemySprites.raider.die[0]);
-  const raiderDie1 = useImage(EnemySprites.raider.die[1]);
-  const raiderDie2 = useImage(EnemySprites.raider.die[2]);
-  const raiderDie3 = useImage(EnemySprites.raider.die[3]);
-  const raiderDieImages = [raiderDie0, raiderDie1, raiderDie2, raiderDie3];
-  const raiderBodyImage = useImage(EnemySprites.raider.body);
-
-  // SniperA walk: 7 frames (SW_01–07), legs-only + Base.png body overlay
-  const sniperAWalk0 = useImage(EnemySprites.sniperA.walk[0]);
-  const sniperAWalk1 = useImage(EnemySprites.sniperA.walk[1]);
-  const sniperAWalk2 = useImage(EnemySprites.sniperA.walk[2]);
-  const sniperAWalk3 = useImage(EnemySprites.sniperA.walk[3]);
-  const sniperAWalk4 = useImage(EnemySprites.sniperA.walk[4]);
-  const sniperAWalk5 = useImage(EnemySprites.sniperA.walk[5]);
-  const sniperAWalk6 = useImage(EnemySprites.sniperA.walk[6]);
-  const sniperAWalkImages = [sniperAWalk0, sniperAWalk1, sniperAWalk2, sniperAWalk3, sniperAWalk4, sniperAWalk5, sniperAWalk6];
-  // SniperA die: 5 frames (SniperDIe_00–04); 5th frame clips before despawn — acceptable
-  const sniperADie0 = useImage(EnemySprites.sniperA.die[0]);
-  const sniperADie1 = useImage(EnemySprites.sniperA.die[1]);
-  const sniperADie2 = useImage(EnemySprites.sniperA.die[2]);
-  const sniperADie3 = useImage(EnemySprites.sniperA.die[3]);
-  const sniperADie4 = useImage(EnemySprites.sniperA.die[4]);
-  const sniperADieImages = [sniperADie0, sniperADie1, sniperADie2, sniperADie3, sniperADie4];
-  const sniperABodyImage = useImage(EnemySprites.sniperA.body);
-
-  // SniperB (Soldier02) walk: 5 frames (SF_01–05), full character — no body overlay
-  const sniperBWalk0 = useImage(EnemySprites.soldier02.walk[0]);
-  const sniperBWalk1 = useImage(EnemySprites.soldier02.walk[1]);
-  const sniperBWalk2 = useImage(EnemySprites.soldier02.walk[2]);
-  const sniperBWalk3 = useImage(EnemySprites.soldier02.walk[3]);
-  const sniperBWalk4 = useImage(EnemySprites.soldier02.walk[4]);
-  const sniperBWalkImages = [sniperBWalk0, sniperBWalk1, sniperBWalk2, sniperBWalk3, sniperBWalk4];
-  // SniperB die: 4 frames (SD2_01–04)
-  const sniperBDie0 = useImage(EnemySprites.soldier02.die[0]);
-  const sniperBDie1 = useImage(EnemySprites.soldier02.die[1]);
-  const sniperBDie2 = useImage(EnemySprites.soldier02.die[2]);
-  const sniperBDie3 = useImage(EnemySprites.soldier02.die[3]);
-  const sniperBDieImages = [sniperBDie0, sniperBDie1, sniperBDie2, sniperBDie3];
-
-  // ─── Terrain tilesheet images (loaded once at mount) ─────────────────────
-  // Each is a 320×320 sprite sheet of 25 tile variants (5×5 grid of 64×64px).
-  // Atlas clipping isolates individual tiles via source rect in the sprites array.
-  const dirtTileImage  = useImage(TileSprites.dirt);
-  const sandTileImage  = useImage(TileSprites.sand);
-  const grassTileImage = useImage(TileSprites.grass);
-  // All 3 must be non-null before any Atlas renders — a single null image
-  // crashes Skia's JSI layer on first render before the loaded images arrive.
-  const tilesReady = !!(dirtTileImage && sandTileImage && grassTileImage);
-
-  // ─── Environment prop images (loaded once at mount, 31 assets) ───────────
-  // One useImage per EnvSprites key. Keys match assetKey strings in mapGenerator pools.
-  // Rendering is gated per-Atlas on img != null; partial loads render available props.
-  const imgEnvHouse01          = useImage(EnvSprites.env_house01);
-  const imgEnvHouse02          = useImage(EnvSprites.env_house02);
-  const imgEnvWatchtower       = useImage(EnvSprites.env_watchtower);
-  const imgEnvTreeLarge1       = useImage(EnvSprites.env_tree_large_1);
-  const imgEnvTreeLarge2       = useImage(EnvSprites.env_tree_large_2);
-  const imgEnvTreeLarge3       = useImage(EnvSprites.env_tree_large_3);
-  const imgEnvTreeLarge4       = useImage(EnvSprites.env_tree_large_4);
-  const imgEnvTreeSmall1       = useImage(EnvSprites.env_tree_small_1);
-  const imgEnvTreeSmall2       = useImage(EnvSprites.env_tree_small_2);
-  const imgEnvTreeSmall3       = useImage(EnvSprites.env_tree_small_3);
-  const imgEnvBush1            = useImage(EnvSprites.env_bush_1);
-  const imgEnvBush2            = useImage(EnvSprites.env_bush_2);
-  const imgEnvBush3            = useImage(EnvSprites.env_bush_3);
-  const imgEnvRockLarge        = useImage(EnvSprites.env_rock_large);
-  const imgEnvRockMedium       = useImage(EnvSprites.env_rock_medium);
-  const imgEnvRockSmall        = useImage(EnvSprites.env_rock_small);
-  const imgEnvBoxWood          = useImage(EnvSprites.env_box_wood);
-  const imgEnvBoxMilitary      = useImage(EnvSprites.env_box_military);
-  const imgEnvBarrelOil        = useImage(EnvSprites.env_barrel_oil);
-  const imgEnvBarrel           = useImage(EnvSprites.env_barrel);
-  const imgEnvBoxWoodSmall     = useImage(EnvSprites.env_box_wood_small);
-  const imgEnvBoxMilitarySmall = useImage(EnvSprites.env_box_military_small);
-  const imgEnvCarWreck1        = useImage(EnvSprites.env_car_wreck_1);
-  const imgEnvCarWreck2        = useImage(EnvSprites.env_car_wreck_2);
-  const imgEnvCarWreck3        = useImage(EnvSprites.env_car_wreck_3);
-  const imgEnvTruckWreck1      = useImage(EnvSprites.env_truck_wreck_1);
-  const imgEnvTruckWreck2      = useImage(EnvSprites.env_truck_wreck_2);
-  const imgEnvSmallTruckWreck  = useImage(EnvSprites.env_small_truck_wreck);
-  const imgEnvAmbulanceWreck   = useImage(EnvSprites.env_ambulance_wreck);
-  const imgEnvPoliceWreck      = useImage(EnvSprites.env_police_wreck);
-  const imgEnvBusWreck         = useImage(EnvSprites.env_bus_wreck);
-  const imgEnvHelicopterWreck  = useImage(EnvSprites.env_helicopter_wreck);
-  const imgEnvHumveeWreck1     = useImage(EnvSprites.env_humvee_wreck_1);
-  const imgEnvHumveeWreck2     = useImage(EnvSprites.env_humvee_wreck_2);
-  const imgEnvHumveeWreck3     = useImage(EnvSprites.env_humvee_wreck_3);
-  const imgEnvHumveeWreck4     = useImage(EnvSprites.env_humvee_wreck_4);
-  const imgEnvHumveeWreck5     = useImage(EnvSprites.env_humvee_wreck_5);
-  const imgEnvHumveeWreck6     = useImage(EnvSprites.env_humvee_wreck_6);
-  const imgEnvAcsWreck         = useImage(EnvSprites.env_acs_wreck);
-  const imgEnvBomberWreck2     = useImage(EnvSprites.env_bomber_wreck_2);
-  const imgEnvBomberWreck3     = useImage(EnvSprites.env_bomber_wreck_3);
-
-  // Flat lookup: assetKey string → loaded SkImage (or null during load).
-  const propImageLookup: Record<string, ReturnType<typeof useImage>> = {
-    env_house01:          imgEnvHouse01,
-    env_house02:          imgEnvHouse02,
-    env_watchtower:       imgEnvWatchtower,
-    env_tree_large_1:     imgEnvTreeLarge1,
-    env_tree_large_2:     imgEnvTreeLarge2,
-    env_tree_large_3:     imgEnvTreeLarge3,
-    env_tree_large_4:     imgEnvTreeLarge4,
-    env_tree_small_1:     imgEnvTreeSmall1,
-    env_tree_small_2:     imgEnvTreeSmall2,
-    env_tree_small_3:     imgEnvTreeSmall3,
-    env_bush_1:           imgEnvBush1,
-    env_bush_2:           imgEnvBush2,
-    env_bush_3:           imgEnvBush3,
-    env_rock_large:       imgEnvRockLarge,
-    env_rock_medium:      imgEnvRockMedium,
-    env_rock_small:       imgEnvRockSmall,
-    env_box_wood:         imgEnvBoxWood,
-    env_box_military:     imgEnvBoxMilitary,
-    env_barrel_oil:       imgEnvBarrelOil,
-    env_barrel:           imgEnvBarrel,
-    env_box_wood_small:   imgEnvBoxWoodSmall,
-    env_box_military_small: imgEnvBoxMilitarySmall,
-    env_car_wreck_1:      imgEnvCarWreck1,
-    env_car_wreck_2:      imgEnvCarWreck2,
-    env_car_wreck_3:      imgEnvCarWreck3,
-    env_truck_wreck_1:    imgEnvTruckWreck1,
-    env_truck_wreck_2:    imgEnvTruckWreck2,
-    env_small_truck_wreck: imgEnvSmallTruckWreck,
-    env_ambulance_wreck:  imgEnvAmbulanceWreck,
-    env_police_wreck:     imgEnvPoliceWreck,
-    env_bus_wreck:        imgEnvBusWreck,
-    env_helicopter_wreck: imgEnvHelicopterWreck,
-    env_humvee_wreck_1:   imgEnvHumveeWreck1,
-    env_humvee_wreck_2:   imgEnvHumveeWreck2,
-    env_humvee_wreck_3:   imgEnvHumveeWreck3,
-    env_humvee_wreck_4:   imgEnvHumveeWreck4,
-    env_humvee_wreck_5:   imgEnvHumveeWreck5,
-    env_humvee_wreck_6:   imgEnvHumveeWreck6,
-    env_acs_wreck:        imgEnvAcsWreck,
-    env_bomber_wreck_2:   imgEnvBomberWreck2,
-    env_bomber_wreck_3:   imgEnvBomberWreck3,
-  };
-
-  // ─── Pickup sprite image ──────────────────────────────────────────────────
-  const moneySmallImage = useImage(PickupSprites.money.small);
-  const crateImage = useImage(PickupSprites.crate);
-
-  // ─── Effect sprite images (loaded once at mount, all unconditional) ───────
-  // Explode: 4 frames (Explode/1–4.png) — frag detonation (non-looping) AND
-  //   molotov zone static visual (frame 3, index 2: peak-bloom, reads as fire patch).
-  // Flame: 7 frames (Flamethrower/1–7.png) — staged for future use (Phase 6 polish).
-  const explode0 = useImage(EffectSprites.explode[0]);
-  const explode1 = useImage(EffectSprites.explode[1]);
-  const explode2 = useImage(EffectSprites.explode[2]);
-  const explode3 = useImage(EffectSprites.explode[3]);
-  const explodeImages = [explode0, explode1, explode2, explode3];
-
-  const flame0 = useImage(EffectSprites.flame[0]);
-  const flame1 = useImage(EffectSprites.flame[1]);
-  const flame2 = useImage(EffectSprites.flame[2]);
-  const flame3 = useImage(EffectSprites.flame[3]);
-  const flame4 = useImage(EffectSprites.flame[4]);
-  const flame5 = useImage(EffectSprites.flame[5]);
-  const flame6 = useImage(EffectSprites.flame[6]);
-  const flameImages = [flame0, flame1, flame2, flame3, flame4, flame5, flame6];
-
-  // Smoke: 7 frames (LightSmoke/1–7.png) — dissipation animation, looping over smoke zone lifetime.
-  const smoke0 = useImage(EffectSprites.smoke[0]);
-  const smoke1 = useImage(EffectSprites.smoke[1]);
-  const smoke2 = useImage(EffectSprites.smoke[2]);
-  const smoke3 = useImage(EffectSprites.smoke[3]);
-  const smoke4 = useImage(EffectSprites.smoke[4]);
-  const smoke5 = useImage(EffectSprites.smoke[5]);
-  const smoke6 = useImage(EffectSprites.smoke[6]);
-  const smokeImages = [smoke0, smoke1, smoke2, smoke3, smoke4, smoke5, smoke6];
-
-  const bulletImage = useImage(EffectSprites.bullet);
-  // Grenade launcher projectile: single static frame (rocket-f1.png, 3×12 px).
-  const rocketF1Image = useImage(EffectSprites.rocketF1);
-  // Tank turret rocket (Phase 5 G5): 2-frame body animation — kept for future use.
-  const rocket0 = useImage(EffectSprites.rocket[0]);
-  const rocket1 = useImage(EffectSprites.rocket[1]);
-  const rocketImages = [rocket0, rocket1];
-
-  // Muzzle flash: 3 frames each, non-looping, 50ms/frame. sniperA = Sniper kit, sniperB = Gunner.
-  const muzzleFlashA0 = useImage(EffectSprites.muzzle_flash_a[0]);
-  const muzzleFlashA1 = useImage(EffectSprites.muzzle_flash_a[1]);
-  const muzzleFlashA2 = useImage(EffectSprites.muzzle_flash_a[2]);
-  const muzzleFlashAImages = [muzzleFlashA0, muzzleFlashA1, muzzleFlashA2];
-  const muzzleFlashB0 = useImage(EffectSprites.muzzle_flash_b[0]);
-  const muzzleFlashB1 = useImage(EffectSprites.muzzle_flash_b[1]);
-  const muzzleFlashB2 = useImage(EffectSprites.muzzle_flash_b[2]);
-  const muzzleFlashBImages = [muzzleFlashB0, muzzleFlashB1, muzzleFlashB2];
-  // Raider muzzle flash: reuses gunner frames (Soldier kit has no standalone flash sprites).
-  const muzzleFlashRaider0 = useImage(EffectSprites.muzzle_flash_raider[0]);
-  const muzzleFlashRaider1 = useImage(EffectSprites.muzzle_flash_raider[1]);
-  const muzzleFlashRaider2 = useImage(EffectSprites.muzzle_flash_raider[2]);
-  const muzzleFlashRaiderImages = [muzzleFlashRaider0, muzzleFlashRaider1, muzzleFlashRaider2];
-  // Tank muzzle flash frames (Phase 5 G5). ACS reuses panzer flash frames.
-  const muzzleFlashPanzer0 = useImage(EffectSprites.muzzle_flash_panzer[0]);
-  const muzzleFlashPanzer1 = useImage(EffectSprites.muzzle_flash_panzer[1]);
-  const muzzleFlashPanzer2 = useImage(EffectSprites.muzzle_flash_panzer[2]);
-  const muzzleFlashPanzerImages = [muzzleFlashPanzer0, muzzleFlashPanzer1, muzzleFlashPanzer2];
-  // Tank base + tower sprites.
-  const acsBaseImage  = useImage(EnemySprites.acs.base);
-  const acsTowerImage = useImage(EnemySprites.acs.tower);
-  const panzerBaseImage  = useImage(EnemySprites.panzer.base);
-  const panzerTowerImage = useImage(EnemySprites.panzer.tower);
-  // Helicopter flyover sprites (Phase 5 atmospheric).
-  const heliBodyImage  = useImage(FlyoverSprites.heliBody);
-  const heliRotor0     = useImage(FlyoverSprites.rotorFrames[0]);
-  const heliRotor1     = useImage(FlyoverSprites.rotorFrames[1]);
-  const heliRotor2     = useImage(FlyoverSprites.rotorFrames[2]);
-  const heliRotorImages = [heliRotor0, heliRotor1, heliRotor2];
+  const {
+    walkImages, weaponIdleImages,
+    scavWalkImages, scavBodyImage, scavDieImages,
+    raiderWalkImages, raiderDieImages, raiderBodyImage,
+    sniperAWalkImages, sniperADieImages, sniperABodyImage,
+    sniperBWalkImages, sniperBDieImages,
+    dirtTileImage, sandTileImage, grassTileImage, tilesReady,
+    propImageLookup,
+    moneySmallImage, crateImage,
+    explodeImages, flameImages, smokeImages,
+    bulletImage, rocketF1Image, rocket0, rocket1, rocketImages,
+    muzzleFlashAImages, muzzleFlashBImages, muzzleFlashRaiderImages, muzzleFlashPanzerImages,
+    acsBaseImage, acsTowerImage, panzerBaseImage, panzerTowerImage,
+    heliBodyImage, heliRotorImages,
+  } = useGameSprites();
 
   // ─── Map data (generated once per mount; reused on redeploy in Phase 5) ──────
   // Phase 7 will generate a fresh map on each run restart via the menu flow.
