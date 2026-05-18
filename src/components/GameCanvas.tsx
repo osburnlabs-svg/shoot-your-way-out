@@ -189,12 +189,6 @@ const THROWABLE_COLORS = {
   molotov: '#e06020', // orange-red
 };
 
-// Tile Atlas rebuild coarsening: only rebuild when player moves this many tiles
-// from the last rebuild center. Tune up to reduce rebuilds further; tune down if
-// leading-edge tiles visually pop in. The buffer in the tile Atlas useMemo must
-// stay >= TILE_REBUILD_THRESHOLD + 1 — currently set to match (4 = 3 + 1).
-const TILE_REBUILD_THRESHOLD = 3;
-
 type Props = {
   width: number;
   height: number;
@@ -243,10 +237,8 @@ export default function GameCanvas({ width, height }: Props) {
   const { dirtSprites, sandSprites, grassSprites,
           dirtTransforms, sandTransforms, grassTransforms } = useMemo(() => {
     console.log(`[STUTTER-DIAG] tileAtlas rebuild col=${playerTileCol} row=${playerTileRow}`);
-    // Buffer = TILE_REBUILD_THRESHOLD + 1 so leading-edge tiles are always present
-    // while the player travels up to TILE_REBUILD_THRESHOLD tiles from the rebuild center.
-    const halfCols = Math.ceil(width / 2 / CAMERA_ZOOM / TILE_SIZE) + 4;
-    const halfRows = Math.ceil(height / 2 / CAMERA_ZOOM / TILE_SIZE) + 4;
+    const halfCols = Math.ceil(width / 2 / CAMERA_ZOOM / TILE_SIZE) + 1;
+    const halfRows = Math.ceil(height / 2 / CAMERA_ZOOM / TILE_SIZE) + 1;
     const colMin = Math.max(0, playerTileCol - halfCols);
     const colMax = Math.min(TILE_COLS - 1, playerTileCol + halfCols);
     const rowMin = Math.max(0, playerTileRow - halfRows);
@@ -432,8 +424,6 @@ export default function GameCanvas({ width, height }: Props) {
   // Remove this block only if the entire timer is refactored away.
   // [STUTTER-DIAG] Tracks last logged tile position to detect boundary crossings.
   const lastLoggedTileRef = useRef({ col: -1, row: -1 });
-  // Tracks the tile position at the last Atlas rebuild, for coarsened rebuild gating.
-  const lastRebuildTileRef = useRef({ col: Math.floor(TILE_COLS / 2), row: Math.floor(TILE_ROWS / 2) });
 
   const timerBuffers = useRef({
     enemyTypes:   new Array<EnemyType | null>(ENEMY_SOFT_CAP).fill(null),
@@ -661,14 +651,8 @@ export default function GameCanvas({ width, height }: Props) {
         console.log(`[STUTTER-DIAG] tile crossing (${lt.col},${lt.row})→(${newTileCol},${newTileRow})`);
       }
       lastLoggedTileRef.current = { col: newTileCol, row: newTileRow };
-      // Gate Atlas rebuild: only fire when player has moved >= TILE_REBUILD_THRESHOLD
-      // tiles from the last rebuild center (Chebyshev distance).
-      const lr = lastRebuildTileRef.current;
-      if (Math.max(Math.abs(newTileCol - lr.col), Math.abs(newTileRow - lr.row)) >= TILE_REBUILD_THRESHOLD) {
-        lastRebuildTileRef.current = { col: newTileCol, row: newTileRow };
-        setPlayerTileCol(newTileCol);
-        setPlayerTileRow(newTileRow);
-      }
+      setPlayerTileCol(newTileCol);
+      setPlayerTileRow(newTileRow);
     }, 100);
     return () => clearInterval(id);
   }, [gameState]);
