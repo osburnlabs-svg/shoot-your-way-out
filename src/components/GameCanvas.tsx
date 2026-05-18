@@ -245,11 +245,11 @@ export default function GameCanvas({ width, height }: Props) {
   // MUST be declared before the tile Atlas useMemo that reads tileObjectPool.current.
   const tileObjectPool = useRef<{
     dirtSprites:  { x: number; y: number; width: number; height: number }[];
-    dirtXforms:   ReturnType<typeof Skia.RSXform>[];
+    dirtXforms:   { scos: number; ssin: number; tx: number; ty: number }[];
     sandSprites:  { x: number; y: number; width: number; height: number }[];
-    sandXforms:   ReturnType<typeof Skia.RSXform>[];
+    sandXforms:   { scos: number; ssin: number; tx: number; ty: number }[];
     grassSprites: { x: number; y: number; width: number; height: number }[];
-    grassXforms:  ReturnType<typeof Skia.RSXform>[];
+    grassXforms:  { scos: number; ssin: number; tx: number; ty: number }[];
   } | null>(null);
   if (tileObjectPool.current === null) {
     const maxHalfCols = Math.ceil(width / 2 / CAMERA_ZOOM / TILE_SIZE) + 4;
@@ -257,10 +257,8 @@ export default function GameCanvas({ width, height }: Props) {
     const max = (2 * maxHalfCols + 1) * (2 * maxHalfRows + 1);
     const makeSprites = (n: number) =>
       Array.from({ length: n }, () => ({ x: 0, y: 0, width: TILE_SIZE, height: TILE_SIZE }));
-    // SkRSXform is a native HostObject — must use Skia.RSXform() constructor, not plain
-    // objects. Mutation uses .set(scos, ssin, tx, ty) since properties are readonly.
     const makeXforms = (n: number) =>
-      Array.from({ length: n }, () => Skia.RSXform(1, 0, 0, 0));
+      Array.from({ length: n }, () => ({ scos: 1, ssin: 0, tx: 0, ty: 0 }));
     tileObjectPool.current = {
       dirtSprites:  makeSprites(max), dirtXforms:   makeXforms(max),
       sandSprites:  makeSprites(max), sandXforms:   makeXforms(max),
@@ -287,9 +285,9 @@ export default function GameCanvas({ width, height }: Props) {
     const dirtSrc:   { x: number; y: number; width: number; height: number }[] = [];
     const sandSrc:   { x: number; y: number; width: number; height: number }[] = [];
     const grassSrc:  { x: number; y: number; width: number; height: number }[] = [];
-    const dirtXform: ReturnType<typeof Skia.RSXform>[] = [];
-    const sandXform: ReturnType<typeof Skia.RSXform>[] = [];
-    const grassXform: ReturnType<typeof Skia.RSXform>[] = [];
+    const dirtXform: { scos: number; ssin: number; tx: number; ty: number }[] = [];
+    const sandXform: { scos: number; ssin: number; tx: number; ty: number }[] = [];
+    const grassXform: { scos: number; ssin: number; tx: number; ty: number }[] = [];
 
     for (let row = rowMin; row <= rowMax; row++) {
       for (let col = colMin; col <= colMax; col++) {
@@ -302,21 +300,21 @@ export default function GameCanvas({ width, height }: Props) {
           case 'dirt': {
             const di = dirtSrc.length;
             const s = pool.dirtSprites[di]!;  s.x = srcX; s.y = srcY;
-            const x = pool.dirtXforms[di]!;   x.set(1, 0, wtx, wty);
+            const x = pool.dirtXforms[di]!;   x.tx = wtx; x.ty = wty;
             dirtSrc.push(s); dirtXform.push(x);
             break;
           }
           case 'sand': {
             const si = sandSrc.length;
             const s = pool.sandSprites[si]!;  s.x = srcX; s.y = srcY;
-            const x = pool.sandXforms[si]!;   x.set(1, 0, wtx, wty);
+            const x = pool.sandXforms[si]!;   x.tx = wtx; x.ty = wty;
             sandSrc.push(s); sandXform.push(x);
             break;
           }
           case 'grass': {
             const gi = grassSrc.length;
             const s = pool.grassSprites[gi]!;  s.x = srcX; s.y = srcY;
-            const x = pool.grassXforms[gi]!;   x.set(1, 0, wtx, wty);
+            const x = pool.grassXforms[gi]!;   x.tx = wtx; x.ty = wty;
             grassSrc.push(s); grassXform.push(x);
             break;
           }
