@@ -27,6 +27,13 @@ export const WORLD_HEIGHT = 6000;
 export const CAMERA_ZOOM = 1.0;
 
 /**
+ * Game tick interval in milliseconds — controls the logic update rate.
+ * 33.333ms = 30fps. The useFrameCallback accumulates vsync time and fires one
+ * tick per interval; sub-interval remainder carries forward to prevent drift.
+ */
+export const TICK_INTERVAL_MS = 33.333;
+
+/**
  * Size of one tile cell in world units. Matches the source tile pixel size (64×64px)
  * so that at CAMERA_ZOOM=1.0 each tile renders at exactly its native resolution.
  * Confirmed from tilesheet dimensions: 320×320 sheets / 5 cols = 64px per tile.

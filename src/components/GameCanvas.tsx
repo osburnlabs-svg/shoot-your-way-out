@@ -142,6 +142,7 @@ import {
   HELI_FLYOVER_DURATION_MS,
   HELI_SPAWN_MIN_MS,
   HELI_SPAWN_MAX_MS,
+  TICK_INTERVAL_MS,
 } from '../data/gameConstants';
 import type { CrateTier } from '../data/gameConstants';
 import type { EnemyType } from '../data/enemies';
@@ -589,6 +590,9 @@ export default function GameCanvas({ width, height }: Props) {
   // [STUTTER-DIAG] Frame-callback invocation rate counter.
   const fcbTickCount = useSharedValue(0);
   const fcbLastLogMs = useSharedValue(0);
+
+  // 30fps throttle accumulator — tracks elapsed vsync time between game ticks.
+  const tickAccMs = useSharedValue(0);
 
   // ─── Helicopter flyover state (UI thread) ────────────────────────────────────
   const heliFlightSV = useSharedValue<{
@@ -1557,6 +1561,20 @@ export default function GameCanvas({ width, height }: Props) {
     const dtMs = frameInfo.timeSincePreviousFrame ?? 0;
     if (dtMs <= 0) return; // skip spurious zero-dt frames (JS-thread timer activity triggers extra UI-thread callbacks)
 
+    // [STUTTER-DIAG] Detect vsync-level long frames BEFORE the 30fps gate so
+    // raw vsync jank is captured whether or not a game tick fires this frame.
+    if (dtMs > 20) {
+      runOnJS(logLongFrame)(dtMs, gameState.value.elapsedMs);
+    }
+
+    // 30fps throttle — accumulate vsync time; fire a game tick only when at
+    // least one TICK_INTERVAL_MS has elapsed. Remainder carries forward so
+    // wall-clock timing stays accurate without drift. The Math.min(dtMs, 50)
+    // cap prevents a giant physics jump after a backgrounded-app resume.
+    tickAccMs.value += Math.min(dtMs, 50);
+    if (tickAccMs.value < TICK_INTERVAL_MS) return;
+    tickAccMs.value -= TICK_INTERVAL_MS;
+
     const ivx = inputActive.value ? inputVectorX.value : 0;
     const ivy = inputActive.value ? inputVectorY.value : 0;
     const iv = (ivx !== 0 || ivy !== 0) ? { x: ivx, y: ivy } : null;
@@ -1566,16 +1584,10 @@ export default function GameCanvas({ width, height }: Props) {
       player: { ...gameState.value.player, inputVector: iv },
     };
 
-    // Cap at 50ms so a backgrounded-app resume doesn't produce a giant physics jump.
-    state = updateGameState(state, Math.min(dtMs, 50), collisionDataShared.value);
+    state = updateGameState(state, TICK_INTERVAL_MS, collisionDataShared.value);
     gameState.value = state;
 
-    // [STUTTER-DIAG] Detect long frames (>20ms = stutter candidate).
-    if (dtMs > 20) {
-      runOnJS(logLongFrame)(dtMs, state.elapsedMs);
-    }
-
-    // [STUTTER-DIAG] Count invocations/sec to detect over-firing at digitizer rate.
+    // [STUTTER-DIAG] Count tick invocations/sec — should read ~30 confirming throttle.
     fcbTickCount.value += 1;
     const elapsedSinceLog = state.elapsedMs - fcbLastLogMs.value;
     if (elapsedSinceLog >= 1000) {
@@ -1585,7 +1597,8 @@ export default function GameCanvas({ width, height }: Props) {
     }
 
     // FPS + debug counters — bridge to React once per second.
-    fpsAccumMs.value += dtMs;
+    // fpsAccumMs tracks tick-time (not vsync-time) so the displayed FPS reads ~30.
+    fpsAccumMs.value += TICK_INTERVAL_MS;
     fpsFrameCount.value += 1;
     if (fpsAccumMs.value >= 1000) {
       const fps = Math.round((fpsFrameCount.value / fpsAccumMs.value) * 1000);
