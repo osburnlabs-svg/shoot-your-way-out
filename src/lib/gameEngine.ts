@@ -107,6 +107,10 @@ import { tickCrateSpawn } from './crateEngine';
 import type { TankPlacement, TankVariant } from '../data/mapTypes';
 import { tickTank } from './tankEngine';
 
+// [STUTTER-DIAG] Minimal-state test flag. When true: no enemy/projectile/pickup/throwable spawning.
+// Flip to false to restore normal gameplay. Remove before ship.
+const MINIMAL_STATE_TEST = true;
+
 export type PlayerState = {
   x: number;
   y: number;
@@ -711,14 +715,14 @@ export function updateGameState(state: GameState, dtMs: number, collData: Collis
     },
   };
 
-  const stateAfterEnemies = tickEnemies(stateAfterPlayer, dtMs, collData);
-  const stateAfterCombat = tickCombat(stateAfterEnemies, dtMs);
+  const stateAfterEnemies = MINIMAL_STATE_TEST ? stateAfterPlayer : tickEnemies(stateAfterPlayer, dtMs, collData);
+  const stateAfterCombat = MINIMAL_STATE_TEST ? stateAfterEnemies : tickCombat(stateAfterEnemies, dtMs);
   const stateAfterTank = tickTank(stateAfterCombat, dtMs);
   const stateAfterPickups = tickPickups(stateAfterTank, dtMs);
-  const stateAfterCrates = tickCrateSpawn(stateAfterPickups, dtMs);
-  const stateAfterThrowables = tickThrowables(stateAfterCrates, dtMs);
-  const stateAfterZones = tickEffectZones(stateAfterThrowables, dtMs);
-  const stateAfterThrowableSkills = tickThrowableSkills(stateAfterZones, dtMs);
+  const stateAfterCrates = MINIMAL_STATE_TEST ? stateAfterPickups : tickCrateSpawn(stateAfterPickups, dtMs);
+  const stateAfterThrowables = MINIMAL_STATE_TEST ? stateAfterCrates : tickThrowables(stateAfterCrates, dtMs);
+  const stateAfterZones = MINIMAL_STATE_TEST ? stateAfterThrowables : tickEffectZones(stateAfterThrowables, dtMs);
+  const stateAfterThrowableSkills = MINIMAL_STATE_TEST ? stateAfterZones : tickThrowableSkills(stateAfterZones, dtMs);
   const stateAfterRegen = tickRegen(stateAfterThrowableSkills, dtMs);
   return tickProgression(stateAfterRegen);
 }
