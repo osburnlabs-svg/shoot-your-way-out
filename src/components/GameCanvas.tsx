@@ -586,6 +586,10 @@ export default function GameCanvas({ width, height }: Props) {
   const fpsAccumMs = useSharedValue(0);
   const fpsFrameCount = useSharedValue(0);
 
+  // [STUTTER-DIAG] Frame-callback invocation rate counter.
+  const fcbTickCount = useSharedValue(0);
+  const fcbLastLogMs = useSharedValue(0);
+
   // ─── Helicopter flyover state (UI thread) ────────────────────────────────────
   const heliFlightSV = useSharedValue<{
     active: boolean;
@@ -616,6 +620,11 @@ export default function GameCanvas({ width, height }: Props) {
   // [STUTTER-DIAG] Long-frame logger — called via runOnJS from the UI-thread worklet.
   const logLongFrame = useCallback((dtMs: number, gameElapsedMs: number) => {
     console.log(`[STUTTER-DIAG] long frame dt=${dtMs.toFixed(1)}ms gameElapsed=${gameElapsedMs}ms`);
+  }, []);
+
+  // [STUTTER-DIAG] Frame-callback rate logger — reports invocations/sec once per second.
+  const logFcbRate = useCallback((ticksThisSecond: number) => {
+    console.log(`[STUTTER-DIAG] fcb/sec=${ticksThisSecond}`);
   }, []);
 
   // ─── Hero sprite state (React, updated by the 100ms timer alongside enemy slots)
@@ -1564,6 +1573,15 @@ export default function GameCanvas({ width, height }: Props) {
     // [STUTTER-DIAG] Detect long frames (>20ms = stutter candidate).
     if (dtMs > 20) {
       runOnJS(logLongFrame)(dtMs, state.elapsedMs);
+    }
+
+    // [STUTTER-DIAG] Count invocations/sec to detect over-firing at digitizer rate.
+    fcbTickCount.value += 1;
+    const elapsedSinceLog = state.elapsedMs - fcbLastLogMs.value;
+    if (elapsedSinceLog >= 1000) {
+      runOnJS(logFcbRate)(fcbTickCount.value);
+      fcbTickCount.value = 0;
+      fcbLastLogMs.value = state.elapsedMs;
     }
 
     // FPS + debug counters — bridge to React once per second.

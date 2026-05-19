@@ -1,0 +1,57 @@
+# Stutter trace investigation — context
+
+## Capture conditions
+- Date: Session 4 (May 18, 2026)
+- Device: Google Pixel 6, Android 16
+- Duration: 26.7 seconds
+- Tool: Android Studio standalone profiler, System Trace task
+- Game state: dev build via Expo, sustained joystick movement throughout capture
+- Captured at HEAD c6c07b4 (clean baseline, diagnostic instrumentation present)
+
+## All Frames summary (5 janky frames, all values from "All Frames" tab)
+
+| Frame # | Frame Duration | Application | GPU | Composition |
+|---|---|---|---|---|
+| 166802285 | 26.09 ms | 2.45 ms | 702 µs | 9.63 ms |
+| 166802345 | 18.88 ms | 2.55 ms | 565 µs | 9.6 ms |
+| 166802890 | 17.35 ms | 1.43 ms | 307 µs | 9.68 ms |
+| 166814229 | 21.93 ms | 1.8 ms | (Unavailable) | 9.59 ms |
+| 166815735 | 17.98 ms | 1.4 ms | 450 µs | 9.58 ms |
+
+## CONFIRMED ROOT CAUSE: Buffer stuffing (Session 4, final)
+
+Android Studio frame panel for frame 166815735 (representative janky frame):
+- Jank type: **Buffer stuffing** (Android's own classification)
+- Layer: com.osburnlabs.shootyourwayout.MainActivity
+- Display timing: Late
+- Expected duration: 16.6 ms
+- Actual duration: 6.6 ms
+- Main thread during frame: Running 91.81%, Sleeping 7.37%
+
+The frame itself renders in 6.6ms — the app code and GPU are fine. The frame is delivered late because the Render thread blocked on `dequeueBuffer` waiting for SurfaceFlinger to free a buffer slot. Buffer queue was full: the app produced frames faster than the display could consume them.
+
+## What this rules in/out (final)
+
+- NOT GC (no GC events in trace)
+- NOT app code slow (Application = 1.4–2.6ms per frame; Main thread 91.81% running during the frame itself, not stalled)
+- NOT GPU (microseconds per frame)
+- NOT __flushAnimationFrame causing slow preceding frames (pre-janky frame 8793 was structurally identical to a normal frame — see pre-janky-frame-events.txt)
+- NOT touch input pressure as a direct blocking cause (one janky frame had no touch event in its doFrame at all)
+- IS: Render thread blocked on dequeueBuffer — SurfaceFlinger buffer queue full
+- ROOT CAUSE STILL OPEN: What is producing frames faster than 60fps and filling the queue. Most likely candidate: something writing gameState.value more than once per vsync, triggering extra Skia renders. Whether this is still __flushAnimationFrame in Reanimated 4.x (vs 3.x where it was documented) is unconfirmed.
+
+## Investigation chronology
+
+**Session 2-3:** JS-thread causes ruled out via React DevTools. Tile rebuild allocation, engine spread refactors, JS reconciliation all eliminated.
+
+**Session 4, step 1 — janky/normal frame comparison:** Identified Choreographer 32.6ms resync on Main thread. Hypothesized __flushAnimationFrame as cause. FabricEventEmitter firing on all frames (normal noise, not discriminating).
+
+**Session 4, step 2 — pre-janky frame (8793):** Structurally identical to normal frame. No extra engine ticks, no GC, no unusual Main thread activity. Preceding frame was clean — the delay was in the inter-frame gap, invisible in doFrame event lists.
+
+**Session 4, step 3 — Android Studio jank classification:** Buffer stuffing confirmed. Mechanism is Render thread/SurfaceFlinger, not Main thread stall. Previous frame-event-list analysis was examining the wrong thread and wrong window.
+
+## Files
+- `normal.txt` — event list from a normal 6.16ms frame
+- `janky.txt` — event list from the worst janky frame, 26.09ms (includes 32.6ms Choreographer resync)
+- `pre-janky-frame-events.txt` — event list from frame 8793, immediately before janky frame 8794. Structurally normal.
+- `trace-context.txt` — this file

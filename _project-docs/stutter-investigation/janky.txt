@@ -1,0 +1,91 @@
+4427639	DrawFrames	Render
+4427651	query	Render
+4427656	query	Render
+4427668	query	Render
+4427672	query	Render
+4427684	syncFrameState	Render
+4427719	acquireBuffer	Render
+4427731	SurfaceTexture-0-32642-0:	Render
+4427753	wait	Render
+4427847	QueueSubmit	Render
+4428065	QueueSubmit	Render
+4428337	wait	Render
+4428349	wait	Render
+4428361	merge	Render
+4428404	releaseBuffer	Render
+4428410	SurfaceTexture-0-32642-0:	Render
+4428452	acquireBuffer	Render
+4428528	prepareTree	Render
+4428771	query	Render
+4428784	dequeueBuffer - VRI[MainActivity]#1(BLAST Consumer)1	Render
+4428793	dequeueBuffer	Render
+4428804	VRI[MainActivity]#1(BLAST Consumer)1:	Render
+4428822	addAndGetFrameTimestamps	Render
+4428858	HWC release fence 534 has signaled	Render
+4428905	Drawing  0.00  0.00 1080.00 2400.00	Render
+4429509	flush commands	Render
+4429514	Vulkan finish frame	Render
+4429541	auto skgpu::ganesh::OpsTask::onPrepare(GrOpFlushState *)::(anonymous class)::operator()() const	Render
+4429546	TextureOp	Render
+4429572	CircularRRectOp	Render
+4429597	AtlasTextOp	Render
+4429627	FillRectOp	Render
+4429638	AtlasTextOp	Render
+4429660	FillRectOp	Render
+4429668	TextureOp	Render
+4429698	AtlasTextOp	Render
+4429737	auto skgpu::ganesh::OpsTask::onExecute(GrOpFlushState *)::(anonymous class)::operator()() const	Render
+4429792	TextureOp	Render
+4429861	CircularRRectOp	Render
+4429888	AtlasTextOp	Render
+4429933	FillRectOp	Render
+4429965	AtlasTextOp	Render
+4429982	FillRectOp	Render
+4429998	TextureOp	Render
+4430034	AtlasTextOp	Render
+4430119	QueueSubmit	Render
+4430709	frameTimelineInfo(frameNumber=8794, vsyncId=166802285, inputEventId=0x2288ea21)	Render
+4430715	dispatchSetFrameTimelineInfo	Render
+4430722	setFrameTimelineInfo(VRI[MainActivity]#1) frameNumber: 8794 vsyncId:	Render
+4430740	setSurfaceDamage	Render
+4430752	queueBuffer	Render
+4430766	applyGrallocMetadataLocked	Render
+4430778	queueBuffer	Render
+4430783	VRI[MainActivity]#1(BLAST Consumer)1:	Render
+4430805	addAndGetFrameTimestamps	Render
+4430848	onFrameAvailable - VRI[MainActivity]#1(f:0,a:2)	Render
+4430862	acquireBuffer	Render
+4430868	VRI[MainActivity]#1(BLAST Consumer)1:	Render
+4430890	acquireNextBufferLocked - VRI[MainActivity]#1(f:0,a:2)frame=8794	Render
+4430977	Transaction::setFrameTimelineInfo frameNumber: 8794 vsyncId:	Render
+4431112	binder transaction async	Render
+4431217	waitForever	Render
+4431289	Trace GPU completion fence	Render
+4431315	reportMetricsWithPresentTime	Render
+4431319	getFrameTimestamps	Render
+4431357	dumpingMemoryStatistics	Render
+16451092	waiting for GPU completion	GPU
+16451098	waitForever	GPU
+4423218	Choreographer#doFrame	Main
+4423376	Choreographer#doFrame - resynced to 166802287 in 32.6ms	Main
+4423382	input	Main
+4423393	VRI[MainActivity]	Main
+4423452	dispatchInputEvent MotionEvent MOVE deviceId=4 source=0x1002, historySize=0	Main
+4423484	deliverInputEvent src=0x1002 eventTimeNano=734689480109000 id=0x24215db1	Main
+4423494	EarlyPostImeInputStage id=0x24215db1	Main
+4423505	NativePostImeInputStage id=0x24215db1	Main
+4423510	ViewPostImeInputStage id=0x24215db1	Main
+4424318	TouchesHelper.sentTouchEventModern(topTouchMove)	Main
+4424556	FabricEventEmitter.receiveEvent('topTouchMove')	Main
+4424873	View#onTouchEvent	Main
+4424942	sendMessage(inputChannel=568e059 com.osburnlabs.shootyourwayout/com.osburnlabs.shootyourwayout.MainActivity, seq=0x178bed0, type=FINISHED)	Main
+4424967	receiveMessage(inputChannel=568e059 com.osburnlabs.shootyourwayout/com.osburnlabs.shootyourwayout.MainActivity, seq=0x178bed4, type=MOTION)	Main
+4424991	Choreographer#scheduleVsyncLocked	Main
+4425008	binder transaction async	Main
+4425065	animation	Main
+4427400	BatchEventDispatchedListeners	Main
+4427462	traversal	Main
+4427492	draw-VRI[MainActivity]	Main
+4427528	Record View#draw()	Main
+4427555	TextureView#draw()	Main
+4427587	postAndWait	Main

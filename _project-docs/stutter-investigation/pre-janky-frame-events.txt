@@ -1,0 +1,78 @@
+4391965	DrawFrames	Render
+4391969	query	Render
+4391971	query	Render
+4391974	query	Render
+4391975	query	Render
+4391978	syncFrameState	Render
+4391992	acquireBuffer	Render
+4391995	SurfaceTexture-0-32642-0:	Render
+4392001	wait	Render
+4392037	QueueSubmit	Render
+4392196	QueueSubmit	Render
+4392409	wait	Render
+4392413	wait	Render
+4392417	merge	Render
+4392434	releaseBuffer	Render
+4392436	SurfaceTexture-0-32642-0:	Render
+4392450	acquireBuffer	Render
+4392481	prepareTree	Render
+4392555	query	Render
+4392559	dequeueBuffer - VRI[MainActivity]#1(BLAST Consumer)1	Render
+4392562	dequeueBuffer	Render
+4392566	VRI[MainActivity]#1(BLAST Consumer)1:	Render
+4392571	addAndGetFrameTimestamps	Render
+4392583	HWC release fence 531 has signaled	Render
+4392598	Drawing  0.00  0.00 1080.00 2400.00	Render
+4392800	flush commands	Render
+4392801	Vulkan finish frame	Render
+4392811	auto skgpu::ganesh::OpsTask::onPrepare(GrOpFlushState *)::(anonymous class)::operator()() const	Render
+4392813	TextureOp	Render
+4392822	CircularRRectOp	Render
+4392829	AtlasTextOp	Render
+4392839	FillRectOp	Render
+4392844	AtlasTextOp	Render
+4392851	FillRectOp	Render
+4392854	TextureOp	Render
+4392856	AtlasTextOp	Render
+4392867	auto skgpu::ganesh::OpsTask::onExecute(GrOpFlushState *)::(anonymous class)::operator()() const	Render
+4392894	TextureOp	Render
+4392923	CircularRRectOp	Render
+4392934	AtlasTextOp	Render
+4392946	FillRectOp	Render
+4392956	AtlasTextOp	Render
+4392961	FillRectOp	Render
+4392966	TextureOp	Render
+4392978	AtlasTextOp	Render
+4393012	QueueSubmit	Render
+4393806	frameTimelineInfo(frameNumber=8793, vsyncId=166802278, inputEventId=0x0)	Render
+4393808	dispatchSetFrameTimelineInfo	Render
+4393812	setFrameTimelineInfo(VRI[MainActivity]#1) frameNumber: 8793 vsyncId:	Render
+4393817	setSurfaceDamage	Render
+4393823	queueBuffer	Render
+4393827	applyGrallocMetadataLocked	Render
+4393835	queueBuffer	Render
+4393836	VRI[MainActivity]#1(BLAST Consumer)1:	Render
+4393843	addAndGetFrameTimestamps	Render
+4393861	onFrameAvailable - VRI[MainActivity]#1(f:0,a:2)	Render
+4393865	acquireBuffer	Render
+4393867	VRI[MainActivity]#1(BLAST Consumer)1:	Render
+4393873	acquireNextBufferLocked - VRI[MainActivity]#1(f:0,a:2)frame=8793	Render
+4393896	Transaction::setFrameTimelineInfo frameNumber: 8793 vsyncId:	Render
+4393928	binder transaction async	Render
+4393972	waitForever	Render
+4394001	Trace GPU completion fence	Render
+4394013	reportMetricsWithPresentTime	Render
+4394014	getFrameTimestamps	Render
+4394044	dumpingMemoryStatistics	Render
+16446880	waiting for GPU completion	GPU
+16446881	waitForever	GPU
+4389646	Choreographer#doFrame	Main
+4389653	animation	Main
+4389707	Choreographer#scheduleVsyncLocked	Main
+4389720	binder transaction async	Main
+4391840	BatchEventDispatchedListeners	Main
+4391864	traversal	Main
+4391882	draw-VRI[MainActivity]	Main
+4391900	Record View#draw()	Main
+4391917	TextureView#draw()	Main
+4391940	postAndWait	Main

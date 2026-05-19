@@ -1,0 +1,69 @@
+4423505	NativePostImeInputStage id=0x24215db1	Main
+4423510	ViewPostImeInputStage id=0x24215db1	Main
+4424318	TouchesHelper.sentTouchEventModern(topTouchMove)	Main
+4424556	FabricEventEmitter.receiveEvent('topTouchMove')	Main
+4424873	View#onTouchEvent	Main
+4424942	sendMessage(inputChannel=568e059 com.osburnlabs.shootyourwayout/com.osburnlabs.shootyourwayout.MainActivity, seq=0x178bed0, type=FINISHED)	Main
+4424967	receiveMessage(inputChannel=568e059 com.osburnlabs.shootyourwayout/com.osburnlabs.shootyourwayout.MainActivity, seq=0x178bed4, type=MOTION)	Main
+4424991	Choreographer#scheduleVsyncLocked	Main
+4425008	binder transaction async	Main
+4425065	animation	Main
+4427400	BatchEventDispatchedListeners	Main
+4427462	traversal	Main
+4427492	draw-VRI[MainActivity]	Main
+4427528	Record View#draw()	Main
+4427555	TextureView#draw()	Main
+4427587	postAndWait	Main
+4293666	flush commands	Render
+4293667	Vulkan finish frame	Render
+4293675	auto skgpu::ganesh::OpsTask::onPrepare(GrOpFlushState *)::(anonymous class)::operator()() const	Render
+4293676	TextureOp	Render
+4293684	CircularRRectOp	Render
+4293690	AtlasTextOp	Render
+4293697	FillRectOp	Render
+4293701	AtlasTextOp	Render
+4293706	FillRectOp	Render
+4293707	TextureOp	Render
+4293709	AtlasTextOp	Render
+4293718	auto skgpu::ganesh::OpsTask::onExecute(GrOpFlushState *)::(anonymous class)::operator()() const	Render
+4293742	TextureOp	Render
+4293765	CircularRRectOp	Render
+4293771	AtlasTextOp	Render
+4293778	FillRectOp	Render
+4293785	AtlasTextOp	Render
+4293788	FillRectOp	Render
+4293791	TextureOp	Render
+4293799	AtlasTextOp	Render
+4293821	QueueSubmit	Render
+4294529	frameTimelineInfo(frameNumber=8788, vsyncId=166802237, inputEventId=0x0)	Render
+4294531	dispatchSetFrameTimelineInfo	Render
+4294534	setFrameTimelineInfo(VRI[MainActivity]#1) frameNumber: 8788 vsyncId:	Render
+4294540	setSurfaceDamage	Render
+4294546	queueBuffer	Render
+4294551	applyGrallocMetadataLocked	Render
+4294559	queueBuffer	Render
+4294560	VRI[MainActivity]#1(BLAST Consumer)1:	Render
+4294568	addAndGetFrameTimestamps	Render
+4294584	onFrameAvailable - VRI[MainActivity]#1(f:0,a:2)	Render
+4294589	acquireBuffer	Render
+4294591	VRI[MainActivity]#1(BLAST Consumer)1:	Render
+4294597	acquireNextBufferLocked - VRI[MainActivity]#1(f:0,a:2)frame=8788	Render
+4294618	Transaction::setFrameTimelineInfo frameNumber: 8788 vsyncId:	Render
+4294663	binder transaction async	Render
+4294703	waitForever	Render
+4294736	Trace GPU completion fence	Render
+4294758	reportMetricsWithPresentTime	Render
+4294759	getFrameTimestamps	Render
+4294778	dumpingMemoryStatistics	Render
+16392823	waiting for GPU completion	GPU
+16392827	waitForever	GPU
+4289790	Choreographer#doFrame	Main
+4289803	animation	Main
+4289897	Choreographer#scheduleVsyncLocked	Main
+4289923	binder transaction async	Main
+4292798	BatchEventDispatchedListeners	Main
+4292850	traversal	Main
+4292890	draw-VRI[MainActivity]	Main
+4292925	Record View#draw()	Main
+4292958	TextureView#draw()	Main
+4292999	postAndWait	Main
