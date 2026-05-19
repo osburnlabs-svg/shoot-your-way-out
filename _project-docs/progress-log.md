@@ -1639,6 +1639,267 @@ Session 2's commit 64501c8 had only modified `GameCanvas.tsx` — the new `src/l
 
 ---
 
+### Phase 5.5 — Session 4 (2026-05-18) — System Trace + RSXform approach + Camera smoothing
+
+**Commits in history:** b03dfb6 | fada6b4 | df39766 | f92621b | 2e473c3 | f0f0f05
+
+**Phase A v2/v3 + camera smoothing (removed by `git reset --hard f0f0f05` — not in history):** bedf469 (Phase A v2) | 628a9e4 (Phase A v3) | f6bf271 | c30b89a | 5dc16f5 (camera smoothing)
+
+**Net change to codebase:** HEAD returned to f0f0f05 (baseline with Phase A v1 reverted). Diagnostic instrumentation from c36019e and 92362a8 still present. All session 4 fix attempts reverted.
+
+---
+
+#### ADB + profiling workflow
+
+ADB wireless debugging failed (device not discoverable over network). Fell back to USB. Standalone Android Studio profiler used directly without opening a full Android project:
+- Profiler binary: `C:\Program Files\Android\Android Studio\bin\profiler.exe`
+- System Trace task selected
+- 26.7-second capture at HEAD c6c07b4, sustained joystick movement throughout
+
+---
+
+#### System Trace results — root cause confirmed
+
+**5 janky frames in 26.7 seconds:**
+
+| Frame | Duration | Application | GPU | Composition |
+|---|---|---|---|---|
+| 166802285 | 26.09 ms | 2.45 ms | 702 µs | 9.63 ms |
+| 166802345 | 18.88 ms | 2.55 ms | 565 µs | 9.6 ms |
+| 166802890 | 17.35 ms | 1.43 ms | 307 µs | 9.68 ms |
+| 166814229 | 21.93 ms | 1.8 ms | — | 9.59 ms |
+| 166815735 | 17.98 ms | 1.4 ms | 450 µs | 9.58 ms |
+
+**Android Studio jank classification for frame 166815735 (representative):**
+- Jank type: **Buffer stuffing**
+- Render thread blocked on `dequeueBuffer` waiting for SurfaceFlinger to free a buffer slot
+- Frame rendered in 6.6ms — app code and GPU are fast; delivered late because buffer queue was full
+
+**Hypotheses tested and falsified:**
+
+| Hypothesis | Test | Result |
+|---|---|---|
+| JS frame callback over-submitting (producing >60fps) | fcb/sec logging (92362a8) | ~60fps confirmed — not the overproducer |
+| Buffer stuffing caused by heavy content | MINIMAL_STATE_TEST flag (b03dfb6) — stripped gameplay state from canvas | Still occurred — content is not the driver |
+| Buffer stuffing caused by prop rendering | HIDE_PROPS_TEST flag (fada6b4) — stripped static prop rendering | Still occurred — props are not the driver |
+| Touch input pressure blocking frames | Pre-janky frame 8793 analysis | Structurally identical to normal; one janky frame had no touch event at all |
+| historySize bloat from coalesced touch events | Trace inspection | historySize=0 on all frames — no coalesced events |
+| GC causing pauses | GC events in trace | None present |
+
+Both diagnostic flag commits reverted (df39766, f92621b) — flags served their purpose.
+
+**Confirmed root cause:** Animated camera `Group` with Reanimated animated `transform` triggers full Skia re-composition of all children on every SharedValue write (Skia GH#3327). `cameraTransform` updates every frame; all tile `Atlas` children re-compose with it — producing multiple Skia render passes per vsync and filling the SurfaceFlinger buffer queue.
+
+---
+
+#### Phase A — move tiles out of animated camera Group (RSXform approach)
+
+Goal: eliminate animated Group re-composition by computing tile world positions as RSXform values; tiles render outside the camera Group via `Atlas` with world-space transforms.
+
+**Phase A v1 (2e473c3, in history, reverted at f0f0f05 — also attempted in prior session context):**
+
+Used `useRSXformBuffer` from RN Skia's Reanimated integration. Key flaw: `useRSXformBuffer` calls `startMapper` during the React render phase (not `useEffect`) — duplicate mappers accumulate on every re-render. Additionally, `SharedValue` writes inside `useMemo` triggered Reanimated's "writing to value during render" violation. Tiles did not render. FCB rate dropped to 29–41/sec.
+
+**Phase A v2 (bedf469, not in history):**
+
+Fixed render-phase write violation by moving all SharedValue writes to `useEffect`. Eliminated camera-snap stutter on device. **Framerate tanked to ~30fps.** Three cost drivers identified from RN Skia source (`buffers.ts`):
+1. `useRSXformBuffer`'s `forEach` iterates all 1000 buffer entries unconditionally per frame (only ~287 visible) — 3.5× wasted work
+2. `startMapper` still called during render → duplicate mappers on tile-crossing re-renders → burst of redundant mapper invocations at every boundary
+3. `dirtTilePositions.value` read 1000×/invocation (once per modifier call); `gameState.value.player.x/y` read ~287×/invocation — ~180,000+ SharedValue reads/sec total across three buffers
+
+**Phase A v3 (628a9e4, not in history):**
+
+Bypassed `useRSXformBuffer` with a custom `startMapper` registered in `useEffect`. Hoisted SharedValue reads to 2/invocation (not 2000). Replaced per-entry function call with inline for-loop. **Same ~30fps wall.** Driver 1 (`val.set()` × ~3000/frame: ~285 visible tiles × 3 buffer arrays) confirmed as the remaining bottleneck. This workload is structurally too expensive at current tile density on Pixel 6.
+
+**Phase A conclusion:** RSXform worklet approach is structurally limited at 1000+ tile buffer size. All Phase A commits removed via `git reset --hard f0f0f05`. Do not re-attempt.
+
+---
+
+#### Option B — Camera smoothing (masking approach)
+
+Hypothesis: if snaps are imperceptible, root cause becomes lower priority. Implemented exponential lerp: `cameraX.value += (target - cameraX.value) * CAMERA_LERP` inside `useFrameCallback`. Two separate `useSharedValue` for cameraX and cameraY; `cameraTransform` derived from them.
+
+**f6bf271 (not in history):** Initial smoothing at `CAMERA_LERP=0.2`. Bug discovered: `useSharedValue(gameState.value.player.x)` reads `.value` during render (arguments evaluated eagerly on every render) → Reanimated "Reading from value during component render" warnings.
+
+**c30b89a (not in history):** Fixed render-phase read by extracting `createInitialGameState` result to a named variable and using `initialGameState.player.x/y` for `useSharedValue` initialization. No Reanimated warnings. Stutter still perceptible at `CAMERA_LERP=0.2` (~3 frames to absorb a snap).
+
+**5dc16f5 (not in history):** Tightened to `CAMERA_LERP=0.1` (~7 frames to absorb a snap). Stutter still perceptible; camera motion now visibly laggy.
+
+**Option B conclusion:** Camera snaps are too large to mask at any reasonable lerp factor without making camera feel broken. All smoothing commits removed via `git reset --hard f0f0f05`. Do not re-attempt camera smoothing as a stutter mask.
+
+---
+
+#### Cumulative do-not-retry list (Sessions 2–4)
+
+| Vector | Approach | Result |
+|---|---|---|
+| Tile rebuild allocation | Session 2 Option B (mutable pool) | Zero felt improvement |
+| Tile rebuild frequency | Session 2 Option A (3-tile coarsening) | Zero felt improvement |
+| Tile rebuild elimination | Session 3 full-map pre-computation | Zero felt improvement |
+| Half-dist Atlas child count | Phase 5 G2 b2e6e88 | Zero felt improvement |
+| Engine-wide spread allocation | Session 3 5-commit ping-pong refactor | Zero felt improvement (worse) |
+| JS-thread React reconciliation | Session 3 React DevTools profile | Healthy; not the cause |
+| RSXform worklet tiles (useRSXformBuffer / custom startMapper) | Session 4 Phase A v2/v3 | Eliminated snap, tanked framerate to 30fps |
+| Camera smoothing | Session 4 CAMERA_LERP 0.2/0.1 | Snaps too large to mask at any reasonable factor |
+
+---
+
+#### Current state and next steps
+
+- **HEAD:** f0f0f05 (clean, diagnostic instrumentation c36019e + 92362a8 still present — strip before production)
+- Root cause confirmed: animated camera `Group` re-composition (GH#3327) forces full Skia re-paint of all tile Atlas children every vsync
+
+**Next session — B1:** Replace Skia tile rendering with a React Native native `<Image>` component for the terrain floor. Animate position via Reanimated `useAnimatedStyle` (translateX/Y derived from player position via `useDerivedValue`). This bypasses Skia composition entirely for tiles — the hypothesis is that a native View animated by `useAnimatedStyle` routes through RN's native animation driver (Reanimated JSI → native view system), not through Skia, eliminating the buffer-stuffing pressure.
+
+Known trade-off: abandons procedural per-tile RSXform rendering. The floor becomes a single positioned image rather than individually-placed tile sprites. The floor asset will need to tile natively via RN's Image `resizeMode` or be a pre-rendered full-map PNG.
+
+Honest uncertainty: if native animated `<Image>` still routes through Skia under the hood (possible on Android with certain RN versions), this approach hits the same wall. Worth one session to test before considering more invasive alternatives.
+
+---
+
+### Phase 5.5 — Session 5 (2026-05-19) — B1 native floor, screen-space props, viewport culling, ImageShader floor
+
+**Commits attempted (all removed by `git reset --hard f0f0f05` — hashes not preserved):**
+Multiple commits across 8 phases (B1 floor, screen-space PropImage, React.memo, culling). All session 5 commits were reset; HEAD returned to f0f0f05.
+
+**Net change to codebase:** HEAD at f0f0f05 (same as end of Session 4). Working tree clean.
+
+---
+
+#### Phase 1 — B1 native floor attempt (4 commits, all reverted)
+
+Implemented the B1 plan from Session 4: replaced Skia tile Atlas floor with a React Native `<Image>` component, animated via Reanimated `useAnimatedStyle` with `translateX`/`translateY` derived from player position. Positioned underneath the Skia `<Canvas>` in the JSX tree. Four commits implementing and iterating the approach.
+
+**Risk B materialized:** Android's Fresco-backed `Animated.Image` does not honor `resizeMode="repeat"`. The 512×512 floor texture stretches to fill the container regardless of the `resizeMode` prop value. This is a documented Fresco limitation — tiling repeat is not supported in the Fresco image pipeline.
+
+All B1 commits reverted. B1 native floor approach ruled out.
+
+---
+
+#### Phase 2 — PictureRecorder for props (analytically rejected)
+
+Evaluated using Skia's `PictureRecorder` API to snapshot all prop draw commands into a static `SkPicture`, then replay the picture with a computed offset. Hypothesis: a single Picture draw call produces less Skia composition pressure than multiple Atlas/Image children.
+
+Rejected analytically: the re-composition driver is the animated camera `Group` transform updating every frame (GH#3327). A PictureRecorder replay is still a Skia draw operation inside or alongside that Group — it would still trigger per-frame re-composition. The approach does not address the root cause. Not implemented.
+
+---
+
+#### Phase 3 — Camera Group elimination to screen-space (commit 548152e, not in history)
+
+Eliminated the animated camera `Group` entirely. All 150–250 prop `PropImage` components moved to screen-space: each receives a per-prop `useDerivedValue` computing `width/2 + (ent.x - px) * CAMERA_ZOOM` and `height/2 + (ent.y - py) * CAMERA_ZOOM`. Effect zones and detonating throwables received new screen-space slot hooks (`useZoneSlotTransform`, `useDetonatingThrowableTransform`) added to `slotHooks.ts`. Tile Atlas and floor `Animated.Image` remain inside the `cameraTransform` Group (floor still broken on Android; tiles still present).
+
+**Device test:** Stutter frequency reduced. Character changed: original camera-snap (world jumps forward and snaps) replaced by rubber-band (props snap back over a longer distance after movement). Hero and enemy sprites remain completely stable throughout — same perceptual asymmetry as before, different manifestation.
+
+**Conclusion:** Eliminating the animated camera Group IS the correct structural direction — reduced frequency validates the GH#3327 diagnosis. Rubber-band character is a new pattern requiring separate investigation.
+
+---
+
+#### Phase 4 — React.memo on PropImage (commit cc1d89e, not in history)
+
+Hypothesis: each 100ms React state update causes GameCanvas to re-render, unmounting and re-mounting PropImage components, triggering `useDerivedValue` re-registration, producing a per-100ms subscription throughput burst visible as rubber-band.
+
+**Implementation:** Wrapped `PropImage` in `React.memo`. Added `[PROP-RENDER]` console.log inside `PropImage` body.
+
+**Device test / diagnostic result:** `[PROP-RENDER]` logs fire once at mount (plus a batch at ~1700ms during initial image load). NOT every 100ms. Re-registration hypothesis falsified — React.memo is working correctly; PropImage does not re-render at timer cadence. Stutter unchanged.
+
+**Conclusion:** Rubber-band stutter is not caused by PropImage re-registration. The subscription is stable between mounts.
+
+---
+
+#### Phase 5 — Viewport culling at 400px buffer (commit 63bc21d, not in history)
+
+Hypothesis: props near the viewport edge produce rubber-band because they are partially on-screen, making subscription lag visible at entry/exit. Culling props beyond `PROP_CULL_BUFFER = 400` world-pixels of the viewport would keep only props with stable screen-space positions mounted, eliminating edge-transition noise.
+
+**Implementation:** `VisibleProps` state object with per-category boolean arrays (`visVeg`, `visBarrel`, `visObstacle`, `visStructure`, `visWreck`). `computeVisibleProps()` with axis-aligned world-space check. Initial state pre-computed from spawn position `(WORLD_WIDTH / 2, WORLD_HEIGHT / 2)`. `prevVisPropsRef` gates `setState` to prevent unnecessary re-renders.
+
+**Device test:** Rubber-band character persisted at higher frequency than pre-culling 548152e baseline.
+
+**Conclusion:** Culling made it worse. Mount-race theory: culling concentrates all prop mounts at the viewport boundary by definition. First-frame race on `useDerivedValue` registration (React reconciliation on JS thread → worklet registration on UI thread → first value to Skia) adds noise at every mount event. With culling, all mounts happen near the player — mount noise becomes visible near the player. This explains the increased frequency but does not explain the baseline rubber-band before culling was added.
+
+---
+
+#### Phase 6 — Viewport culling at 800px buffer (commit a17f845, not in history)
+
+Single-line change: `PROP_CULL_BUFFER = 400` → `PROP_CULL_BUFFER = 800`.
+
+**Device test:** Zero change from 400px. Frequency and character identical.
+
+**Conclusion:** Buffer size is not the variable. Mount-race noise is occurring regardless of buffer width.
+
+---
+
+#### Phase 7 — Atomic shared snapshot theory (analytically falsified, no code)
+
+**Theory:** Multiple `useDerivedValue` worklets reading `gameState` in the same vsync do not atomically snapshot the same state. If `gameState.value` is partially updated between worklet executions, different props would render positions from different state versions — producing viewport-edge-specific tearing.
+
+**Falsification:** The Reanimated UI thread is single-threaded. Worklet executions are sequential — no interleaving is possible. Non-atomic reads would produce uniform positional inconsistency across all props on every frame, not viewport-edge-specific rubber-band. The behavioral evidence (rubber-band only at entry/exit, not during continuous visibility) is inconsistent with non-atomic reads. Not implemented.
+
+---
+
+#### Phase 8 — ImageShader floor fix (TypeScript compile failure, changes discarded)
+
+After all stutter fixes reverted, attempted a separate fix for the broken Android floor (`resizeMode="repeat"` broken on Fresco). Plan: replace `Animated.Image` floor with Skia `<Fill><ImageShader tx="repeat" ty="repeat" transform={floorShaderTransform}/>`. Transform formula: `[{ translateX: px - width/2 }, { translateY: py - height/2 }]` to scroll world-UV correctly at `CAMERA_ZOOM=1.0`.
+
+**TypeScript failure:** In `@shopify/react-native-skia` v2.2.12, the `transform` prop on `<ImageShader>` is explicitly excluded from `AnimatedProps<ImageShaderProps, never>`. The prop type is `Omit<AnimatedProps<ImageShaderProps, never>, "transform" | "fit" | "tx" | "ty"> & { ... }`. A `DerivedValue<...>` is rejected at compile time — `<ImageShader>` accepts only a static Skia matrix for `transform`. The floor would render but never scroll.
+
+Per plan discipline, this was surfaced rather than worked around. Changes discarded via `git restore`. ImageShader path ruled out at v2.2.12.
+
+---
+
+#### Reset to f0f0f05
+
+All session 5 commits removed via `git reset --hard f0f0f05`. Working tree clean.
+
+---
+
+#### Mount-race theory — new finding this session
+
+**Why rubber-band appears at viewport entry/exit but not during continuous visibility:**
+
+When a `PropImage` is continuously in view, its `useDerivedValue` subscription is active and receiving every-frame updates — positional lag is imperceptible because the subscription never stales.
+
+When a prop enters the viewport for the first time, there is a first-frame race: React reconciliation on the JS thread schedules the mount; `useDerivedValue` registers its worklet subscription on the UI thread; Skia receives the first computed position value. During this registration gap, the player has moved — the first rendered position is stale. This manifests as a visible snap-then-catch-up: rubber-band.
+
+**Why culling made it worse:** With culling enabled, all prop mounts happen near the viewport boundary by definition — that is where `isVisible` transitions from false to true. Pre-culling (548152e baseline), props are mounted at game start and subscriptions are already registered by the time the player approaches them. Culling converted stable subscriptions to on-demand subscriptions, maximizing mount-race exposure.
+
+**What mount-race theory does not explain:** The baseline rubber-band at 548152e before any culling was added. At 548152e, all 150–250 props are mounted at game start. If mount-race only happens at first mount, and first mount happens before gameplay starts, all subscriptions should be stable by the time the player moves. Yet rubber-band is still present. Mount-race explains why culling made it worse; it does not explain the underlying cause of the baseline rubber-band.
+
+---
+
+#### Cumulative do-not-retry list (Sessions 2–5)
+
+| Vector | Approach | Result |
+|---|---|---|
+| Tile rebuild allocation | Session 2 Option B (mutable pool) | Zero felt improvement |
+| Tile rebuild frequency | Session 2 Option A (3-tile coarsening) | Zero felt improvement |
+| Tile rebuild elimination | Session 3 full-map pre-computation | Zero felt improvement |
+| Half-dist Atlas child count | Phase 5 G2 b2e6e88 | Zero felt improvement |
+| Engine-wide spread allocation | Session 3 5-commit ping-pong refactor | Zero felt improvement (worse) |
+| JS-thread React reconciliation | Session 3 React DevTools profile | Healthy; not the cause |
+| RSXform worklet tiles (useRSXformBuffer / custom startMapper) | Session 4 Phase A v2/v3 | Eliminated snap, tanked framerate to 30fps |
+| Camera smoothing | Session 4 CAMERA_LERP 0.2/0.1 | Snaps too large to mask at any reasonable factor |
+| B1 native floor (Animated.Image resizeMode="repeat") | Session 5 Phase 1 | resizeMode="repeat" ignored by Android Fresco — texture stretches to fill |
+| PictureRecorder for props | Session 5 Phase 2 | Analytically rejected — still Skia, still subject to GH#3327 |
+| Screen-space PropImage / camera Group elimination | Session 5 Phase 3 (548152e) | Reduces frequency; changes character to rubber-band; underlying cause unidentified |
+| React.memo on PropImage | Session 5 Phase 4 (cc1d89e) | No improvement; re-registration hypothesis falsified |
+| Viewport culling at 400px | Session 5 Phase 5 (63bc21d) | Frequency increased — mount-race amplified at boundary |
+| Viewport culling at 800px | Session 5 Phase 6 (a17f845) | Zero change from 400px — buffer size not the variable |
+| Atomic shared snapshot approach | Session 5 Phase 7 | Analytically falsified — UI thread is single-threaded |
+| ImageShader floor transform | Session 5 Phase 8 | transform excluded from AnimatedProps at v2.2.12 — TypeScript compile failure |
+
+---
+
+#### Current state and next steps
+
+- **HEAD:** f0f0f05 (same as Session 4 end). Animated camera Group present. Floor broken on Android (Fresco + resizeMode). Diagnostic instrumentation c36019e + 92362a8 still present — strip before production.
+- **Validated direction:** Eliminating the animated camera Group reduces stutter frequency and changes character — this is the correct structural path. Implementation challenge: how to render tiles + props outside the animated Group without hitting an RSXform cost wall (Session 4) or a rubber-band issue (Session 5).
+- **Floor fix:** Both known approaches are blocked (B1 native floor: Fresco limitation; ImageShader: transform not animatable at v2.2.12). Needs a new plan.
+- **Underlying rubber-band cause:** Unknown. Mount-race explains why culling regressed frequency; it does not explain the baseline rubber-band at 548152e. Root cause identification deferred — requires new diagnostic approach or an architectural approach that sidesteps the issue entirely.
+
+**Next session approach TBD.** Do not re-attempt any item on the cumulative do-not-retry list.
+
+---
+
 ## Phase 6 — Audio + atmospheric effects
 
 **Goal:** Audio engine fully implemented (music + SFX channels), all 25 SFX wired and playing, 4 music tracks looping correctly, fog-of-war, rain particles + drifting clouds (rain runs only — no lightning, no thunder), vignette, muzzle flashes, bullet origin correction, explosion and smoke effects rendering.
