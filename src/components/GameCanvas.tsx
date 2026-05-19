@@ -61,7 +61,6 @@ import {
   MipmapMode,
   Skia,
   useImage,
-  useRSXformBuffer,
 } from '@shopify/react-native-skia';
 import {
   runOnJS,
@@ -160,10 +159,6 @@ import {
   useThrowableSlotTransform,
   useEnemySlotFlash,
 } from '../lib/slotHooks';
-
-// Fixed RSXform buffer size per tile type. Upper bound on visible tiles of one
-// type: (halfCols*2+1)×(halfRows*2+1) ≤ 21×41 = 861 on Pixel 6; 1000 covers any device.
-const TILE_ATLAS_BUFFER_SIZE = 1000;
 
 // Cycle order and display labels for the debug weapon button.
 const WEAPON_CYCLE: HeroWeaponPose[] = [
@@ -491,18 +486,11 @@ export default function GameCanvas({ width, height }: Props) {
   const [playerTileCol, setPlayerTileCol] = useState(() => Math.floor(TILE_COLS / 2));
   const [playerTileRow, setPlayerTileRow] = useState(() => Math.floor(TILE_ROWS / 2));
 
-  // ─── Tile world positions (UI thread, written by useMemo, read by RSXform worklets) ─
-  // Flat [wx0, wy0, wx1, wy1, ...] per tile type. Worklets subtract camera position each
-  // frame to produce screen-space RSXforms without an animated camera Group wrapper.
-  const dirtTilePositions = useSharedValue<number[]>([]);
-  const sandTilePositions = useSharedValue<number[]>([]);
-  const grassTilePositions = useSharedValue<number[]>([]);
-
   // ─── Tile Atlas (viewport-culled, rebuilt when player crosses a tile boundary) ─
   // Visible tile range = player tile ± halfCols/halfRows (+1 buffer for edge pop).
-  // World positions written to SharedValues; UI-thread worklets apply camera offset
-  // each frame. Sprites padded to TILE_ATLAS_BUFFER_SIZE to match fixed buffer length.
-  const { dirtSprites, sandSprites, grassSprites } = useMemo(() => {
+  // RSXforms are world-space; camera Group handles all scrolling.
+  const { dirtSprites, sandSprites, grassSprites,
+          dirtTransforms, sandTransforms, grassTransforms } = useMemo(() => {
     console.log(`[STUTTER-DIAG] tileAtlas rebuild col=${playerTileCol} row=${playerTileRow}`);
     const halfCols = Math.ceil(width / 2 / CAMERA_ZOOM / TILE_SIZE) + 1;
     const halfRows = Math.ceil(height / 2 / CAMERA_ZOOM / TILE_SIZE) + 1;
@@ -511,12 +499,12 @@ export default function GameCanvas({ width, height }: Props) {
     const rowMin = Math.max(0, playerTileRow - halfRows);
     const rowMax = Math.min(TILE_ROWS - 1, playerTileRow + halfRows);
 
-    const dirtSrc:  { x: number; y: number; width: number; height: number }[] = [];
-    const sandSrc:  { x: number; y: number; width: number; height: number }[] = [];
-    const grassSrc: { x: number; y: number; width: number; height: number }[] = [];
-    const dirtPos: number[] = [];
-    const sandPos: number[] = [];
-    const grassPos: number[] = [];
+    const dirtSrc:   { x: number; y: number; width: number; height: number }[] = [];
+    const sandSrc:   { x: number; y: number; width: number; height: number }[] = [];
+    const grassSrc:  { x: number; y: number; width: number; height: number }[] = [];
+    const dirtXform: ReturnType<typeof Skia.RSXform>[] = [];
+    const sandXform: ReturnType<typeof Skia.RSXform>[] = [];
+    const grassXform: ReturnType<typeof Skia.RSXform>[] = [];
 
     for (let row = rowMin; row <= rowMax; row++) {
       for (let col = colMin; col <= colMax; col++) {
@@ -524,73 +512,19 @@ export default function GameCanvas({ width, height }: Props) {
         const srcX = (cell.variantIndex % 5) * TILE_SIZE;
         const srcY = Math.floor(cell.variantIndex / 5) * TILE_SIZE;
         const src  = { x: srcX, y: srcY, width: TILE_SIZE, height: TILE_SIZE };
+        const xform = Skia.RSXform(1, 0, col * TILE_SIZE, row * TILE_SIZE);
         switch (cell.type) {
-          case 'dirt':
-            dirtSrc.push(src); dirtPos.push(col * TILE_SIZE, row * TILE_SIZE); break;
-          case 'sand':
-            sandSrc.push(src); sandPos.push(col * TILE_SIZE, row * TILE_SIZE); break;
-          case 'grass':
-            grassSrc.push(src); grassPos.push(col * TILE_SIZE, row * TILE_SIZE); break;
+          case 'dirt':  dirtSrc.push(src);  dirtXform.push(xform);  break;
+          case 'sand':  sandSrc.push(src);  sandXform.push(xform);  break;
+          case 'grass': grassSrc.push(src); grassXform.push(xform); break;
         }
       }
     }
-
-    // Write world positions to SharedValues so worklets pick them up next frame.
-    dirtTilePositions.value = dirtPos;
-    sandTilePositions.value = sandPos;
-    grassTilePositions.value = grassPos;
-
-    // Pad sprite source rects to match the fixed RSXform buffer length.
-    const EMPTY = { x: 0, y: 0, width: 0, height: 0 };
-    while (dirtSrc.length < TILE_ATLAS_BUFFER_SIZE) dirtSrc.push(EMPTY);
-    while (sandSrc.length < TILE_ATLAS_BUFFER_SIZE) sandSrc.push(EMPTY);
-    while (grassSrc.length < TILE_ATLAS_BUFFER_SIZE) grassSrc.push(EMPTY);
-
-    return { dirtSprites: dirtSrc, sandSprites: sandSrc, grassSprites: grassSrc };
+    return {
+      dirtSprites:    dirtSrc,   sandSprites:    sandSrc,   grassSprites:    grassSrc,
+      dirtTransforms: dirtXform, sandTransforms: sandXform, grassTransforms: grassXform,
+    };
   }, [initialMapData, playerTileCol, playerTileRow, width, height]);
-
-  // ─── Tile RSXform buffers (UI thread, fired by startMapper every frame) ────────────
-  // Camera math (world → screen) lives in each worklet. No animated camera Group needed
-  // for tiles. scos=CAMERA_ZOOM encodes scale; inactive slots sent to (-9999,-9999).
-  const dirtAtlasTransforms = useRSXformBuffer(TILE_ATLAS_BUFFER_SIZE, (val, i) => {
-    'worklet';
-    const pos = dirtTilePositions.value;
-    if (i * 2 + 1 < pos.length) {
-      const px = gameState.value.player.x;
-      const py = gameState.value.player.y;
-      val.set(CAMERA_ZOOM, 0,
-        (pos[i * 2]! - px) * CAMERA_ZOOM + width / 2,
-        (pos[i * 2 + 1]! - py) * CAMERA_ZOOM + height / 2);
-    } else {
-      val.set(1, 0, -9999, -9999);
-    }
-  });
-  const sandAtlasTransforms = useRSXformBuffer(TILE_ATLAS_BUFFER_SIZE, (val, i) => {
-    'worklet';
-    const pos = sandTilePositions.value;
-    if (i * 2 + 1 < pos.length) {
-      const px = gameState.value.player.x;
-      const py = gameState.value.player.y;
-      val.set(CAMERA_ZOOM, 0,
-        (pos[i * 2]! - px) * CAMERA_ZOOM + width / 2,
-        (pos[i * 2 + 1]! - py) * CAMERA_ZOOM + height / 2);
-    } else {
-      val.set(1, 0, -9999, -9999);
-    }
-  });
-  const grassAtlasTransforms = useRSXformBuffer(TILE_ATLAS_BUFFER_SIZE, (val, i) => {
-    'worklet';
-    const pos = grassTilePositions.value;
-    if (i * 2 + 1 < pos.length) {
-      const px = gameState.value.player.x;
-      const py = gameState.value.player.y;
-      val.set(CAMERA_ZOOM, 0,
-        (pos[i * 2]! - px) * CAMERA_ZOOM + width / 2,
-        (pos[i * 2 + 1]! - py) * CAMERA_ZOOM + height / 2);
-    } else {
-      val.set(1, 0, -9999, -9999);
-    }
-  });
 
   // ─── Prop Atlas data (computed once at mount; static world-space positions) ─
   // Groups each entity list by assetKey → { sprites: SkRect[], transforms: SkRSXform[] }.
@@ -1693,38 +1627,40 @@ export default function GameCanvas({ width, height }: Props) {
       <View style={StyleSheet.absoluteFill}>
         <Canvas style={StyleSheet.absoluteFill}>
 
-          {/* ── Tile ground layer (z=0, outside camera Group) ─────────────────────── */}
-          {/* Screen-space RSXforms computed each frame by UI-thread worklets.          */}
-          {/* No animated Group wrapper — eliminates camera-Group re-composition cost.  */}
+          {/*
+           * Camera Group: world-space coordinate system scrolled by cameraTransform.
+           * Tiles use static world-space RSXforms (col*TILE_SIZE, row*TILE_SIZE) — the
+           * Group's cameraTransform handles all camera scrolling, no per-frame RSXform
+           * update needed. React-state entities (effects, buildings) also live here.
+           * Animated-derived-value entities (enemies, projectiles, pickups) remain
+           * outside to avoid nested animated Skia Group stutter.
+           */}
+          <Group transform={cameraTransform}>
+
+          {/* ── Tile ground layer (z=0, drawn first inside camera Group) ────── */}
+          {/* RSXforms are world-space (col*64, row*64). Camera Group scrolls them. */}
           {tilesReady && (
             <>
               <Atlas
                 image={dirtTileImage!}
                 sprites={dirtSprites}
-                transforms={dirtAtlasTransforms}
+                transforms={dirtTransforms}
                 sampling={{ filter: FilterMode.Nearest, mipmap: MipmapMode.None }}
               />
               <Atlas
                 image={sandTileImage!}
                 sprites={sandSprites}
-                transforms={sandAtlasTransforms}
+                transforms={sandTransforms}
                 sampling={{ filter: FilterMode.Nearest, mipmap: MipmapMode.None }}
               />
               <Atlas
                 image={grassTileImage!}
                 sprites={grassSprites}
-                transforms={grassAtlasTransforms}
+                transforms={grassTransforms}
                 sampling={{ filter: FilterMode.Nearest, mipmap: MipmapMode.None }}
               />
             </>
           )}
-
-          {/*
-           * Camera Group: props, effect zones, detonating throwables.
-           * Tiles moved out (Phase A — Option A stutter fix). Props remain here for Phase B.
-           * Enemies/projectiles/pickups remain outside (nested animated Group stutter).
-           */}
-          <Group transform={cameraTransform}>
 
           {/* ── Scatter props (z=1: vegetation → rocks → barrels → wrecks → structures) */}
           {/* One Atlas per assetKey type. Static world-space RSXforms; camera Group  */}
