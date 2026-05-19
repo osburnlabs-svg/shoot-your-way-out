@@ -7,9 +7,24 @@ Canonical source for all forward-looking work on Shoot Your Way Out. Reference t
 Gameplay-affecting tech debt and feature work. Must be complete before polish phases. Principle: no UI/sound/menu work until gameplay is at final state.
 
 ### Bugs and tech debt
-- **Stuttering investigation — primary v1 blocker.** Mo's position: would not ship in current state. Across sessions 2 and 3, ruled out: tile rebuild allocation (Options A and B last night, tile pre-comp today), engine-wide spread allocation (5-commit ping-pong refactor today), JS-thread React reconciliation (DevTools profile today). Camera-snap stutter is movement-correlated and visible only on the world (tiles/props) — hero and enemies are immune due to perceptual asymmetry. Diagnostic instrumentation (c36019e) is still in the codebase.
-  Next session approach: Android Studio System Trace (Perfetto). Mo installing Android Studio this evening. Remaining suspects are all on the UI thread / worklet runtime / Skia rendering — invisible to JS-side profilers. System Trace is the only tool that can definitively identify what's running during a long frame.
-  Do not re-attempt: tile rebuild fixes (allocation or frequency), engine spread refactors, any "diagnose from logs and fix" attempt without profiling data first.
+- **Stuttering investigation — primary v1 blocker.** Root cause confirmed (Session 4 System Trace): animated camera `Group` with Reanimated animated `transform` triggers full Skia re-composition of all tile Atlas children on every vsync (GH#3327), producing multiple Skia render passes per frame and filling the SurfaceFlinger buffer queue (Android "buffer stuffing" jank type). Application thread fast (1.4–2.6ms/frame), GPU negligible — the problem is render pass frequency, not render cost per pass. Camera-snap stutter is movement-correlated, visible only on world tiles/props — hero and enemies immune (perceptual asymmetry).
+
+  **Cumulative do-not-retry list (Sessions 2–4):**
+  - Tile rebuild allocation (mutable pool, Session 2) — zero felt improvement
+  - Tile rebuild frequency (3-tile coarsening, Session 2) — zero felt improvement
+  - Tile rebuild elimination (full-map pre-computation, Session 3) — zero felt improvement
+  - Half-dist Atlas child count (Phase 5 G2) — zero felt improvement
+  - Engine-wide spread allocation (5-commit ping-pong refactor, Session 3) — zero felt improvement (worse)
+  - JS-thread React reconciliation (DevTools profile, Session 3) — healthy; not the cause
+  - RSXform worklet tiles (useRSXformBuffer / custom startMapper, Session 4) — eliminated snap, tanked framerate to 30fps; structurally limited at 1000+ tile buffer size
+  - Camera smoothing (CAMERA_LERP 0.2/0.1, Session 4) — snaps too large to mask at any reasonable lerp factor
+
+  **Next session — B1:** Replace Skia tile rendering with a React Native native `<Image>` component for the terrain floor, animated via Reanimated `useAnimatedStyle` (translateX/Y from player position via `useDerivedValue`). Hypothesis: native View animated by `useAnimatedStyle` routes through RN's native animation driver, not through Skia — bypassing the buffer-stuffing pressure entirely. Trade-off: abandons procedural per-tile RSXform rendering; floor becomes a single positioned image. Honest uncertainty: if native animated Image still routes through Skia on this Android/RN version, same wall applies. One session to test.
+
+  **Image generation (confirmed by Mo):** Per-tile procedural variation between runs is not visually important — map identity comes from prop placement, not tile noise. For B1, CC generates each biome's ground texture by running the existing tile generator once and snapshotting via Skia's `makeImageSnapshot`. Save the result as a PNG in the assets folder and commit as a static file. The game loads it like any other sprite asset. One static image per biome (desert, grass-dirt). No runtime procedural tile generation needed.
+
+- **Strip diagnostic instrumentation.** Commits c36019e (STUTTER-DIAG long-frame logger on UI thread) and 92362a8 (fcb/sec rate counter in useFrameCallback) are still in the codebase. Added during Sessions 2–4 stutter investigation. Strip both before any production build or distribution.
+- **Phantom enemy leg bug (4e69ed2).** Visual bug: phantom enemy leg sprites appear incorrectly. Logged at commit 4e69ed2. Investigate and fix before Phase 6 visual polish begins.
 - **File refactor decision.** GameCanvas.tsx ~30k tokens drives CC context bloat (~40-50% of per-prompt token cost). Targeted split (extract derived-value hooks and timer logic into separate files) or full code organization pass. Decide approach and execute.
 
 ### Gameplay polish
