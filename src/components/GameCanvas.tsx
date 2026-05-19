@@ -160,6 +160,11 @@ import {
   useEnemySlotFlash,
 } from '../lib/slotHooks';
 
+// [STUTTER-DIAG] Hide static map props (vegetation, obstacles, barrels, wrecks,
+// buildings) and tank turrets to test prop-load composition cost. Flip to false
+// to restore. Remove before ship.
+const HIDE_PROPS_TEST = true;
+
 // Cycle order and display labels for the debug weapon button.
 const WEAPON_CYCLE: HeroWeaponPose[] = [
   'pistol', 'rifle', 'machinegun', 'grenade_launcher', 'flamethrower',
@@ -1665,7 +1670,7 @@ export default function GameCanvas({ width, height }: Props) {
           {/* ── Scatter props (z=1: vegetation → rocks → barrels → wrecks → structures) */}
           {/* One Atlas per assetKey type. Static world-space RSXforms; camera Group  */}
           {/* scrolls them. Skipped per-entry if image is still null during load.     */}
-          {[
+          {!HIDE_PROPS_TEST && [
             ...Object.entries(propAtlasData.vegetation),
             ...Object.entries(propAtlasData.obstacles),
             ...Object.entries(propAtlasData.barrels),
@@ -1900,7 +1905,7 @@ export default function GameCanvas({ width, height }: Props) {
           {/* ── Tank turrets (Phase 5 G5) ─────────────────────────────────── */}
           {/* One ACS + one Panzer. Two sibling animated Groups per tank      */}
           {/* (base + tower) — avoids animated-wrapping-animated stutter.     */}
-          {initialMapData.tanks.map((mapTank, ti) => {
+          {!HIDE_PROPS_TEST && initialMapData.tanks.map((mapTank, ti) => {
             const baseTransform  = tankBaseTransforms[ti]!;
             const towerTransform = tankTowerTransforms[ti]!;
             const projTransform  = tankProjectileTransforms[ti]!;
