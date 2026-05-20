@@ -90,6 +90,7 @@ export function tickCombat(state: GameState, dtMs: number): GameState {
   let weaponCooldownMs = player.weaponCooldownMs - dtMs;
   if (weaponCooldownMs < 0) weaponCooldownMs = 0;
 
+  let playerLastFiredAtMs = player.lastFiredAtMs;
   let nextProjectileId = state.nextProjectileId;
   let nextPickupId = state.nextPickupId;
   let killCount = state.killCount;
@@ -205,6 +206,7 @@ export function tickCombat(state: GameState, dtMs: number): GameState {
     }
 
     weaponCooldownMs = effective.cooldownMs;
+    playerLastFiredAtMs = state.elapsedMs;
     audioEngine.playSFX('shoot_pistol');
   }
 
@@ -509,6 +511,7 @@ export function tickCombat(state: GameState, dtMs: number): GameState {
     player: {
       ...player,
       weaponCooldownMs,
+      lastFiredAtMs: playerLastFiredAtMs,
       hp: newPlayerHp,
       lastDamagedAtMs: newLastDamagedAtMs,
     },

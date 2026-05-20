@@ -648,6 +648,8 @@ export default function GameCanvas({ width, height }: Props) {
     () => Array.from({ length: ENEMY_SOFT_CAP }, () => -1),
   );
   const [tankFlashFrames, setTankFlashFrames] = useState<[number, number]>([-1, -1]);
+  // Player muzzle flash frame — same lifecycle as enemy flash (-1 = not flashing, 0–2 = active).
+  const [playerFlashFrame, setPlayerFlashFrame] = useState(-1);
   const [heliActive, setHeliActive] = useState(false);
   const [heliRotorFrame, setHeliRotorFrame] = useState(0);
 
@@ -814,6 +816,16 @@ export default function GameCanvas({ width, height }: Props) {
         }
       }
       setTankFlashFrames(newTankFlashFrames);
+
+      // Player muzzle flash — same elapsed-since-lastFiredAtMs pattern as enemy flash.
+      const playerFlashElapsed = state.player.lastFiredAtMs > 0
+        ? state.elapsedMs - state.player.lastFiredAtMs
+        : -1;
+      setPlayerFlashFrame(
+        playerFlashElapsed >= 0 && playerFlashElapsed < MUZZLE_FLASH_DURATION_MS
+          ? Math.min(Math.floor(playerFlashElapsed / MUZZLE_FLASH_FRAME_DURATION_MS), MUZZLE_FLASH_FRAME_COUNT - 1)
+          : -1,
+      );
 
       // Pickup slot active flags — buffer pattern.
       const pa = timerBuffers.current.pickupActive;
@@ -1588,6 +1600,10 @@ export default function GameCanvas({ width, height }: Props) {
   const bodyH = bodyImage ? bodyImage.height() * HERO_SPRITE_SCALE : 0;
   const weaponW = weaponImage ? weaponImage.width() * HERO_SPRITE_SCALE : 0;
   const weaponH = weaponImage ? weaponImage.height() * HERO_SPRITE_SCALE : 0;
+  // Reuses muzzle_flash_raider frames and RAIDER_FLASH_OFFSET for all weapon variants.
+  // Valid while HERO_SPRITE_SCALE === ENEMY_SPRITE_SCALE (both = 2). If either scale
+  // diverges, this offset will need recalibration against the hero barrel position.
+  const playerFlashImg = playerFlashFrame >= 0 ? (muzzleFlashRaiderImages[playerFlashFrame] ?? null) : null;
 
   // ─── Pickup render sizes ──────────────────────────────────────────────────
   const moneyW = moneySmallImage ? moneySmallImage.width() * PICKUP_SPRITE_SCALE : 0;
@@ -2041,6 +2057,16 @@ export default function GameCanvas({ width, height }: Props) {
                 y={-weaponH / 2}
                 width={weaponW}
                 height={weaponH}
+                sampling={{ filter: FilterMode.Nearest, mipmap: MipmapMode.None }}
+              />
+            )}
+            {playerFlashImg && (
+              <Image
+                image={playerFlashImg}
+                x={-playerFlashImg.width() * EFFECT_SPRITE_SCALE / 2 + RAIDER_FLASH_OFFSET.x}
+                y={-playerFlashImg.height() * EFFECT_SPRITE_SCALE / 2 + RAIDER_FLASH_OFFSET.y}
+                width={playerFlashImg.width() * EFFECT_SPRITE_SCALE}
+                height={playerFlashImg.height() * EFFECT_SPRITE_SCALE}
                 sampling={{ filter: FilterMode.Nearest, mipmap: MipmapMode.None }}
               />
             )}

@@ -147,6 +147,12 @@ export type PlayerState = {
    */
   lastDamagedAtMs: number;
   /**
+   * elapsedMs when the player last fired a projectile (any weapon).
+   * -9999 at init (not fired yet). Read by the 100ms timer to compute
+   * playerFlashFrame for the muzzle flash visual in GameCanvas.
+   */
+  lastFiredAtMs: number;
+  /**
    * Current player level. Initialized to 1. Increments in G3 when the player
    * selects a skill from the level-up modal — NOT when the XP threshold is crossed.
    * tickProgression reads this to determine which threshold to check next.
@@ -529,6 +535,7 @@ export function createInitialGameState(canvasWidth: number, canvasHeight: number
       score: 0,
       xp: 0,
       lastDamagedAtMs: 0,
+      lastFiredAtMs: -9999,
       level: 1,
       skillStacks: {
         ammo_545bt: 0,
