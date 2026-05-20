@@ -451,13 +451,12 @@ export const MOLOTOV_TICK_INTERVAL_MS = 250;
 export const MOLOTOV_FIRE_FRAME_COUNT = 7;
 
 /**
- * Duration per fire frame (ms). Must be a multiple of the 100ms sprite timer interval
- * to avoid sampling stutter (misaligned frame durations cause some frames to show for
- * 2× their intended duration when the timer samples them twice before they advance).
- * 7 × 100ms = 700ms per loop cycle — shorter than FLAMETHROWER_ZONE_DURATION_MS (840ms)
- * so the animation loops briefly; visually fine at the zone's fast pace.
+ * Duration per fire frame (ms). Ideally a multiple of the 100ms sprite timer interval
+ * to avoid sampling stutter, but 120ms is kept here intentionally: 7 × 120ms = 840ms
+ * exactly matches FLAMETHROWER_ZONE_DURATION_MS, preventing a partial second loop that
+ * would leave a visible flame artifact after the zone expires.
  */
-export const MOLOTOV_FIRE_FRAME_DURATION_MS = 100;
+export const MOLOTOV_FIRE_FRAME_DURATION_MS = 120;
 
 // ─── Effect sprite scale ──────────────────────────────────────────────────────
 
