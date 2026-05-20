@@ -652,24 +652,18 @@ export function updateGameState(state: GameState, dtMs: number, collData: Collis
   let newIsMoving = false;
   let newWalkStartedAtMs = player.walkStartedAtMs;
 
+  // Hoisted — needed for move speed (moving branch) and weapon range (stationary scan).
+  const weapon = WEAPON_PROFILES[player.equippedWeaponId];
+  const effective = getEffectiveStats(player.skillStacks, weapon, player.maxHp);
+
   if (inputVector !== null) {
     newIsMoving = true;
 
     // Face toward input direction
     newTargetRotation = Math.atan2(inputVector.y, inputVector.x);
 
-    // Smooth rotation: step toward target angle, capped at max angular speed.
-    // Normalize diff to [-PI, PI] so we always rotate the short way around.
-    const maxDelta = PLAYER_MAX_ANGULAR_SPEED_RAD_PER_SEC * (dtMs / 1000);
-    const rawDiff = newTargetRotation - player.rotation;
-    const rotDiff = rawDiff - Math.round(rawDiff / (2 * Math.PI)) * (2 * Math.PI);
-    newRotation =
-      player.rotation + Math.sign(rotDiff) * Math.min(Math.abs(rotDiff), maxDelta);
-
     // Move at full speed in input direction (inputVector is already normalized).
     // Speed is drawn from effective stats so gear_tactical_boots stacks apply.
-    const weapon = WEAPON_PROFILES[player.equippedWeaponId];
-    const effective = getEffectiveStats(player.skillStacks, weapon, player.maxHp);
     const speed = effective.moveSpeedPxPerSec * (dtMs / 1000);
     newX = player.x + inputVector.x * speed;
     newY = player.y + inputVector.y * speed;
@@ -686,7 +680,36 @@ export function updateGameState(state: GameState, dtMs: number, collData: Collis
     const resolvedC = resolveCircle(newX, newY, PLAYER_COLLISION_RADIUS_PX, collData);
     newX = resolvedC.x;
     newY = resolvedC.y;
+  } else {
+    // Stationary: rotate toward the nearest alive enemy in weapon range, if any.
+    // Mirrors the targeting scan in combatEngine.ts tickCombat (step 2) — if the
+    // criteria ever change there, update both scans together.
+    const rangeSq = effective.rangePx * effective.rangePx;
+    let closestIdx = -1;
+    let minDSq = rangeSq + 1;
+    for (let i = 0; i < state.enemies.length; i++) {
+      const e = state.enemies[i];
+      if (!e || e.status !== 'alive') continue;
+      const edx = e.x - player.x;
+      const edy = e.y - player.y;
+      const dSq = edx * edx + edy * edy;
+      if (dSq < minDSq) { minDSq = dSq; closestIdx = i; }
+    }
+    if (closestIdx !== -1) {
+      const t = state.enemies[closestIdx]!;
+      newTargetRotation = Math.atan2(t.y - player.y, t.x - player.x);
+    }
+    // else: no target in range — newTargetRotation unchanged, step below is a no-op.
   }
+
+  // Smooth rotation: step toward target angle, capped at max angular speed.
+  // Normalize diff to [-PI, PI] so we always rotate the short way around.
+  // Applies uniformly to both movement-facing and stationary target-facing.
+  const maxDelta = PLAYER_MAX_ANGULAR_SPEED_RAD_PER_SEC * (dtMs / 1000);
+  const rawDiff = newTargetRotation - player.rotation;
+  const rotDiff = rawDiff - Math.round(rawDiff / (2 * Math.PI)) * (2 * Math.PI);
+  newRotation =
+    player.rotation + Math.sign(rotDiff) * Math.min(Math.abs(rotDiff), maxDelta);
 
   // Clamp player to world bounds so the camera never shows void past tile edges.
   // Margin = half the screen dimension / zoom, ensuring the viewport stays within
