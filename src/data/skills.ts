@@ -51,7 +51,13 @@ export type SkillId =
   // Phase 4b G5
   | 'throwables_frag'
   | 'throwables_smoke'
-  | 'throwables_molotov';
+  | 'throwables_molotov'
+  // Phase 5.5
+  | 'gear_heavy_plate'
+  | 'gear_knee_pads'
+  | 'ammo_fmj'
+  | 'optics_acog'
+  | 'gear_energy_bar';
 
 // ─── On-selection effect descriptor ──────────────────────────────────────────
 
@@ -300,6 +306,49 @@ export const SKILLS: Record<SkillId, SkillDefinition> = {
     // Cooldown per stack: max(12000 - 3000 * stacks, 6000) ms.
     effect: {},
   },
+
+  // ── Phase 5.5 — Stat-modifier clones ────────────────────────────────────────
+
+  gear_heavy_plate: {
+    id: 'gear_heavy_plate',
+    displayName: 'Heavy Plate',
+    description: '-12% damage taken',
+    category: 'gear',
+    maxStacks: 3,
+    effect: { damageTakenMultAdd: -0.12 },
+  },
+  gear_knee_pads: {
+    id: 'gear_knee_pads',
+    displayName: 'Knee Pads',
+    description: '-6% damage taken',
+    category: 'gear',
+    maxStacks: 2,
+    effect: { damageTakenMultAdd: -0.06 },
+  },
+  ammo_fmj: {
+    id: 'ammo_fmj',
+    displayName: 'FMJ Ammo',
+    description: '+18% damage',
+    category: 'ammo',
+    maxStacks: 3,
+    effect: { damageMultAdd: 0.18 },
+  },
+  optics_acog: {
+    id: 'optics_acog',
+    displayName: 'ACOG',
+    description: '+12% range',
+    category: 'optics',
+    maxStacks: 3,
+    effect: { rangeMultAdd: 0.12 },
+  },
+  gear_energy_bar: {
+    id: 'gear_energy_bar',
+    displayName: 'Energy Bar',
+    description: '+12 max HP',
+    category: 'gear',
+    maxStacks: 3,
+    effect: { maxHpAdd: 12 },
+  },
 };
 
 /**
@@ -331,6 +380,12 @@ export const SKILL_IDS: SkillId[] = [
   'throwables_frag',
   'throwables_smoke',
   'throwables_molotov',
+  // Phase 5.5
+  'gear_heavy_plate',
+  'gear_knee_pads',
+  'ammo_fmj',
+  'optics_acog',
+  'gear_energy_bar',
 ];
 
 // ─── Effective stats ──────────────────────────────────────────────────────────

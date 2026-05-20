@@ -421,6 +421,11 @@ export const GuiSprites = {
     throwables_frag:          require('../../assets/ui/icons/Frag.png'),
     throwables_smoke:         require('../../assets/ui/icons/Smoke.png'),
     throwables_molotov:       require('../../assets/ui/icons/Molotov.png'),
+    gear_heavy_plate:         require('../../assets/ui/icons/Heavy_Plate.png'),
+    gear_knee_pads:           require('../../assets/ui/icons/Kneepads.png'),
+    ammo_fmj:                 require('../../assets/ui/icons/FMJ.png'),
+    optics_acog:              require('../../assets/ui/icons/ACOG.png'),
+    gear_energy_bar:          require('../../assets/ui/icons/Energy_Bar.png'),
   },
 } as const;
 
