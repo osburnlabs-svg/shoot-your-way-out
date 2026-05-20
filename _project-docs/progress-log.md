@@ -31,6 +31,7 @@ Status legend:
 | 4b — Ability skills + crates | 🟢 Complete | 2026-05-10 | G1: 5411988 Slot-fix: 8ff2533 G2: 18b44e3 G3: e2a1deb G4: 8c31b42 G4-polish: 9cb7762 G5: b4091c6 Smoke: 2438bb4 | G1 ✅ G2 ✅ G3 ✅ G4 ✅ G5 ✅ | All 20 v1 skills shipped; throwable system; revive; bloom-hold-dissipate smoke animation |
 | 4c — Crate weapons | 🟢 Complete | 2026-05-11 | G1: 75dc967 Fix: 68f5ef3 266fbd6 G2: d6f1c1c G3: 8c390b3 Polish: cd2d2d8 5a29a3e 2daeffd a0b7e61 4eca404 Close: cb8bddb | G1 ✅ G2 ✅ G3 ✅ | World-spawn crates; weapon roll + reveal modal; Shotgun/Rocket Launcher/Flamethrower active; custom weapon icons; debug scaffold cleaned up |
 | 5 — Maps + obstacles + vehicle enemies | 🟢 Complete | 2026-05-13 → 2026-05-17 | G1: 99bf87d→3c17fac G2: 86c1a33→44cb822 G3: 6ed8a3c→b391493→30fb59c→2c04ed9→656fddf→c979729→93bc790→289a832→f9c30e7→74b6376→a311bdb→c3450b7 G4: 81a0cbd→832828a→1e94df5→ee1e503→345c364→eb0ceec→384566a→fb1f99d→1029ab4→40cb8bb→5937a47→d18dc5a G5: 25bdb9f→6b97271→4a0ccec→338f884→5cf5883→7c05592 Flyover: 7bac617→1677616→e985445 | G1 ✅ G2 ✅ G3 ✅ G4 ✅ G5 ✅ Flyover ✅ | G5 tank turret (ACS + Panzer, genuine rocket fire); ambient helicopter flyover system |
+| 5.5 — Gameplay completion | 🟢 Complete | 2026-05-17 → 2026-05-19 | 67c0bfb aeb1d8c 5a342e5 c3a86d6 3d1fc57 623f4bd 745cb70 23fe135 6fff044 4c43cba 92dab24 28ab327 b1fe4c8 | Yes (all features device-tested) | Stutter fixed (30fps cap); hero auto-rotation; muzzle flash; weapon rarity tiers; 5 skill clones; 25-skill pool |
 | 6 — Audio + atmospheric effects | ⚪ | | | | |
 | 7 — UI + persistence + analytics | ⚪ | | | | |
 | 8 — Helicopter boss + hazards | ⚪ | | | | |
@@ -1440,7 +1441,7 @@ Design decisions captured 2026-05-14. Apply when the relevant phase work begins.
 
 **Goal:** Close all gameplay-affecting tech debt and feature work before polish phases begin. No UI/sound/menu work until gameplay is at final state.
 
-**Status:** 🟡 In Progress
+**Status:** 🟢 Complete — 2026-05-19
 
 ---
 
@@ -1897,6 +1898,123 @@ When a prop enters the viewport for the first time, there is a first-frame race:
 - **Underlying rubber-band cause:** Unknown. Mount-race explains why culling regressed frequency; it does not explain the baseline rubber-band at 548152e. Root cause identification deferred — requires new diagnostic approach or an architectural approach that sidesteps the issue entirely.
 
 **Next session approach TBD.** Do not re-attempt any item on the cumulative do-not-retry list.
+
+---
+
+### Phase 5.5 — Session 6 (2026-05-19) — THE STUTTER FIX + Feature Sprint to Gameplay Completion
+
+**Commits:** 67c0bfb | aeb1d8c | 5a342e5 | c3a86d6 | 3d1fc57 | 623f4bd | 745cb70 | 23fe135 | 6fff044 | 4c43cba | 92dab24 | 28ab327 | b1fe4c8
+
+---
+
+#### The stutter fix — session open context
+
+Five days and five sessions of investigation ended Session 5 with `git reset --hard f0f0f05` and no fix landing. Session 6 opened with Mo considering a full engine rebuild to Phaser. Before committing to rebuild, Mo tried one more small fix: cap the game at 30fps.
+
+CC's research found three possible mechanisms (throttle `useFrameCallback`, Skia vsync config, fixed timestep). Source-grounded analysis confirmed:
+- Skia vsync config: not viable in v2.2.12 (no API)
+- Fixed timestep with 60fps render: doesn't fix root cause (`cameraTransform` still fires 60×/sec)
+- Throttle `useFrameCallback` via time accumulator: viable, ~5 lines
+
+**Commit 67c0bfb** shipped the time accumulator: `TICK_INTERVAL_MS = 33.333` constant, `tickAccMs` SharedValue, remainder-carry-forward gate that returns early when not enough time has accumulated. Game logic and rendering both throttled to 30fps. Mo tested on device.
+
+**Mo's exact words after device test: "claude..... my jaw is dropping. its fixed."**
+
+---
+
+#### Why it worked — the mechanism
+
+The bug was never per-frame cost. It was throughput mismatch with SurfaceFlinger's buffer queue.
+
+At 60fps, every vsync produced a buffer submission. GH#3327 (the documented Skia Android bug) made the animated camera Group invalidate its entire subtree on every transform change — a full Skia re-composition every vsync. The composition itself fit in budget (~9ms), but submitting 60 of these per second filled SurfaceFlinger's queue faster than it could drain. When the queue filled, the next submission waited. That wait time was the visible stutter.
+
+Session 4's System Trace data was always pointing at it — all 5 janky frames showed App thread work of only 1.4–2.5ms with 17–26ms total duration. The gap was `dequeueBuffer` wait, not work. We read it as "something is slow" instead of "the queue is full."
+
+At 30fps, half the submissions. Queue drains between them. Buffer stuffing eliminated.
+
+**Lesson logged:** Throughput-mismatch bugs look like cost bugs. Read the time gap as wait, not as work, when the data points there.
+
+---
+
+#### Two latent bugs exposed by 30fps
+
+The 30fps cap changed the visibility of two pre-existing bugs that 60fps timing had masked.
+
+**Phantom enemy leg (commit 5a342e5).** Enemy slot's inactive branch in `slotHooks.ts` returned screen coordinate `(0,0)` — the top-left corner — when every other slot type (projectile/pickup/crate) used `-9999` off-screen. Race condition: `gameState.value.enemies[slot]` goes null at the game tick, `useEnemySlotTransform` worklet returns `(0,0)` immediately, but `enemySlotTypes[slot]` in React state lags up to 100ms behind the 100ms timer. During the race window, the JSX renders the slot at screen `(0,0)` with stale sprite frame for 1–6 frames depending on framerate. Bug was MORE visible at 60fps (~6 frames) than at 30fps (~3 frames), but Mo first noticed during extended testing after helicopter flyby shipped (which gave more sustained playtime to spot it). Race is frame-rate-independent. Fix: change enemy inactive transform to `-9999`, matching the established pattern.
+
+**Pickup orbit (commit c3a86d6).** Phase 3 G4a fixed an earlier "tail-chase / can't catch up" pickup magnet bug by removing acceleration and using direct-pull at `MAGNET_MAX_SPEED`. That speed was bumped to 1200 at some point after G4a. At 60fps with `dtSec=0.01667`, step distance was ~20px per tick — orbit zone math required `d ≤ step-12 = 8px`, but `d > 12px = collected`; no orbit possible. At 30fps with `dtSec=0.03333`, step distance doubled to ~40px — creating a persistent 16px-wide orbit ring (`12px < d ≤ 28px` where pickup overshoots through collection radius and lands on far side, oscillating forever). Fix: structural overshoot clamp `stepDist = Math.min(MAGNET_MAX_SPEED_PX_PER_SEC * dtSec, dist)` — pickup stops at player position when it would overshoot. Geometrically prevents orbit at any framerate or speed setting.
+
+Both bugs were latent. Frame rate timing had masked them. Fixed for free by the 30fps change exposing them.
+
+---
+
+#### Hero auto-rotation to face shot target (commit 3d1fc57)
+
+First major gameplay feature shipped after stutter fix. Hero rotates to face the weapon's auto-targeted enemy when stationary; existing rotation-to-movement-direction preserved when moving. Reuses existing weapon targeting logic + existing angular-step machinery (`PLAYER_MAX_ANGULAR_SPEED_RAD_PER_SEC`). Hero sprite renders smoothly at arbitrary angles.
+
+Implementation highlights:
+- Hoisted `weapon`/`effective` out of the if-block (both branches need `effective.rangePx`)
+- Extracted angular step to after both branches (runs uniformly)
+- New else branch with O(50) enemy scan for nearest alive in weapon range
+- Target-scanning loop duplicated with `combatEngine`'s scan — acceptable tradeoff to keep combatEngine.ts untouched per high-risk-file flag
+
+**Mo's reaction:** "holy shit, might have been one of the best things we have added. massive improvement. makes the hero feel like a tactical badass. works perfect too!"
+
+---
+
+#### Player muzzle flash (commits 623f4bd, 745cb70)
+
+Reused raider muzzle flash visual (`muzzle_flash_raider`, 3 frames) + same `RAIDER_FLASH_OFFSET` (verified Group-local at `HERO_SPRITE_SCALE = ENEMY_SPRITE_SCALE = 2`, ports directly). Player fire stamps `lastFiredAtMs` in `combatEngine`; 100ms timer computes flash frame index identical to raider/sniper/tank pattern. Time-based animation, no fire-rate awareness needed.
+
+Skip list: Rocket Launcher (`gp25`) and Flamethrower (`rpo`) don't show muzzle flash. Gate in 100ms timer (presentation layer) for clean semantic separation.
+
+**Bullets-from-gun-barrel — SCRAPPED.** Original Phase 6 plan bundled muzzle flash + bullet origin correction together. Mo's observation after auto-rotation + muzzle flash shipped: with hero facing target and muzzle flash anchored at barrel, the bullet spawn position is visually irrelevant. Direction perception is what matters. Feature removed from inventory.
+
+---
+
+#### PKM removal + doc reconciliation (commit 23fe135)
+
+PKM (Machine Gun) was dormant dead code — defined in `weapons.ts` but excluded from `CRATE_TIER_WEAPONS`, no `weaponHudIcons` entry, no acquisition path. Removed entirely. Reconciled stale references across v3 doc and progress-log (Phase 4a entries about L4/L8/L12 weapon progression that no longer exists in code, Shotgun pose mapping correction). Player-facing weapons confirmed at 7: Pistol, SMG, Assault Rifle, Shotgun, Sniper Rifle, Rocket Launcher, Flamethrower.
+
+---
+
+#### Weapon rarity tiers (commits 6fff044, 4c43cba)
+
+Per strategy doc Section 11, with Mo's design adjustments:
+- 4 tiers: Common/Uncommon/Rare/Legendary with damage multipliers 1.0/1.1/1.2/1.3×
+- Drop weights: 50/30/15/5
+- Two independent rolls per crate: weapon type (uniform 1/6 across 6 non-pistol weapons) + rarity tier
+- Visual: tier label text in tier color; color border initially shipped then removed in 4c43cba — label alone reads cleaner on device
+- Auto-discard rule (strategy doc Section 11.6) scrapped per Mo's call — rarity is informational, not gatekeeping. Player always sees Equip/Scrap regardless of tier comparison.
+- Starter Pistol: always Common, rarity not displayed in modal
+- Flamethrower zone DoT scales with rarity multiplier; skills do NOT scale flamethrower (intentional — flamethrower is mechanically distinct from projectile weapons)
+
+---
+
+#### Skill clones (commit 28ab327)
+
+5 stat-modifier skill clones per strategy doc Section 7:
+- Heavy Plate (-12% damage taken, maxStacks: 3) — clone of Plate Carrier, intentionally slightly stronger per stack
+- Knee Pads (-6% damage taken, maxStacks: 2) — clone of Ceramic Insert
+- FMJ Ammo (+18% damage, maxStacks: 3) — clone of AP Rounds
+- ACOG (+12% range, maxStacks: 3) — clone of Red Dot
+- Energy Bar (+12 max HP, maxStacks: 3) — clone of MRE
+
+No engine changes required — all 5 effect fields already existed. Pool grew from 20 → 25 skills. Clones stack additively with originals (intentional — late-run power fantasy moment for players who happen to roll original + clone together).
+
+---
+
+#### Flame frame duration adventure (commits 92dab24 → b1fe4c8)
+
+`MOLOTOV_FIRE_FRAME_DURATION_MS = 120` was misaligned with the 100ms sprite timer, causing frames 0 and 5 to stall at ~200ms during the 840ms flame zone lifetime. Changed to 100ms in 92dab24. Device test revealed the 700ms cycle within 840ms zone lifetime started a visible partial second loop after the animation completed. Reverted to 120 in b1fe4c8 with comment documenting the intentional choice (7 × 120 = 840ms exactly matches zone lifetime). Net: no change to flame animation, but the constant now has an explanatory comment.
+
+Naming debt noted: `MOLOTOV_FIRE_FRAME_DURATION_MS` is stale (Molotov uses static `explodeImages[2]`, doesn't use this constant). Accurate name would be `FLAME_ZONE_FRAME_DURATION_MS`. Rename deferred as future cosmetic cleanup.
+
+---
+
+### ✅ Phase 5.5 — COMPLETE (2026-05-19)
+
+All Phase 5.5 inventory items shipped or formally scrapped. Game is gameplay-complete. Polish and UI work begins in Phase 6.
 
 ---
 

@@ -127,7 +127,7 @@ Same gameplay effect (start with skill applied). Currency adds the ability to *c
 
 ### 4.2 Flea market inventory
 
-**Skills (20 base + clones):** every skill in the game is purchasable for one run. Selecting one applies 1 stack of that skill when the run starts.
+**Skills (25 — 20 base + 5 Phase 5.5 clones, more clones in future batches):** every skill in the game is purchasable for one run. Selecting one applies 1 stack of that skill when the run starts.
 
 **Weapons (7 total):** every weapon is purchasable. Buying adds the weapon to the player's run alongside the starter Pistol (does NOT replace Pistol). Aligns with Phase 7's weapon-inventory design.
 
@@ -322,25 +322,24 @@ This is a conscious tradeoff. Unique legendary modifiers would be more memorable
 
 ### 11.5 Visual differentiation
 
-Two visual treatments per rarity:
+v1 ships one visual treatment per rarity:
 
-1. **Color-tinted rarity label** ("Common", "Uncommon", "Rare", "Legendary") in the rarity color. Explicit read — player knows exactly what tier they got.
-2. **Colored border on the weapon icon card** in the rarity color. Instant visual signal before the player reads the label — same pattern used by Diablo, Borderlands, and most ARPGs. Implemented as `borderWidth` + `borderColor` style props on the existing `<View>` card in `CrateRevealModal`. No Skia, no canvas work required.
+1. **Color-tinted rarity label** ("Common", "Uncommon", "Rare", "Legendary") in the rarity color. Explicit read — player knows exactly what tier they got. Shipped Phase 5.5 Session 6 (commit 6fff044; border removed 4c43cba).
 
-Both treatments appear in:
-- Crate reveal modal (when weapon is revealed)
+A **colored border on the weapon icon card** was implemented and device-tested (commit 4c43cba) but removed — the border competed visually with the tier label and the label alone read more cleanly. Glow or background shade treatment is a Phase 6 polish candidate.
+
+The tier label appears in:
+- Crate reveal modal (when weapon is revealed) — shipped v1
 - HUD weapon icon strip (when weapon is equipped — Phase 7)
 - Flea market purchase screen (Phase 10) if/when weapons appear there with rarity
 
-### 11.6 Inventory interaction with rarity
+### 11.6 Inventory interaction with rarity (revised 2026-05-19)
 
-Phase 7's weapon inventory design specifies "if EQUIPing a weapon you already own, switch active without adding a duplicate." Rarity is informational — it does not gate player choices. The player always retains Equip/Scrap agency regardless of rarity tier.
+Rarity is informational, not gatekeeping. The crate reveal modal shows rarity color and tier label so the player can make an informed Equip/Scrap decision. The current single-weapon-equip model means every crate presents Equip or Scrap regardless of how the rolled rarity compares to the currently-equipped weapon's rarity.
 
-When a crate drops a weapon the player already owns at a different rarity:
+The original auto-discard rule (auto-scrap duplicates of lower rarity) was scrapped on 2026-05-19 (Session 6) per design call: the player retains full agency. If they want to scrap a Legendary in favor of a Common variant of a different weapon type they prefer, that's their choice.
 
-- **Player is presented with Equip / Scrap options as normal.** Rarity is displayed on the card but does not auto-resolve the decision.
-- **Scrapping any rarity converts to a money pickup.** No auto-discard.
-- **Player may hold any rarity tier they choose** — they are not forced to upgrade to a higher-rarity copy.
+When Phase 7's weapon inventory ships, the existing "don't add duplicates" rule applies. Rarity remains informational at that point.
 
 ### 11.7 Skills are NOT affected
 

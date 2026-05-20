@@ -122,7 +122,7 @@ Shoot Your Way Out is **game #1 of a series of mobile games**. We are building a
 | Framework | React Native (managed Expo workflow) | Industry standard for cross-platform mobile; managed Expo handles tooling pain |
 | Build & Submit | EAS Build + EAS Submit | Cloud builds (iOS works on Windows), one-command store submission |
 | OTA Updates | EAS Update | Ship balance changes and bug fixes without store review |
-| Rendering | `@shopify/react-native-skia` | 2D graphics on UI thread via Reanimated worklets, hits 60fps reliably |
+| Rendering | `@shopify/react-native-skia` | 2D graphics on UI thread via Reanimated worklets; capped at 30fps via time accumulator (Phase 5.5) |
 | Animation | `react-native-reanimated` | Powers Skia worklets and HUD transitions |
 | Gestures | `react-native-gesture-handler` | Drag-to-move input |
 | Storage | `@react-native-async-storage/async-storage` | Standard mobile persistence |
@@ -131,7 +131,7 @@ Shoot Your Way Out is **game #1 of a series of mobile games**. We are building a
 | IAP | `expo-in-app-purchases` (or `react-native-iap` if SDK 54 compat issues) | TBD at Phase 9 |
 | Analytics | PostHog or Amplitude (free tier) | Decided at Phase 1 |
 | Routing | Plain React state (no `expo-router`) | Three screens, file-based routing is overkill |
-| Frame rate | 60fps target, delta-time loop | Drag-to-move feels sluggish below 60; degrades gracefully |
+| Frame rate | 30fps cap via time accumulator (Phase 5.5) | SurfaceFlinger buffer stuffing at 60fps caused stutter — 30fps is the fix, not a constraint |
 
 **Capacitor is dropped** — that was for wrapping the web app, irrelevant since we're going native.
 
@@ -291,7 +291,7 @@ Path: `top-down-trucks-and-cars-pixel-art-asset-pack/PNG/`
 ### Controls
 - **Drag-to-move** — finger on screen, character follows finger position
 - **Auto-fire** — character shoots nearest enemy automatically
-- **60fps target** — delta-time game loop, frame-rate-independent
+- **30fps cap** — time accumulator in `useFrameCallback`; game logic and rendering both throttled. Fixed SurfaceFlinger buffer stuffing (Phase 5.5 Session 6, commit 67c0bfb). Do not revert.
 
 ### Weapons (5 visual tiers, 8 stat profiles)
 
@@ -926,9 +926,9 @@ Routing gesture callbacks through `.runOnJS(true)` writes input SharedValues fro
 
 **GameState SharedValue must contain ONLY fields read by UI-thread worklets**
 
-Reanimated's `SharedValue.value = x` deep-copies the entire object tree through JSI to the C++ worklet runtime on every write. `gameState.value = updateGameState(...)` runs every frame at 60fps — so every field in `GameState`, however deeply nested, is serialized 60 times per second. Fields that worklets never read are pure serialization overhead.
+Reanimated's `SharedValue.value = x` deep-copies the entire object tree through JSI to the C++ worklet runtime on every write. `gameState.value = updateGameState(...)` runs every frame at 30fps — so every field in `GameState`, however deeply nested, is serialized 30 times per second. Fields that worklets never read are pure serialization overhead.
 
-Symptom: adding a large data structure (e.g. an 8,836-element tile grid) to GameState that no worklet reads produces 9× JSI serialization cost per frame and a multi-minute initial SharedValue allocation. The performance cliff is invisible at small sizes (32×32 = 1,024 cells tolerable; 94×94 = 8,836 cells fatal at 60fps). Discovered in Phase 5 G2: tileGrid in GameState caused 3-minute initial load times and 1 FPS during gameplay at 6000×6000. Putting non-worklet data in the SharedValue forces per-frame JSI serialization for no benefit and breaks at scale.
+Symptom: adding a large data structure (e.g. an 8,836-element tile grid) to GameState that no worklet reads produces 9× JSI serialization cost per frame and a multi-minute initial SharedValue allocation. The performance cliff is invisible at small sizes (32×32 = 1,024 cells tolerable; 94×94 = 8,836 cells fatal at 30fps). Discovered in Phase 5 G2: tileGrid in GameState caused 3-minute initial load times and 1 FPS during gameplay at 6000×6000. Putting non-worklet data in the SharedValue forces per-frame JSI serialization for no benefit and breaks at scale.
 
 *Binding rule:* Any data that only the JS thread reads (tile grids, map metadata, weather, static entity lists, any future pre-computed lookup tables) must live in regular React `useState` or `useRef`, NOT in `GameState`. Conceptual ownership ("this is game data") does not override this rule. The criterion is: **does a UI-thread worklet read it?** If no, it stays out of `GameState`. Applied in Phase 5 G2 (commit d91b4ce): `MapData` (including `tileGrid: TileCell[][]`) removed from `GameState`; lives as `initialMapData` in `GameCanvas` React state. Tile rendering reads `initialMapData.tileGrid` directly, never through `gameState.value`.
 
@@ -1009,6 +1009,14 @@ Stationary damaging entities (turrets, future hazards) combine prop-like and ene
 React hooks require a stable call count across renders. For entities whose count is small and bounded (e.g., always exactly 2 tanks), declare one `useDerivedValue` per slot per transform type unconditionally at component mount — never inside a condition or loop. Skip rendering when a slot is inactive by returning `null` from the JSX map; the hook still runs cheaply with no Skia subscriber.
 
 *Applied in G5:* 2 tanks × 3 transform types (base, tower, projectile) = 6 fixed `useDerivedValue` calls at mount, regardless of how many tanks actually spawned. `tankBaseTransforms[ti]`, `tankTowerTransforms[ti]`, `tankProjectileTransforms[ti]` are accessed by index. If a tank didn't spawn, the derived values compute a position at `(0, 0)` and the JSX map returns `null` for that slot.
+
+**Game runs at 30fps — do not revert to 60fps without re-introducing the buffer stuffing fix**
+
+The game is capped at 30fps via a time accumulator in `useFrameCallback`. Implementation: `TICK_INTERVAL_MS = 33.333` constant; `tickAccMs` SharedValue; remainder-carry-forward gate at the top of `useFrameCallback` that returns early when `tickAccMs < TICK_INTERVAL_MS`. Game logic and rendering both throttled: engine tick, camera transform, all entity rendering fire only when the accumulator crosses the threshold.
+
+*Why this is locked:* At 60fps, every vsync produced a `gameState.value` write that triggered a full Skia re-composition of all tile Atlas children inside the animated camera `Group` (GH#3327 — animated Skia Group invalidates its entire subtree on every transform change). The composition itself fit in per-frame budget (~9ms), but 60 submissions/sec filled SurfaceFlinger's buffer queue faster than it could drain. The resulting `dequeueBuffer` wait was the visible stutter — not per-frame render cost. Session Trace data showed App thread work of only 1.4–2.5ms/frame with 17–26ms total duration; the gap was queue-wait, not work. At 30fps, half the submissions; queue drains between them; buffer stuffing eliminated.
+
+*Do not revert:* Restoring `useFrameCallback` to fire every vsync without the accumulator gate re-introduces the buffer stuffing. The stutter will return. This is not a cosmetic frame rate preference — the 30fps cap is the architectural fix for GH#3327 in this rendering stack. Shipped Phase 5.5 Session 6 (commit 67c0bfb).
 
 ---
 
@@ -1106,7 +1114,7 @@ syo_install_date: string                  // for analytics cohort
 **Mobile-specific:**
 - Test touch on real device early
 - Safe area insets matter on iPhone — HUD elements need padding for notch and dynamic island
-- 60fps target — profile performance before adding visual effects
+- 30fps cap — time accumulator fix for SurfaceFlinger buffer stuffing; do not revert (Phase 5.5)
 - AsyncStorage for all persistence (no localStorage)
 - iOS silent switch override is required for audio
 

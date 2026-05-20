@@ -4,64 +4,54 @@ Canonical source for all forward-looking work on Shoot Your Way Out. Reference t
 
 ## Phase 5.5 — Gameplay Completion
 
-Gameplay-affecting tech debt and feature work. Must be complete before polish phases. Principle: no UI/sound/menu work until gameplay is at final state.
+**Goal:** Close all gameplay-affecting tech debt and feature work before polish phases begin. No UI/sound/menu work until gameplay is at final state.
 
-### Bugs and tech debt
-- **Stuttering investigation — primary v1 blocker.** Root cause confirmed (Session 4 System Trace): animated camera `Group` with Reanimated animated `transform` triggers full Skia re-composition of all tile Atlas children on every vsync (GH#3327), producing multiple Skia render passes per frame and filling the SurfaceFlinger buffer queue (Android "buffer stuffing" jank type). Application thread fast (1.4–2.6ms/frame), GPU negligible — the problem is render pass frequency, not render cost per pass. Camera-snap stutter is movement-correlated, visible only on world tiles/props — hero and enemies immune (perceptual asymmetry).
+**Status: 🟢 COMPLETE (2026-05-19).** Game is gameplay-complete. Polish and UI work begins in Phase 6.
 
-  **Validated direction (Session 5):** Eliminating the animated camera Group reduces stutter frequency and changes character — correct structural path. Screen-space PropImage approach (commit 548152e, reverted) reduced frequency but introduced rubber-band character (props snap back after viewport entry/exit). Underlying cause of rubber-band: unidentified. Mount-race theory explains why viewport culling made it worse; does not explain the baseline rubber-band before culling.
+### Shipped / resolved in Phase 5.5
 
-  **Cumulative do-not-retry list (Sessions 2–5):**
-  - Tile rebuild allocation (mutable pool, Session 2) — zero felt improvement
-  - Tile rebuild frequency (3-tile coarsening, Session 2) — zero felt improvement
-  - Tile rebuild elimination (full-map pre-computation, Session 3) — zero felt improvement
-  - Half-dist Atlas child count (Phase 5 G2) — zero felt improvement
-  - Engine-wide spread allocation (5-commit ping-pong refactor, Session 3) — zero felt improvement (worse)
-  - JS-thread React reconciliation (DevTools profile, Session 3) — healthy; not the cause
-  - RSXform worklet tiles (useRSXformBuffer / custom startMapper, Session 4) — eliminated snap, tanked framerate to 30fps; structurally limited at 1000+ tile buffer size
-  - Camera smoothing (CAMERA_LERP 0.2/0.1, Session 4) — snaps too large to mask at any reasonable lerp factor
-  - B1 native floor (Animated.Image resizeMode="repeat", Session 5) — resizeMode="repeat" ignored by Android Fresco; texture stretches to fill
-  - PictureRecorder for props (Session 5) — analytically rejected; still Skia, still subject to GH#3327
-  - Screen-space PropImage / camera Group elimination (Session 5, 548152e) — reduces frequency but introduces rubber-band; underlying cause unidentified; not a complete fix
-  - React.memo on PropImage (Session 5, cc1d89e) — no improvement; re-registration hypothesis falsified by [PROP-RENDER] logs
-  - Viewport culling at 400px (Session 5, 63bc21d) — frequency increased; mount-race amplified at viewport boundary
-  - Viewport culling at 800px (Session 5, a17f845) — zero change from 400px; buffer size not the variable
-  - Atomic shared snapshot approach (Session 5) — analytically falsified; UI thread is single-threaded
-  - ImageShader floor transform (Session 5) — transform excluded from AnimatedProps at v2.2.12; TypeScript compile failure
+- **Stutter fix** — RESOLVED via 30fps cap (commit 67c0bfb). Root cause: SurfaceFlinger buffer queue saturation at 60fps submission rate during GH#3327 full-Skia-recomposition per vsync. Full investigation history in progress-log Sessions 1–6.
+- **Diagnostic instrumentation stripped** — DONE (commit aeb1d8c). Commits c36019e + 92362a8 removed.
+- **Phantom enemy leg bug** — FIXED (commit 5a342e5). Inactive enemy slots now return `(-9999, -9999)` matching all other slot types. Root cause: 100ms React state lag behind worklet null-transition.
+- **Pickup orbit at 30fps** — FIXED (commit c3a86d6). Overshoot clamp `stepDist = Math.min(speed * dt, dist)` prevents oscillation at any framerate.
+- **Hero auto-rotation to face shot target** — SHIPPED (commit 3d1fc57). Hero faces nearest enemy in weapon range when stationary; faces movement direction when moving.
+- **Player muzzle flash** — SHIPPED (commits 623f4bd, 745cb70). Raider visual + offset reused; skipped for Rocket Launcher and Flamethrower.
+- **Bullets emanate from gun barrel** — SCRAPPED (Mo's call, Session 6). Auto-rotation + muzzle flash made bullet spawn origin visually irrelevant; direction perception is what matters.
+- **PKM removal + doc reconciliation** — DONE (commit 23fe135). 7 player-facing weapons confirmed.
+- **Weapon rarity tiers** — SHIPPED (commits 6fff044, 4c43cba). Common/Uncommon/Rare/Legendary; 50/30/15/5 weights; 1.0/1.1/1.2/1.3× damage multipliers; tier label text color; auto-discard rule scrapped (rarity informational only).
+- **Skill clones (5 items)** — SHIPPED (commit 28ab327). Heavy Plate, Knee Pads, FMJ Ammo, ACOG, Energy Bar. Pool: 20 → 25 skills.
+- **Crate spawn validity** — SHIPPED (commit f0856d1, Session 1).
+- **Decorative prop placement fixes** — SHIPPED (commits 4d8b093, 00850f4, 8972100, Session 1).
 
-  **Next session approach TBD.** Known constraints: animated camera Group must be eliminated (GH#3327 confirmed root cause); tiles + props must render outside the animated Group. RSXform (Session 4) and screen-space PropImage (Session 5) both have cost or quality walls. Floor fix is also blocked (both B1 and ImageShader paths exhausted). Do not re-attempt any item on the do-not-retry list.
+### Carried into Phase 6 backlog from Phase 5.5
 
-- **Strip diagnostic instrumentation.** Commits c36019e (STUTTER-DIAG long-frame logger on UI thread) and 92362a8 (fcb/sec rate counter in `useFrameCallback`) are still in the codebase. Added during Sessions 2–4 stutter investigation. Strip both before any production build or distribution.
-- **Phantom enemy leg bug (4e69ed2).** Visual bug: phantom enemy leg sprites appear incorrectly. Logged at commit 4e69ed2. Investigate and fix before Phase 6 visual polish begins.
-- **100ms timer structural coupling.** The `setInterval` in `GameCanvas` handles: hero sprite frame, player vitals (HP bar), level-up choices, crate reveal, enemy slots × 4, throwable slots, zone slots, and rocket flags. One timer, many concerns. Not at breaking point. Phase 6+ refactor candidate: split into domain-specific timers with appropriate cadences.
-- **tileGrid removal.** `tileGrid` field survives in `mapGenerator.ts`, `mapTypes.ts`, and `mapLoader.ts` from an earlier tile rendering approach but is no longer used for rendering (tile Atlas replaced it). Dead code. Remove in a cleanup pass.
-- **File refactor decision.** GameCanvas.tsx ~30k tokens drives CC context bloat (~40-50% of per-prompt token cost). Targeted split (extract derived-value hooks and timer logic into separate files) or full code organization pass. Decide approach and execute.
+- **Code review and optimization pass.** Mo flagged in Session 6 — general code health review before Phase 6 visual work begins.
+- **Rarity v2 visual treatment.** Glow effect or background shade as Phase 6 polish candidate. Colored border removed in 4c43cba (label alone ships for v1); more visual differentiation is optional polish for Phase 6.
+- **100ms timer structural coupling.** `setInterval` in `GameCanvas` handles too many concerns (hero sprite, vitals, level-up, crate reveal, enemy slots, throwable slots, zone slots, rocket flags). Phase 6+ refactor candidate.
+- **tileGrid dead code removal.** `tileGrid` field survives in `mapGenerator.ts`, `mapTypes.ts`, and `mapLoader.ts` but is no longer used for rendering (tile Atlas replaced it). Dead code.
+- **GameCanvas.tsx file refactor decision.** ~30k tokens — targeted split vs full code-organization pass. Deferred indefinitely per project memory; do not resume without Mo reopening it.
+- **`MOLOTOV_FIRE_FRAME_DURATION_MS` rename.** Stale constant name — Molotov uses static `explodeImages[2]`, not this constant; it drives flame zone animation only. Accurate name: `FLAME_ZONE_FRAME_DURATION_MS`. Cosmetic cleanup, deferred.
+- **`SCAV_WALK_FRAME_DURATION_MS` sampling misalignment.** Technically not a multiple of the 100ms sprite timer interval (same class of issue as the flame frame fix), but visually masked by the continuous walk loop (no start/end stall pattern where misalignment is visible). Low priority; document and defer.
 
-### Gameplay polish
-- **Hero auto-rotation to face shot target.** Compute angle to nearest enemy in firing range, apply rotation to player sprite transform. Pre-implementation check: confirm hero sprite reads correctly at arbitrary angles.
-- **Bullets emanate from gun barrel.** Paired with auto-rotation. Per-weapon barrel offset constant. Spawn projectiles at hero position + offset (rotates with hero facing).
-
-### Feature work
-- **Weapon variant tiers.** Common/Uncommon/Rare/Legendary per weapon. Requires: rarity data definitions, crate roll logic, equip logic (rarity comparison), visual borders on icon cards, stat scaling per tier.
-- **Skill clones (5 items).** Heavy Plate, Knee Pads, FMJ Ammo, ACOG, Energy Bar. Each is one PNG drop + one data row in skills.ts + one icon mapping in sprites.ts.
-
-### Closed this session (Session 1, 2026-05-17)
-
-- **Crate spawn validity** (was in original inventory) — commit f0856d1. On-prop exclusion via `solidPropExclusions` in `GameState`; world-edge bounds derived from `viewHalfW`/`viewHalfH` to match player wall exactly.
-- **Decorative barrel/crate overlap with buildings** (discovered mid-session) — commit 4d8b093. Fixed orbit from native-space center distance to scaled-edge-relative gap (`BARREL_EDGE_MIN = 10`, `BARREL_EDGE_MAX = 90`).
-- **Within-cluster prop-on-prop overlap** (discovered mid-session) — commit 00850f4. Added `clusterPlaced` tracking per building; `tooCloseScaled` check with gap = 5 against already-placed cluster siblings.
-- **Vegetation density bump** (design change, not a bug) — commit 8972100. 50–80 → 70–100. Also corrected five stale `MapData` docstrings in `mapTypes.ts`.
-
-### Triaged tech debt items from progress-log.md (reference original entries)
-- **[F] CC context bloat** — covered by file refactor decision above
+### Triaged items (closed or moved)
+- **[F] CC context bloat** — covered by GameCanvas.tsx file refactor decision above.
 - **[L] Variant A muzzle flash position varies across walk frames** — fundamental fix requires moving sprite frame selection off React state into SharedValue. Deferred indefinitely; current visual is acceptable.
-- **Player world-bounds clamping** — RESOLVED via existing invisible wall. Close the original entry.
-- **theme.ts per-map tint keys stale** — should become weather-variant tints in Phase 6. Move out of 5.5.
-- **Auto-weapon-upgrade alternative design** — design review only if Phase 5.5 playtesting shows unlucky-crate-runs feel punishing.
+- **Player world-bounds clamping** — RESOLVED via existing invisible wall.
+- **theme.ts per-map tint keys stale** — moved to Phase 6 Theme polish section.
+- **Auto-weapon-upgrade alternative design** — no longer relevant; crate-plus-rarity system provides sufficient weapon progression variety.
 
 ## Phase 6 — Visual Polish & Atmosphere
 
 After gameplay completion. Visual-only items.
+
+### Tech debt and cleanup carried from Phase 5.5
+- **Code review and optimization pass.** Mo flagged in Session 6 — general code health review before visual work begins. No specific issues identified; open-ended review pass.
+- **Rarity v2 visual treatment.** Glow effect or background shade on weapon icon in CrateRevealModal. Colored border was removed in 4c43cba (label alone ships for v1); more visual differentiation is a Phase 6 polish candidate. Validate need on device — label alone may be sufficient.
+- **100ms timer structural coupling.** `setInterval` in `GameCanvas` handles too many concerns. Phase 6+ refactor candidate: split into domain-specific timers with appropriate cadences.
+- **tileGrid dead code removal.** `tileGrid` field in `mapGenerator.ts`, `mapTypes.ts`, `mapLoader.ts` — unused since tile Atlas replaced it. One cleanup commit.
+- **`MOLOTOV_FIRE_FRAME_DURATION_MS` rename to `FLAME_ZONE_FRAME_DURATION_MS`.** Cosmetic — the constant drives flame zone animation, not Molotov. One-line rename + grep sweep to update references.
+- **`SCAV_WALK_FRAME_DURATION_MS` sampling misalignment.** Not a multiple of the 100ms sprite timer interval (same class as the flame frame fix). Visually masked by the continuous walk loop (no start/end stall), so lower priority than flame was.
+- **Muzzle flash + bullet origin** — Note from original Phase 6 scope. Player muzzle flash shipped in Phase 5.5 (commits 623f4bd, 745cb70). Bullet origin correction SCRAPPED (visually irrelevant with hero auto-rotation). Verify this item is fully closed before Phase 6 visual pass begins.
 
 ### Color and asset polish
 - **Bullet sprite color change.** GunnerBullet sand-colored, blends into desert map. Edit PNG in Photopea to high-contrast color (yellow or white recommended). Five-minute task.
@@ -73,7 +63,7 @@ After gameplay completion. Visual-only items.
 - **Fog of war.** Visibility falloff at distance.
 - **Rain particles + drifting clouds.** Weather effects. NOTE: lightning flash + thunder SFX cut to v1.1.
 - **Vignette.** Screen edge darkening.
-- **Muzzle flashes + bullet origin correction.** Note from original Phase 6 scope; partially shipped in G4/G5 muzzle flash work. Verify what remains.
+- **Muzzle flashes + bullet origin correction.** Fully resolved in Phase 5.5: player muzzle flash shipped (commits 623f4bd, 745cb70); bullet origin correction scrapped (visually irrelevant with auto-rotation). ✅ Closed.
 - **Explosion + smoke rendering.** For rocket impacts, tank fire, etc.
 
 ### Environmental polish (deferred from G2/G3/G4)
