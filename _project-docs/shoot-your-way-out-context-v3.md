@@ -740,7 +740,7 @@ shoot-your-way-out/
       analytics.ts               — event logging (Phase 7)
       persistence.ts             — AsyncStorage typed wrapper
     data/
-      weapons.ts                 — 8 weapon stat profiles
+      weapons.ts                 — 7 weapon stat profiles
       skills.ts                  — 20 skill definitions
       enemies.ts                 — 8 enemy types
       bosses.ts                  — Hunter (helicopter) definition
@@ -1112,7 +1112,7 @@ syo_install_date: string                  // for analytics cohort
 
 **Asset integration:**
 - Verify file paths against this doc before assuming structure
-- Five hero weapon animations, eight weapon stat profiles, mapped by `weapon.animation` field
+- Five hero weapon animations, seven weapon stat profiles, mapped by `weapon.animationPose` field
 - Helicopter boss uses componentized parts (base + rotor + MG + rocket) layered at runtime, not a single sprite sheet
 - Single procedural map generator (`lib/mapGenerator.ts`) — runs once at game start, every run unique, no pre-authored map files
 - 20 skills, modular effects, all swap-out-able
@@ -1145,7 +1145,7 @@ syo_install_date: string                  // for analytics cohort
 
 **Locked in v1:**
 - Single procedurally-generated map (6000×6000, biome-based tile terrain, seeded at run start)
-- 8 weapons across 5 visual tiers (including crate-only Grenade Launcher + Flamethrower)
+- 7 weapons across 5 animation poses (including crate-only Grenade Launcher + Flamethrower)
 - 25 skills across 5 categories (20 base + 5 confirmed clones — see `strategy-monetization-v1.md` Section 7)
 - 5 enemy types: Scav, Raider (Phase 3); Spec Ops (mobile), Sniper turret (stationary rooftop), Tank turret (Phase 5). Tank turret has 3 visual variants (Humvee/BTR/Panzer) sharing one mechanical class.
 - Helicopter ambient flyby (no attacks — see `strategy-monetization-v1.md` Section 14)

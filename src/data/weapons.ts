@@ -5,9 +5,9 @@
  * Engine code (combatEngine.ts) reads these; never hardcodes weapon stats.
  *
  * G2: Pistol only — auto-fire, projectile travel, collision.
- * Phase 4a adds: AKS-74U (pistol pose), AK-74 (rifle), SVD (rifle). PKM defined but
- *   dormant — removed from level progression and crate pool (Phase 4c G2 decision).
- *   Guaranteed progression: Pistol → SMG (L4) → Assault Rifle (L8) → Sniper Rifle (L16).
+ * Phase 4a adds: AKS-74U (pistol pose), AK-74 (rifle), SVD (rifle).
+ *   Phase 4c G2: PKM removed (was dormant; weapon floor unlock system also removed).
+ *   All non-Pistol weapons are crate-only drops (see CRATE_TIER_WEAPONS in gameConstants.ts).
  * Phase 4b adds crate-only weapons: M870 Shotgun (machinegun pose),
  *   RPO Rocket Launcher (grenade_launcher pose), RPO Flamethrower (flamethrower pose).
  */
@@ -69,17 +69,6 @@ export const WEAPON_PROFILES: Record<string, WeaponProfile> = {
     cooldownMs: 200,
     rangePx: 280,
     projectileSpeedPxPerSec: 600,
-  },
-
-  pkm: {
-    id: 'pkm',
-    displayName: 'Machine Gun',
-    animationPose: 'machinegun',
-    // Highest sustained DPS of the guaranteed tier. 14dmg × 10shots/s = 140dmg/s.
-    damage: 14,
-    cooldownMs: 100,
-    rangePx: 260,
-    projectileSpeedPxPerSec: 500,
   },
 
   svd: {

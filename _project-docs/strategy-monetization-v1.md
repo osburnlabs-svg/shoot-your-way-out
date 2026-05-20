@@ -334,12 +334,13 @@ Both treatments appear in:
 
 ### 11.6 Inventory interaction with rarity
 
-Phase 7's weapon inventory design specifies "if EQUIPing a weapon you already own, switch active without adding a duplicate." Rarity adds one rule:
+Phase 7's weapon inventory design specifies "if EQUIPing a weapon you already own, switch active without adding a duplicate." Rarity is informational — it does not gate player choices. The player always retains Equip/Scrap agency regardless of rarity tier.
 
-- **If rolled rarity > owned rarity for the same weapon type:** replace the owned copy with the new higher-tier version.
-- **If rolled rarity ≤ owned rarity for the same weapon type:** discard the new copy. Optionally convert to score or money pickup (design choice for Phase 7+).
+When a crate drops a weapon the player already owns at a different rarity:
 
-Player never has two of the same weapon at different tiers. Always the best version they've found.
+- **Player is presented with Equip / Scrap options as normal.** Rarity is displayed on the card but does not auto-resolve the decision.
+- **Scrapping any rarity converts to a money pickup.** No auto-discard.
+- **Player may hold any rarity tier they choose** — they are not forced to upgrade to a higher-rarity copy.
 
 ### 11.7 Skills are NOT affected
 

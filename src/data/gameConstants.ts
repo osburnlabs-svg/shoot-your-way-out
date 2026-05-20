@@ -556,7 +556,6 @@ export const CRATE_TIER_WEIGHTS: Record<CrateTier, number> = {
 
 /**
  * Weapon IDs available per tier. Uses actual weapon profile IDs from weapons.ts.
- * pkm excluded — dormant weapon, not surfaced to the player.
  */
 export const CRATE_TIER_WEAPONS: Record<CrateTier, string[]> = {
   common:    ['aks74u'],

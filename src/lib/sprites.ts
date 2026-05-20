@@ -390,7 +390,6 @@ export const GuiSprites = {
    * Weapon HUD icons for the CrateRevealModal (and future weapon HUD in Phase 7).
    * All 7 icons are custom AI-sourced 64×64 or 80×80 RGBA PNGs (batch: weapon sprite swap).
    * Kit silhouette placeholders (Pistol_HUD, SMG_HUD, MG_HUD) no longer used here.
-   * pkm excluded — dormant weapon, not surfaced to the player.
    */
   weaponHudIcons: {
     pistol: require('../../assets/ui/icons/Pistol.png'),
