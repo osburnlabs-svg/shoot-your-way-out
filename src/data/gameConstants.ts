@@ -450,8 +450,14 @@ export const MOLOTOV_TICK_INTERVAL_MS = 250;
 /** Number of frames in the Flamethrower sprite sheet (Effects/Flamethrower/1–7.png). */
 export const MOLOTOV_FIRE_FRAME_COUNT = 7;
 
-/** Duration per fire frame (ms). 7 × 120ms ≈ 840ms per loop cycle. */
-export const MOLOTOV_FIRE_FRAME_DURATION_MS = 120;
+/**
+ * Duration per fire frame (ms). Must be a multiple of the 100ms sprite timer interval
+ * to avoid sampling stutter (misaligned frame durations cause some frames to show for
+ * 2× their intended duration when the timer samples them twice before they advance).
+ * 7 × 100ms = 700ms per loop cycle — shorter than FLAMETHROWER_ZONE_DURATION_MS (840ms)
+ * so the animation loops briefly; visually fine at the zone's fast pace.
+ */
+export const MOLOTOV_FIRE_FRAME_DURATION_MS = 100;
 
 // ─── Effect sprite scale ──────────────────────────────────────────────────────
 
