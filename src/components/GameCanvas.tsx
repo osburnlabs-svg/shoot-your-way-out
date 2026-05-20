@@ -818,11 +818,15 @@ export default function GameCanvas({ width, height }: Props) {
       setTankFlashFrames(newTankFlashFrames);
 
       // Player muzzle flash — same elapsed-since-lastFiredAtMs pattern as enemy flash.
+      // Rocket launcher (gp25) and flamethrower (rpo) skip the flash: rifle sprite
+      // doesn't read correctly on those weapons.
       const playerFlashElapsed = state.player.lastFiredAtMs > 0
         ? state.elapsedMs - state.player.lastFiredAtMs
         : -1;
+      const showPlayerFlash = state.player.equippedWeaponId !== 'gp25'
+        && state.player.equippedWeaponId !== 'rpo';
       setPlayerFlashFrame(
-        playerFlashElapsed >= 0 && playerFlashElapsed < MUZZLE_FLASH_DURATION_MS
+        showPlayerFlash && playerFlashElapsed >= 0 && playerFlashElapsed < MUZZLE_FLASH_DURATION_MS
           ? Math.min(Math.floor(playerFlashElapsed / MUZZLE_FLASH_FRAME_DURATION_MS), MUZZLE_FLASH_FRAME_COUNT - 1)
           : -1,
       );
