@@ -492,7 +492,6 @@ export default function GameCanvas({ width, height }: Props) {
   // RSXforms are world-space; camera Group handles all scrolling.
   const { dirtSprites, sandSprites, grassSprites,
           dirtTransforms, sandTransforms, grassTransforms } = useMemo(() => {
-    console.log(`[STUTTER-DIAG] tileAtlas rebuild col=${playerTileCol} row=${playerTileRow}`);
     const halfCols = Math.ceil(width / 2 / CAMERA_ZOOM / TILE_SIZE) + 1;
     const halfRows = Math.ceil(height / 2 / CAMERA_ZOOM / TILE_SIZE) + 1;
     const colMin = Math.max(0, playerTileCol - halfCols);
@@ -532,7 +531,6 @@ export default function GameCanvas({ width, height }: Props) {
   // Rendered in z-order: vegetation → obstacles → barrels → wrecks → buildings.
   // RSXforms are world-space (centered on entity); camera Group handles scrolling.
   const propAtlasData = useMemo(() => {
-    console.log('[STUTTER-DIAG] propAtlasData rebuild');
     // Structure assets use STRUCTURE_SPRITE_SCALE; per-asset map handles individual
     // exceptions where a native size is already large enough at the category default.
     const STRUCTURE_ASSETS = new Set(['env_house01', 'env_house02', 'env_watchtower']);
@@ -587,10 +585,6 @@ export default function GameCanvas({ width, height }: Props) {
   const fpsAccumMs = useSharedValue(0);
   const fpsFrameCount = useSharedValue(0);
 
-  // [STUTTER-DIAG] Frame-callback invocation rate counter.
-  const fcbTickCount = useSharedValue(0);
-  const fcbLastLogMs = useSharedValue(0);
-
   // 30fps throttle accumulator — tracks elapsed vsync time between game ticks.
   const tickAccMs = useSharedValue(0);
 
@@ -620,16 +614,6 @@ export default function GameCanvas({ width, height }: Props) {
     },
     [],
   );
-
-  // [STUTTER-DIAG] Long-frame logger — called via runOnJS from the UI-thread worklet.
-  const logLongFrame = useCallback((dtMs: number, gameElapsedMs: number) => {
-    console.log(`[STUTTER-DIAG] long frame dt=${dtMs.toFixed(1)}ms gameElapsed=${gameElapsedMs}ms`);
-  }, []);
-
-  // [STUTTER-DIAG] Frame-callback rate logger — reports invocations/sec once per second.
-  const logFcbRate = useCallback((ticksThisSecond: number) => {
-    console.log(`[STUTTER-DIAG] fcb/sec=${ticksThisSecond}`);
-  }, []);
 
   // ─── Hero sprite state (React, updated by the 100ms timer alongside enemy slots)
   const [spriteState, setSpriteState] = useState<{
@@ -690,9 +674,6 @@ export default function GameCanvas({ width, height }: Props) {
   // Avoids Array.from() per-tick GC pressure — confirmed JS-thread GC spike source.
   // Each buffer is mutated in place; setState receives .slice() for re-render trigger.
   // Remove this block only if the entire timer is refactored away.
-  // [STUTTER-DIAG] Tracks last logged tile position to detect boundary crossings.
-  const lastLoggedTileRef = useRef({ col: -1, row: -1 });
-
   const timerBuffers = useRef({
     enemyTypes:   new Array<EnemyType | null>(ENEMY_SOFT_CAP).fill(null),
     enemyStatus:  new Array<'alive' | 'dying' | null>(ENEMY_SOFT_CAP).fill(null),
@@ -913,12 +894,6 @@ export default function GameCanvas({ width, height }: Props) {
       // Atlas arrays for the visible window when the player crosses a tile boundary.
       const newTileCol = Math.floor(state.player.x / TILE_SIZE);
       const newTileRow = Math.floor(state.player.y / TILE_SIZE);
-      // [STUTTER-DIAG] Log tile boundary crossings.
-      const lt = lastLoggedTileRef.current;
-      if (lt.col !== -1 && (newTileCol !== lt.col || newTileRow !== lt.row)) {
-        console.log(`[STUTTER-DIAG] tile crossing (${lt.col},${lt.row})→(${newTileCol},${newTileRow})`);
-      }
-      lastLoggedTileRef.current = { col: newTileCol, row: newTileRow };
       setPlayerTileCol(newTileCol);
       setPlayerTileRow(newTileRow);
     }, 100);
@@ -1561,12 +1536,6 @@ export default function GameCanvas({ width, height }: Props) {
     const dtMs = frameInfo.timeSincePreviousFrame ?? 0;
     if (dtMs <= 0) return; // skip spurious zero-dt frames (JS-thread timer activity triggers extra UI-thread callbacks)
 
-    // [STUTTER-DIAG] Detect vsync-level long frames BEFORE the 30fps gate so
-    // raw vsync jank is captured whether or not a game tick fires this frame.
-    if (dtMs > 20) {
-      runOnJS(logLongFrame)(dtMs, gameState.value.elapsedMs);
-    }
-
     // 30fps throttle — accumulate vsync time; fire a game tick only when at
     // least one TICK_INTERVAL_MS has elapsed. Remainder carries forward so
     // wall-clock timing stays accurate without drift. The Math.min(dtMs, 50)
@@ -1586,15 +1555,6 @@ export default function GameCanvas({ width, height }: Props) {
 
     state = updateGameState(state, TICK_INTERVAL_MS, collisionDataShared.value);
     gameState.value = state;
-
-    // [STUTTER-DIAG] Count tick invocations/sec — should read ~30 confirming throttle.
-    fcbTickCount.value += 1;
-    const elapsedSinceLog = state.elapsedMs - fcbLastLogMs.value;
-    if (elapsedSinceLog >= 1000) {
-      runOnJS(logFcbRate)(fcbTickCount.value);
-      fcbTickCount.value = 0;
-      fcbLastLogMs.value = state.elapsedMs;
-    }
 
     // FPS + debug counters — bridge to React once per second.
     // fpsAccumMs tracks tick-time (not vsync-time) so the displayed FPS reads ~30.
