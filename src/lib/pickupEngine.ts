@@ -28,7 +28,7 @@ import {
   COLLECT_RADIUS_PX,
   CRATE_PICKUP_RADIUS_PX,
   CRATE_TIER_WEIGHTS,
-  CRATE_TIER_WEAPONS,
+  CRATE_WEAPON_POOL,
 } from '../data/gameConstants';
 import type { CrateTier } from '../data/gameConstants';
 
@@ -128,8 +128,7 @@ export function tickPickups(state: GameState, dtMs: number): GameState {
       } else {
         tier = 'legendary';
       }
-      const pool = CRATE_TIER_WEAPONS[tier];
-      const weaponId = pool[Math.floor(Math.random() * pool.length)]!;
+      const weaponId = CRATE_WEAPON_POOL[Math.floor(Math.random() * CRATE_WEAPON_POOL.length)]!;
 
       pendingCrateReveal = true;
       crateRevealWeaponId = weaponId;

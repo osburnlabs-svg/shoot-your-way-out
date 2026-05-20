@@ -1391,6 +1391,7 @@ export default function GameCanvas({ width, height }: Props) {
         ...state.player,
         equippedWeaponId: state.crateRevealWeaponId,
         weaponPose: weapon.animationPose,
+        equippedWeaponRarity: state.crateRevealTier ?? 'common',
       },
       pendingCrateReveal: false,
       crateRevealWeaponId: null,

@@ -548,29 +548,30 @@ export type CrateTier = 'common' | 'uncommon' | 'rare' | 'legendary';
 
 /** Probability weight for each tier. Must sum to 1.0. */
 export const CRATE_TIER_WEIGHTS: Record<CrateTier, number> = {
-  common:    0.40,
-  uncommon:  0.35,
-  rare:      0.20,
+  common:    0.50,
+  uncommon:  0.30,
+  rare:      0.15,
   legendary: 0.05,
 };
 
-/**
- * Weapon IDs available per tier. Uses actual weapon profile IDs from weapons.ts.
- */
-export const CRATE_TIER_WEAPONS: Record<CrateTier, string[]> = {
-  common:    ['aks74u'],
-  uncommon:  ['ak74', 'm870'],
-  rare:      ['gp25'],
-  legendary: ['svd', 'rpo'],
-};
+/** All crate-droppable weapon IDs. Rolled independently from rarity (uniform 1/6). */
+export const CRATE_WEAPON_POOL = ['aks74u', 'ak74', 'm870', 'svd', 'gp25', 'rpo'] as const;
 
-// ─── Tier display colors (UI only) ────────────────────────────────────────────
+// ─── Rarity display and stat multipliers ──────────────────────────────────────
 
 export const TIER_COLORS: Record<CrateTier, string> = {
-  common:    '#bbbbbb',
-  uncommon:  '#4cc36a',
-  rare:      '#4a8fff',
-  legendary: '#ff9a3c',
+  common:    '#5a9954',
+  uncommon:  '#4a80c4',
+  rare:      '#8b5acd',
+  legendary: '#c9a356',
+};
+
+/** Damage multiplier per rarity tier. Applied to projectile damage at fire time. */
+export const RARITY_DAMAGE_MULTIPLIERS: Record<CrateTier, number> = {
+  common:    1.00,
+  uncommon:  1.10,
+  rare:      1.20,
+  legendary: 1.30,
 };
 
 // ─── Helicopter ambient flyover ───────────────────────────────────────────────

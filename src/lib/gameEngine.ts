@@ -127,6 +127,8 @@ export type PlayerState = {
   walkStartedAtMs: number;
   /** ID key into WEAPON_PROFILES. Determines firing behavior. Always 'pistol' in G2. */
   equippedWeaponId: string;
+  /** Rarity tier of the currently equipped weapon. 'common' for the starter Pistol. */
+  equippedWeaponRarity: CrateTier;
   /**
    * Remaining cooldown in ms before the next shot can fire.
    * Always decrements toward 0. When 0 and a target is in range, fires immediately.
@@ -529,6 +531,7 @@ export function createInitialGameState(canvasWidth: number, canvasHeight: number
       isMoving: false,
       walkStartedAtMs: 0,
       equippedWeaponId: STARTING_WEAPON_ID,
+      equippedWeaponRarity: 'common',
       weaponCooldownMs: 0,
       hp: PLAYER_STARTING_HP,
       maxHp: PLAYER_STARTING_HP,

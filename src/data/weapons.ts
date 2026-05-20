@@ -7,7 +7,7 @@
  * G2: Pistol only — auto-fire, projectile travel, collision.
  * Phase 4a adds: AKS-74U (pistol pose), AK-74 (rifle), SVD (rifle).
  *   Phase 4c G2: PKM removed (was dormant; weapon floor unlock system also removed).
- *   All non-Pistol weapons are crate-only drops (see CRATE_TIER_WEAPONS in gameConstants.ts).
+ *   All non-Pistol weapons are crate-only drops (see CRATE_WEAPON_POOL in gameConstants.ts).
  * Phase 4b adds crate-only weapons: M870 Shotgun (machinegun pose),
  *   RPO Rocket Launcher (grenade_launcher pose), RPO Flamethrower (flamethrower pose).
  */

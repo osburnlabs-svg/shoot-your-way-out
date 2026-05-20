@@ -42,6 +42,7 @@ import {
   PLAYER_COLLISION_RADIUS_PX,
   CONTACT_DAMAGE_INTERVAL_MS,
   HIT_FLASH_DURATION_MS,
+  RARITY_DAMAGE_MULTIPLIERS,
   SHOTGUN_PELLET_COUNT,
   SHOTGUN_SPREAD_DEG,
   FLAMETHROWER_CONE_DEG,
@@ -131,6 +132,8 @@ export function tickCombat(state: GameState, dtMs: number): GameState {
     const nx = dx / dist;
     const ny = dy / dist;
     const spd = weapon.projectileSpeedPxPerSec;
+    const rarityMult = RARITY_DAMAGE_MULTIPLIERS[player.equippedWeaponRarity] ?? 1.0;
+    const rarityDamage = effective.damage * rarityMult;
 
     if (weapon.id === 'm870') {
       // Shotgun: SHOTGUN_PELLET_COUNT pellets spread over SHOTGUN_SPREAD_DEG arc.
@@ -148,7 +151,7 @@ export function tickCombat(state: GameState, dtMs: number): GameState {
           speedPxPerSec: spd,
           distanceTraveledPx: 0,
           maxRangePx: effective.rangePx,
-          damage: effective.damage,
+          damage: rarityDamage,
           pierceRemaining: effective.pierce,
           hitEnemyIds: [],
           isRocket: false,

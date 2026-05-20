@@ -53,6 +53,7 @@ import {
   FLAMETHROWER_ZONE_DURATION_MS,
   FLAMETHROWER_ZONE_RADIUS_PX,
   FLAMETHROWER_ZONE_DAMAGE_PER_SEC,
+  RARITY_DAMAGE_MULTIPLIERS,
   ENEMY_COLLISION_RADIUS_PX,
   THROWABLE_TARGET_RANGE_PX,
 } from '../data/gameConstants';
@@ -431,7 +432,10 @@ export function tickEffectZones(state: GameState, _dtMs: number): GameState {
     } else if (zone.type === 'flame') {
       const timeSinceLastTick = elapsedMs - zone.lastTickAppliedMs;
       if (timeSinceLastTick >= MOLOTOV_TICK_INTERVAL_MS) {
-        const tickDamage = FLAMETHROWER_ZONE_DAMAGE_PER_SEC * (MOLOTOV_TICK_INTERVAL_MS / 1000);
+        // Rarity multiplier applies to flamethrower zone DoT. Skill damage modifiers do NOT —
+        // flamethrower is intentionally outside the projectile damage system.
+        const rarityMult = RARITY_DAMAGE_MULTIPLIERS[state.player.equippedWeaponRarity] ?? 1.0;
+        const tickDamage = FLAMETHROWER_ZONE_DAMAGE_PER_SEC * rarityMult * (MOLOTOV_TICK_INTERVAL_MS / 1000);
         const result = applyAOEDamage(
           enemies, pickups, nextPickupId, killCount,
           zone.x, zone.y, FLAMETHROWER_ZONE_RADIUS_PX, tickDamage, elapsedMs,
