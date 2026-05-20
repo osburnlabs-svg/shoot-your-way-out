@@ -29,7 +29,7 @@ export function useEnemySlotTransform(gameState: SharedValue<GameState>, slotInd
     const enemy = gameState.value.enemies[slotIndex];
     const px = gameState.value.player.x;
     const py = gameState.value.player.y;
-    if (!enemy) return [{ translateX: 0 }, { translateY: 0 }, { rotate: 0 }];
+    if (!enemy) return [{ translateX: -9999 }, { translateY: -9999 }, { rotate: 0 }];
     const dx = px - enemy.x;
     const dy = py - enemy.y;
     return [
