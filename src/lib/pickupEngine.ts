@@ -75,14 +75,18 @@ export function tickPickups(state: GameState, dtMs: number): GameState {
     // ─── Magnet pull ────────────────────────────────────────────────────────
     if (distSq < effectiveMagnetRangeSq) {
       // Direct-pull: recompute velocity fresh each tick — no momentum.
+      // stepDist clamped to dist so pickup never overshoots player position.
+      // Without this clamp, at 30fps (40px/tick step) a 12px collect radius
+      // creates a 12–28px orbit window where pickups oscillate forever.
       const dist = Math.sqrt(distSq);
+      const stepDist = Math.min(MAGNET_MAX_SPEED_PX_PER_SEC * dtSec, dist);
       const vx = (dx / dist) * MAGNET_MAX_SPEED_PX_PER_SEC;
       const vy = (dy / dist) * MAGNET_MAX_SPEED_PX_PER_SEC;
 
       newPickups[i] = {
         id: pickup.id,
-        x: pickup.x + vx * dtSec,
-        y: pickup.y + vy * dtSec,
+        x: pickup.x + (dx / dist) * stepDist,
+        y: pickup.y + (dy / dist) * stepDist,
         vxPxPerSec: vx,
         vyPxPerSec: vy,
         type: pickup.type,
