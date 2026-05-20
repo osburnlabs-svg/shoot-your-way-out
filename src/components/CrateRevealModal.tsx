@@ -59,9 +59,7 @@ export default function CrateRevealModal({
         <Text style={styles.header}>WEAPON CRATE</Text>
 
         {icon !== undefined && (
-          <View style={{ borderWidth: 2, borderColor: tierColor, padding: 3 }}>
-            <Image source={icon} style={styles.weaponIcon} resizeMode="contain" filterQuality="none" />
-          </View>
+          <Image source={icon} style={styles.weaponIcon} resizeMode="contain" filterQuality="none" />
         )}
 
         <Text style={styles.weaponName}>{weapon.displayName}</Text>
