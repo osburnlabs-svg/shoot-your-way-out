@@ -120,7 +120,7 @@ const styles = StyleSheet.create({
   },
   header: {
     color: '#c9a356',
-    fontSize: 32,
+    fontSize: 42,
     fontFamily: PIXEL_FONT_FAMILY,
     textAlign: 'center',
     textShadowColor: '#000000',
@@ -148,7 +148,7 @@ const styles = StyleSheet.create({
   },
   name: {
     color: '#ffffff',
-    fontSize: 12,
+    fontSize: 16,
     fontFamily: PIXEL_FONT_FAMILY,
     textAlign: 'center',
     textShadowColor: '#000000',
@@ -158,7 +158,7 @@ const styles = StyleSheet.create({
   },
   level: {
     color: '#ffd700',
-    fontSize: 11,
+    fontSize: 14,
     fontFamily: PIXEL_FONT_FAMILY,
     textAlign: 'center',
     textShadowColor: '#000000',
@@ -167,7 +167,8 @@ const styles = StyleSheet.create({
   },
   desc: {
     color: '#d0d0d0',
-    fontSize: 10,
+    fontSize: 12,
+    fontFamily: PIXEL_FONT_FAMILY,
     textAlign: 'center',
     textShadowColor: '#000000',
     textShadowRadius: 1,

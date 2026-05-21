@@ -109,7 +109,7 @@ const styles = StyleSheet.create({
   },
   header: {
     color: '#c9a356',
-    fontSize: 22,
+    fontSize: 29,
     fontFamily: PIXEL_FONT_FAMILY,
     letterSpacing: 2,
     textAlign: 'center',
@@ -125,7 +125,7 @@ const styles = StyleSheet.create({
   },
   weaponName: {
     color: '#c9a356',
-    fontSize: 18,
+    fontSize: 23,
     fontFamily: PIXEL_FONT_FAMILY,
     textAlign: 'center',
     textShadowColor: '#000000',
@@ -133,7 +133,7 @@ const styles = StyleSheet.create({
     textShadowOffset: { width: 1, height: 1 },
   },
   tierLabel: {
-    fontSize: 13,
+    fontSize: 17,
     fontFamily: PIXEL_FONT_FAMILY,
     textAlign: 'center',
     letterSpacing: 1,
@@ -160,7 +160,7 @@ const styles = StyleSheet.create({
   },
   buttonText: {
     color: '#ffffff',
-    fontSize: 14,
+    fontSize: 18,
     fontFamily: PIXEL_FONT_FAMILY,
     textShadowColor: '#000000',
     textShadowRadius: 2,
@@ -169,7 +169,8 @@ const styles = StyleSheet.create({
   },
   scrapSubtext: {
     color: '#aaaaaa',
-    fontSize: 10,
+    fontSize: 12,
+    fontFamily: PIXEL_FONT_FAMILY,
     textAlign: 'center',
   },
 });
