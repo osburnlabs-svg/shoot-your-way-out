@@ -181,16 +181,6 @@ function formatElapsed(totalSec: number): string {
 }
 
 /**
- * Throwable in-flight circle colors — defined locally (not in gameConstants) as
- * they are purely visual/render concerns. Smoke/Molotov zone colors are also here.
- * G5 TODO: remove debug spawn buttons that reference these; colors stay for flight circles.
- */
-const THROWABLE_COLORS = {
-  frag:    '#e8c040', // yellow-gold
-  smoke:   '#a0c8a0', // pale green-grey
-  molotov: '#e06020', // orange-red
-};
-
 type Props = {
   width: number;
   height: number;
@@ -431,6 +421,7 @@ export default function GameCanvas({ width, height }: Props) {
   const bulletImage = useImage(EffectSprites.bullet);
   // Grenade launcher projectile: single static frame (rocket-f1.png, 3×12 px).
   const rocketF1Image = useImage(EffectSprites.rocketF1);
+  const grenadeImage = useImage(EffectSprites.grenade);
   // Tank turret rocket (Phase 5 G5): 2-frame body animation — kept for future use.
   const rocket0 = useImage(EffectSprites.rocket[0]);
   const rocket1 = useImage(EffectSprites.rocket[1]);
@@ -1882,11 +1873,19 @@ export default function GameCanvas({ width, height }: Props) {
           {/* Screen-coord derived values — outside camera Group.            */}
           {/* Inactive/detonating slots sit at (-9999,-9999) — invisible.   */}
           {allThrowableTransforms.map((transform, i) => {
-            const t = throwableSlotData[i]!;
-            const color = t.type ? THROWABLE_COLORS[t.type] : '#000000';
+            if (!grenadeImage) return null;
+            const gw = grenadeImage.width() * EFFECT_SPRITE_SCALE;
+            const gh = grenadeImage.height() * EFFECT_SPRITE_SCALE;
             return (
               <Group key={`throw-fly-${i}`} transform={transform}>
-                <Circle cx={0} cy={0} r={5} color={color} />
+                <Image
+                  image={grenadeImage}
+                  x={-gw / 2}
+                  y={-gh / 2}
+                  width={gw}
+                  height={gh}
+                  sampling={{ filter: FilterMode.Nearest, mipmap: MipmapMode.None }}
+                />
               </Group>
             );
           })}
