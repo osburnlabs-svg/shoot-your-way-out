@@ -2022,7 +2022,35 @@ All Phase 5.5 inventory items shipped or formally scrapped. Game is gameplay-com
 
 **Goal:** Audio engine fully implemented (music + SFX channels), all 25 SFX wired and playing, 4 music tracks looping correctly, fog-of-war, rain particles + drifting clouds (rain runs only — no lightning, no thunder), vignette, muzzle flashes, bullet origin correction, explosion and smoke effects rendering.
 
-**Status:** Not started
+**Status:** 🟡 In Progress — Session 1 complete (items 1–3 closed); items 4, 5, 6 open.
+
+### Phase 6 — Session 1 (2026-05-20)
+
+**Shipped:**
+
+- **Item 1 — Dead code removal.** mapTints stale per-map keys removed from theme.ts (commit 0c042ae). tileGrid claim in original inventory was wrong — investigation showed tileGrid is load-bearing (read by GameCanvas viewport culling); that part of scope was correctly dropped. Inventory corrected in 02ad87e.
+- **Item 2 — Bullet rendering verification.** No commit needed. Inventory entry was stale; sprite swap from Skia Circle to kit asset was already shipped in a prior phase. Marked closed in 5b53c37.
+- **Item 3 — Throwable sprite swap.** All three throwable types (frag, molotov, smoke) swapped from `<Circle>` placeholder to dedicated kit sprites from `assets/ui/icons/` (Frag.png, Molotov.png, Smoke.png). 64×64 world units, no scale multiplier. Detonation rendering unchanged. Mo reported the larger size produces a pleasing "3D coming-toward-screen" effect; ship-as-is decision locked. Commit cbd122d. Inventory closed in a4f3527.
+- **Bonus — THROWABLE_COLORS removal.** Constant became dead after item 3 sprite swap. Removed in dedicated micro-commit 6a746e8.
+- **Doc fix — vegetation budget + rain suppression.** Two confirmed-stale claims in v3 context doc corrected against actual code: vegetation count is 70–100 inline expression (not `{min: 0, max: 20}` budget object); rain suppression was removed in Phase 5 G3 and no longer exists. Commit aacdafe.
+
+**Deferred / open:**
+
+- **Item 4 — Pond as static prop.** Deferred. Original inventory plan conflicted with constraints Mo articulated during planning (budget preservation, no spawn-count reduction, no new custom spawn logic, no barrel displacement). Investigated paths all violated at least one constraint. 320×320 sprite is also ~2× larger than any existing collision shape. Disposition decision deferred to fresh session: implement with one constraint relaxed (which), defer to v1.1, or scrap entirely. See inventory item 4 for full constraint set.
+- **Item 5 — Vignette.** Not yet started.
+- **Item 6 — Code review and optimization pass.** Not yet started. Per inventory, this runs last and covers all Phase 6 changes.
+
+**Failure modes encountered (record for future CC sessions):**
+
+- **JSX comment block edit failure in large files.** First attempt at item 3 (commit 4433ce5) corrupted GameCanvas.tsx by removing THROWABLE_COLORS with an Edit tool pattern match that captured part of an adjacent JSX comment block (`{/* ... */}`), leaving `*/}` orphaned at line 1622 and breaking the build. Reverted via b15d83e. Second attempt succeeded by anchoring the old_string pattern at known landmarks (e.g., trailing `type Props = {` boundary). Pattern for future large-file edits: when removing a constant or block, explicitly include adjacent code landmarks in the Edit tool's old_string to prevent the match from extending into comment blocks. GameCanvas.tsx is the highest-risk file for this — ~30k tokens, many JSX comment blocks.
+- **Doc drift count this session: 5.** mapTints file list wrong in inventory; tileGrid claim wrong in inventory (saved by pre-review checkpoint); bullet rendering already done but inventory said active; item 3 target was wrong object entirely (inventory described gp25 projectile; actual target was thrown frag grenade skill); vegetation budget + rain suppression in v3 doc. Working principle reinforced: doc updates land in-session as their own commit, immediately after the relevant change or finding. Batched end-of-session doc updates produced this drift in Phase 5 and earlier. Hot-context corrections produce accurate edits; cold-context ones produce approximations.
+
+**Working discipline confirmed this session:**
+
+- Pre-review checkpoint caught one real error (tileGrid was load-bearing, not dead). Standard procedure; never skip.
+- Revert-before-diagnosing held cleanly on the JSX comment block failure.
+- Single-focused-commit discipline held across all four commits + one revert.
+- Polish-mode guardrail (no architectural changes, no scope expansion mid-task, no "while we're in there") held. One scope expansion happened (frag-only → all three throwables), but it was a deliberate product decision made before any code was written, not mid-commit drift.
 
 ---
 
