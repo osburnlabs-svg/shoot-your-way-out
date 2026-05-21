@@ -89,16 +89,16 @@ const styles = StyleSheet.create({
   },
   weaponBox: {
     position: 'absolute',
-    width: 72,
-    height: 72,
+    width: 96,
+    height: 96,
     backgroundColor: 'rgba(0,0,0,0.55)',
-    borderRadius: 6,
+    borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
   },
   weaponIcon: {
-    width: 56,
-    height: 56,
+    width: 76,
+    height: 76,
   },
   statsPanel: {
     position: 'absolute',
