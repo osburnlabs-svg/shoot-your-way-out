@@ -61,6 +61,14 @@ Each doc update is its own focused commit, separate from code commits. Same sing
 
 *What this protects.* UI work is the easiest place for creative ambition to inflate scope. A "fancy" pause menu adds days of work and zero player value. These principles cap scope at "competently boring" — which is the correct target for a side-project mobile game prioritizing ship velocity.
 
+**Docs are reference, not narrative.** The v3 context doc, inventory, and progress log are read by cold-context sessions and pay token cost on every read. Entries capture the minimum needed for state recovery, not a complete history of what was discussed. Commit messages capture what changed. File contents capture current state. Progress log captures decisions and learnings not obvious from those sources alone. Avoid duplication across docs.
+
+*When in doubt, terser.* A doc entry that re-narrates content already in commit messages or already in the current state of another doc is bloat. Cut it. A progress log entry of three terse sentences usually serves cold-context recovery better than a multi-section block, because the multi-section block buries the recoverable signal in repeated context.
+
+*Bloat tolerance varies by file.* v3 doc bloat is most expensive (read every session, signal-to-noise matters). Inventory bloat is moderate (status entries can be terse — "shipped, see commit X" is often sufficient). Progress log bloat is cheap-ish per entry but accumulates across hundreds of entries over a multi-month project.
+
+*What this protects.* Doc bloat accumulates silently. Each individual entry feels reasonable; the aggregate becomes expensive in token cost on every read. Without an explicit "terser by default" rule, entries inflate to fill available space. With the rule, entries default to the minimum needed and stay there.
+
 **The three-stage workflow.** Work on this project flows through three stages, in order. Skipping a stage tends to produce wrong-direction work that's expensive to undo.
 
 1. **Strategic planning (Mo + Claude in chat).** Scope, decisions, tradeoffs, design direction. No code is written. Claude pushes back where appropriate and surfaces things Mo might not see; Mo drives direction and catches strategic drift. Output: an aligned understanding of what to build and why, plus locked decisions on anything contestable.
