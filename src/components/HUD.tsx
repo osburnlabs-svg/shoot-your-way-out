@@ -53,15 +53,13 @@ export default function HUD({ money, hp, level, xp, elapsed, kills, equippedWeap
           <View style={styles.weaponBox}>
             <Image source={weaponIcon} style={styles.weaponIcon} resizeMode="contain" />
           </View>
+          <Text style={styles.weaponNameLabel}>
+            {WEAPON_PROFILES[equippedWeaponId]?.displayName ?? equippedWeaponId}
+          </Text>
           {equippedWeaponId !== 'pistol' && (
-            <>
-              <Text style={styles.weaponNameLabel}>
-                {WEAPON_PROFILES[equippedWeaponId]?.displayName ?? equippedWeaponId}
-              </Text>
-              <Text style={[styles.rarityLabel, { color: TIER_COLORS[equippedWeaponRarity] }]}>
-                {equippedWeaponRarity.charAt(0).toUpperCase() + equippedWeaponRarity.slice(1)}
-              </Text>
-            </>
+            <Text style={[styles.rarityLabel, { color: TIER_COLORS[equippedWeaponRarity] }]}>
+              {equippedWeaponRarity.charAt(0).toUpperCase() + equippedWeaponRarity.slice(1)}
+            </Text>
           )}
         </View>
       )}
