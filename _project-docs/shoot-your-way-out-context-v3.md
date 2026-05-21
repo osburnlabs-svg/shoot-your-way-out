@@ -37,6 +37,14 @@ Each doc update is its own focused commit, separate from code commits. Same sing
 
 *Frame.* This project is a side project meant to be fun. Side projects only work if they stay fun. The strategy doc is a thinking space, not a monetization spec. Treating every casual idea like a scope-creep threat kills the fun and filters interesting ideas before they get a chance.
 
+**Per-phase doc audit.** Before drafting any implementation prompts for a new phase, run a scoped audit of the v3 context doc claims that affect the planned work. Scope is the sections relevant to this phase only — not the whole doc. Findings get corrected in their own focused commit before any phase implementation prompts are drafted. Phases run as: plan the phase → audit the phase → implement the phase.
+
+*Why scoped, not full.* A full whole-doc audit produces speculative findings against code that doesn't exist yet (Phase 7 audit cannot meaningfully verify Phase 9 claims). A scoped per-phase audit produces actionable findings on code that's stable enough to verify against. The full audit task was deferred multiple times during Phase 5 and 6 precisely because "audit everything" never finishes — replacing it with per-phase audits closes drift without the unfinishable-task problem.
+
+*What this protects.* Three things: (1) Drift compounds when audits are deferred indefinitely. (2) Audits scoped to "everything" never finish or produce stale findings. (3) Implementation prompts drafted against unverified doc claims produce wrong-direction work — the pattern that bit Phase 6 five times before being corrected mid-session.
+
+*Mechanics.* CC reads the v3 doc sections in scope plus the relevant code files. Produces a findings report: what the doc claims, what the code actually does, where they disagree. Mo reviews findings, approves corrections. Corrections land as a single focused doc commit. Then implementation prompts begin.
+
 **The three-stage workflow.** Work on this project flows through three stages, in order. Skipping a stage tends to produce wrong-direction work that's expensive to undo.
 
 1. **Strategic planning (Mo + Claude in chat).** Scope, decisions, tradeoffs, design direction. No code is written. Claude pushes back where appropriate and surfaces things Mo might not see; Mo drives direction and catches strategic drift. Output: an aligned understanding of what to build and why, plus locked decisions on anything contestable.
