@@ -2054,7 +2054,7 @@ All Phase 5.5 inventory items shipped or formally scrapped. Game is gameplay-com
 
 ### Phase 6 — Session 2 (2026-05-21)
 
-**Status:** Item 4 (pond) disposition decided — deferred to v1.1. Items 5 (vignette) and 6 (code review pass) still open.
+**Status:** Item 4 (pond) deferred to v1.1. Item 5 (vignette) shipped. Item 6 (code review pass) still open.
 
 **Decided this session:**
 
@@ -2063,6 +2063,10 @@ All Phase 5.5 inventory items shipped or formally scrapped. Game is gameplay-com
 **Working norm reinforced:**
 
 - **Brainstorm mode + build mode as session modes** (carried over from prior chats, not yet in v3 doc). Brainstorm mode for exploration without scope reflexes; build mode for execution discipline. Triggers: "brainstorm mode" / "back to build mode." To be formalized in v3 context doc in a future commit alongside the in-session doc-updates norm.
+
+**Shipped:**
+
+- **Item 5 — Vignette.** Shipped (final commit 4ccc40e). Static Skia `<RadialGradient>` overlay at alpha 0.95, radius 0.85 × diagonal. First Skia shader in codebase — previous overlays were all RN Views. Tuning required four passes: initial invisible-subtle defaults (0.35/0.7×) → diagnostic aggressive values (0.8/0.5×) to confirm render path → progressive narrowing to final (0.95/0.85×). Lesson for future Skia overlay work: device-test the render path with aggressive values before assuming subtle defaults will be visible. HUD elements unaffected because they render in RN's native compositor above the Canvas.
 
 ---
 
