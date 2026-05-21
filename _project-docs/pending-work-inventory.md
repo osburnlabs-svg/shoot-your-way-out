@@ -56,10 +56,10 @@ Post-Phase-5.5 triage locked Phase 6 as a lean polish + cleanup phase. Most orig
 
 5. **Vignette.** ✅ Shipped (commit 4ccc40e). Subtle-to-moderate screen-edge darkening overlay. Static `<Rect>` + `<RadialGradient>` in screen-space, inserted between helicopter flyover block and `</Canvas>` close. Values: edge alpha 0.95, radius multiplier 0.85 × diagonal, center transparent. HUD elements (debug overlay, ReviveModal, LevelUpModal, CrateRevealModal, weapon cycle button) all render above the Canvas via the RN native compositor — vignette does not affect them. Performance: zero animated props, single static gradient blend per frame, no impact on 30fps cap. Initial values (alpha 0.35, radius 0.7×) read as invisible on device; required diagnostic pass at aggressive values to confirm render path works, then three tuning passes to reach final. Tuning history: 80b5f93 (initial 0.35/0.7×, invisible) → 96fc1fa (diagnostic 0.8/0.5×, confirmed render works) → 8a7d271 (0.6/0.6×, too light) → 0b9e488 (0.8/0.85×, right radius wrong darkness) → 4ccc40e (0.95/0.85×, shipped). First Skia shader in the codebase; all prior screen overlays were RN View backgroundColor patterns.
 
-6. **Code review and optimization pass.** Open-ended health pass. Performed last so it covers all Phase 6 changes plus existing code. Surface findings for Mo to triage; do not auto-fix everything.
+6. **Code review and optimization pass.** ❌ Scrapped from Phase 6 (decision made session 2). Original scope assumed Phase 6 would be substantial enough to justify its own review pass. Actual Phase 6 was a small polish phase (~45 lines of code change total across items 1, 3, 5, plus bonus dead-code removal). A full code review on a codebase that will substantially change in Phase 7 (UI rebuild) and Phase 9 (planned engine cleanup) is premature — findings would go stale. Item folded into Phase 9 scope: full codebase review + optimization pass to execute after Phase 8 closes, when codebase is stable enough for findings to remain valid.
 
 ---
-*Phase 6 session 1 close — known-safe HEAD: aacdafe. Items 1, 2, 3 closed; THROWABLE_COLORS dead-code bonus shipped; vegetation/rain doc drift corrected. Items 4 (pond) and 5 (vignette) still open; item 6 (code review pass) still pending. Resume in fresh CC session with this doc + progress log as the only context handoff.*
+*✅ Phase 6 COMPLETE — closed session 2 (2026-05-21). Final state: items 1, 2, 3, 5 shipped. Item 4 (pond) deferred to v1.1 with full investigation notes. Item 6 (code review) scrapped from Phase 6, folded into Phase 9 scope. Known-safe HEAD at close: 4ccc40e (final vignette tuning). Total Phase 6 code change: ~45 lines across 4 commits + bonus dead-code removal + 1 doc-drift correction commit. Net session count: 2.*
 
 ### Scrapped from original Phase 6 scope (do not implement)
 
@@ -160,6 +160,7 @@ Final phase before launch. All audio integration here.
 - **UI-thread worklet GC allocation churn.** 36k-60k objects/sec → 2-4ms GC pauses. Engine-wide mutable-state refactor. SKIP if targeted object pooling in Phase 5.5 already resolved stuttering.
 - **Projectile compact array pattern.** Projectiles still use compact array pattern (unlike pickups which were fixed). Post-launch template cleanup.
 - **Asset loading consolidation (texture atlases).** Replace individual useImage calls with TexturePacker atlas. Do NOT do earlier — final asset list isn't locked until end of Phase 8/9.
+- **Full codebase code review + optimization pass.** Folded from Phase 6 item 6 (scrapped session 2). Scope: entire codebase. Output format: findings-only report with disposition per finding (ship in Phase 9 / defer to v1.1 / scrap). Disposition rule for findings: ship only if risk-free + localized + (trivial-mechanical OR measurable perf win). All other findings defer or scrap. Hard constraints: no proposed changes to the 30fps cap, hybrid collision pools, or anything settled in Phase 5 stutter work.
 
 ### Monetization (per strategy-monetization-v1.md)
 - **IAP SDK integration** (react-native-iap).

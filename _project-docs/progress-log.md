@@ -2022,7 +2022,7 @@ All Phase 5.5 inventory items shipped or formally scrapped. Game is gameplay-com
 
 **Goal:** Audio engine fully implemented (music + SFX channels), all 25 SFX wired and playing, 4 music tracks looping correctly, fog-of-war, rain particles + drifting clouds (rain runs only — no lightning, no thunder), vignette, muzzle flashes, bullet origin correction, explosion and smoke effects rendering.
 
-**Status:** 🟡 In Progress — Session 1 complete (items 1–3 closed); items 4, 5, 6 open.
+**Status:** ✅ Complete — closed session 2 (2026-05-21). Items 1, 2, 3, 5 shipped. Item 4 (pond) deferred to v1.1. Item 6 (code review pass) scrapped, folded into Phase 9.
 
 ### Phase 6 — Session 1 (2026-05-20)
 
@@ -2054,9 +2054,11 @@ All Phase 5.5 inventory items shipped or formally scrapped. Game is gameplay-com
 
 ### Phase 6 — Session 2 (2026-05-21)
 
-**Status:** Item 4 (pond) deferred to v1.1. Item 5 (vignette) shipped. Item 6 (code review pass) still open.
+**Status:** Item 4 (pond) deferred to v1.1. Item 5 (vignette) shipped. Item 6 (code review pass) scrapped from Phase 6, folded into Phase 9. Phase 6 closed.
 
 **Decided this session:**
+
+- **Item 6 — Code review pass — scrapped from Phase 6, folded into Phase 9.** Full code review on a codebase about to change substantially (Phase 7 UI rebuild + Phase 9 engine cleanup) would produce findings that go stale before being acted on. Right time for a full review is after Phase 8, when codebase is stable. Phase 9 scope updated to include the review. Phase 6 closes complete.
 
 - **Item 4 (pond) deferred to v1.1.** Brainstorm + verification revealed the pond is not naturally polish-mode-shaped: requires novel scale override, novel circle collision radius (largest in pool by ~2.6×), and either new placement logic or shifts existing structure PRNG stream. Full investigation in inventory item 4. Water features will be considered as a real v1.1 feature with proper scope, not retrofitted polish.
 
