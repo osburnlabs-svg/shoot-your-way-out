@@ -7,6 +7,7 @@ import 'react-native-gesture-handler';
 import React, { useState } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import GameScreen from './screens/GameScreen';
 
@@ -20,9 +21,11 @@ export default function App() {
   const [screen] = useState<Screen>('game');
 
   return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
-      <StatusBar style="light" />
-      {screen === 'game' && <GameScreen />}
-    </GestureHandlerRootView>
+    <SafeAreaProvider>
+      <GestureHandlerRootView style={{ flex: 1 }}>
+        <StatusBar style="light" />
+        {screen === 'game' && <GameScreen />}
+      </GestureHandlerRootView>
+    </SafeAreaProvider>
   );
 }
