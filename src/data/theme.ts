@@ -10,9 +10,9 @@ export const palette = {
   toxicGreen: '#4CAF50',
 } as const;
 
-// Typography — swap PIXEL_FONT_FAMILY to the loaded font name when pixel font lands (Phase 7 follow-up).
-// All HUD and UI components reference these constants so the swap is a single line change here.
-export const PIXEL_FONT_FAMILY: string | undefined = undefined;
+// Typography — VT323-Regular loaded via useFonts in App.tsx; key name matches the useFonts map entry.
+// All HUD and UI components reference this constant — change here propagates app-wide.
+export const PIXEL_FONT_FAMILY: string = 'VT323-Regular';
 export const FONT_WEIGHT_BOLD = 'bold' as const;
 export const FONT_WEIGHT_NORMAL = '400' as const;
 

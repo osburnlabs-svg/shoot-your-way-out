@@ -6,6 +6,7 @@ import 'react-native-gesture-handler';
 
 import React, { useState } from 'react';
 import { StatusBar } from 'expo-status-bar';
+import { useFonts } from 'expo-font';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
@@ -17,8 +18,14 @@ import GameScreen from './screens/GameScreen';
 type Screen = 'game'; // expand to union when Phase 7 adds other screens
 
 export default function App() {
+  const [fontsLoaded, fontError] = useFonts({
+    'VT323-Regular': require('../assets/fonts/VT323-Regular.ttf'),
+  });
   // Destructure only the value — setScreen unused until Phase 7 wires navigation callbacks
   const [screen] = useState<Screen>('game');
+
+  // Render nothing until fonts are ready. Loading screen replaces this in a later Phase 7 commit.
+  if (!fontsLoaded && !fontError) return null;
 
   return (
     <SafeAreaProvider>
