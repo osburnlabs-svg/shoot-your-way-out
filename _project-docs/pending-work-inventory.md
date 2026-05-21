@@ -91,7 +91,7 @@ All UI work. Persistence decisions made here.
 
 ### UI rebuild (from original Phase 7 scope)
 - **Custom UI rebuild — all screens, HUD, menus.** Replace current debug overlay and modal default fonts with custom UI using kit color palette (`#0a0d08`, `#c9a356`, `#cc3333`) and pixel font. NOT kit layout PNGs. Per locked decision May 12 2026 (progress log line 53).
-- **SafeAreaProvider RNCSafeAreaProvider registration.** HUD hardcoded offsets need to use SafeAreaProvider properly.
+- **SafeAreaProvider RNCSafeAreaProvider registration.** ✅ Shipped (commit 3c39cdf, verified 2026-05-21). `<SafeAreaProvider>` wraps `<GestureHandlerRootView>` in App.tsx. Hardcoded inset values in GameCanvas.tsx remain — in scope for the HUD rebuild commit that follows. See progress log v3 Errata item 7 for resolution history.
 - **Debug overlay replacement.** Current plain `<Text>` with hardcoded insets → custom UI using kit color palette (`#0a0d08`, `#c9a356`, `#cc3333`) and pixel font, NOT kit HUD layout PNGs. Per locked decision (May 12 2026, progress log line 53): all Phase 7 UI is custom built. Kit-first principle still applies to in-world sprites (weapons, throwables, enemies, props, environment) — it does NOT apply to UI elements.
 - **Level-up modal typography.** RN default font → pixel font pass.
 - **Pistol and SMG weapon icons at 64×64 vs others at 80×80** — slight modal size mismatch. Fix sizing or accept.

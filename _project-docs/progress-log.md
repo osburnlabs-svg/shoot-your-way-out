@@ -2072,11 +2072,15 @@ All Phase 5.5 inventory items shipped or formally scrapped. Game is gameplay-com
 
 ---
 
-## Phase 7 — UI + persistence + analytics
+## Phase 7 — UI Rebuild + Persistence + Analytics
 
 **Goal:** Polished main menu, settings panel with volume sliders, pause menu, game over screen with stats, persistence (high score, total kills, etc.), minimap, PostHog analytics events firing.
 
-**Status:** Not started
+**Status:** 🟡 In progress (started 2026-05-21)
+
+### Phase 7 Session 1 — 2026-05-21
+
+Phase 7 started. SafeAreaProvider registration shipped (commit 3c39cdf) — resolves Phase 2 G2 ViewManagerRegistry crash via fresh dev client APK rebuild. Four working norms captured durably in v3 this session (in-session doc updates, brainstorm/build mode, per-phase audit, mobile UI best practices — commits 3498ab5, 9bbb28d, 193aac0). Kit-first principle narrowed to in-world assets only via aligned doc drift correction across three files (commits e9a9393, 1ec8ee2). Phase 7 sequencing locked: SafeAreaProvider → HUD → Loading → Main menu → Pause → Death polish → Settings.
 
 ---
 
@@ -2165,6 +2169,8 @@ Major decisions made during development that override or clarify the v3 doc.
 - **Workaround (Group 2):** Removed `<SafeAreaProvider>` from `App.tsx`. Debug overlay in `GameCanvas.tsx` uses hardcoded inset values (`top: 50, right: 10`) with a TODO comment. Package left in `package.json` — the native side is in the APK.
 - **Action for Phase 7:** Before relying on `<SafeAreaProvider>` or `useSafeAreaInsets` for real HUD positioning, verify that `RNCSafeAreaProvider` appears in the ViewManagerRegistry. A fresh dev client rebuild at that point may resolve it incidentally.
 - **Future template games (game #2+):** Install `react-native-safe-area-context` in the initial scaffold before the first dev client build to avoid the version drift.
+
+[Resolved 2026-05-21: Re-attempted SafeAreaProvider registration in commit 3c39cdf. `<SafeAreaProvider>` wraps `<GestureHandlerRootView>` in App.tsx. Fresh dev client APK rebuild registered the native ViewManager correctly. Hardcoded inset workaround in GameCanvas.tsx remains pending HUD rebuild.]
 
 ### 6. Adding native modules requires rebuilding the dev client APK
 
