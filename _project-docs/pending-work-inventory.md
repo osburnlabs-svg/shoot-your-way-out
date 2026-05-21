@@ -185,7 +185,7 @@ Per strategy-monetization-v1.md.
 
 Items needed to keep project docs accurate and trustworthy. Not gameplay work; not blocked on any phase.
 
-- **v3 context doc audit.** Compare key v3 statements against current code; identify and correct drifts. Known drifts already confirmed this session: vegetation budget values (v3 says 0–20, code says 70–100) and rain-suppression rule (v3 says active, code removed it in Phase 5 G3). These two are explicitly known-stale until the audit happens. Other drifts likely exist; that's what the audit is for. Do not partially fix just the known items before running the full audit — partial fixes while unknown drifts exist can create new inconsistencies.
+- **v3 context doc audit.** Compare key v3 statements against current code; identify and correct drifts. Known drifts confirmed during prior sessions: vegetation budget values and rain-suppression rule were corrected in the Phase 6 doc cleanup commit — see v3 doc line 481. Other drifts likely exist; that's what the audit is for.
 - **Close-out doc process improvement.** Codify a tighter end-of-session/end-of-phase doc update protocol so v3 doesn't drift from code again. Probably a new section in v3 or a working rule in the collaboration model. Draft in strategy chat before committing to docs.
 - **Sniper rooftop spawning (v3 stale).** Sniper rooftop spawning was removed as a Phase 5 G3 scope reduction; v3 context doc still describes it as active behavior. Confirmed stale during session 3 testing. Catch during v3 audit.
 

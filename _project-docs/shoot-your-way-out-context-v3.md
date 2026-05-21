@@ -478,7 +478,7 @@ Every run generates a unique map at game start. There are no pre-authored map fi
     bus: { min: 0, max: 1 },              // 256×256 centerpiece — use sparingly; 3 variants in pool
     scatter: { min: 4, max: 14 },         // 128×128 standalones from Broken_assets — 25 in pool (excludes bus + 7 component parts)
   },
-  vegetationBudget: { min: 0, max: 20 },  // 0 when weather === 'rain'; all 10 tree/bush sprites eligible
+  vegetationCount: 70-100,  // inline 70 + floor(rng() * 31) at mapGenerator.ts:380. Every run, regardless of weather. All 10 tree/bush sprites eligible. Rain suppression removed in Phase 5 G3.
   sniperCountPerBuilding: { min: 0, max: 1 },
   weather: 'clear' | 'rain',             // two values only — rolled at generation time; dust and leaves dropped
 }
