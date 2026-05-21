@@ -4,6 +4,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { xpForLevel } from '../data/balance';
 import { GuiSprites } from '../lib/sprites';
 import { palette, PIXEL_FONT_FAMILY, FONT_WEIGHT_BOLD } from '../data/theme';
+import { WEAPON_PROFILES } from '../data/weapons';
+import { TIER_COLORS } from '../data/gameConstants';
+import type { CrateTier } from '../data/gameConstants';
 
 type Props = {
   money: number;
@@ -13,6 +16,7 @@ type Props = {
   elapsed: number;  // seconds
   kills: number;
   equippedWeaponId: string;
+  equippedWeaponRarity: CrateTier;
 };
 
 function formatTime(totalSec: number): string {
@@ -21,7 +25,7 @@ function formatTime(totalSec: number): string {
   return `${m}:${s < 10 ? '0' : ''}${s}`;
 }
 
-export default function HUD({ money, hp, level, xp, elapsed, kills, equippedWeaponId }: Props) {
+export default function HUD({ money, hp, level, xp, elapsed, kills, equippedWeaponId, equippedWeaponRarity }: Props) {
   const insets = useSafeAreaInsets();
 
   const xpFloor = xpForLevel(level);
@@ -43,10 +47,22 @@ export default function HUD({ money, hp, level, xp, elapsed, kills, equippedWeap
         <Text style={styles.xpLevelLabel}> Lvl {level}</Text>
       </View>
 
-      {/* Weapon icon — top-left, below XP bar. */}
+      {/* Weapon section — top-left, below XP bar: icon box + optional name/rarity labels. */}
       {weaponIcon != null && (
-        <View style={[styles.weaponBox, { top: topEdge + 18, left: insets.left + 10 }]}>
-          <Image source={weaponIcon} style={styles.weaponIcon} resizeMode="contain" />
+        <View style={[styles.weaponSection, { top: topEdge + 18, left: insets.left + 10 }]}>
+          <View style={styles.weaponBox}>
+            <Image source={weaponIcon} style={styles.weaponIcon} resizeMode="contain" />
+          </View>
+          {equippedWeaponId !== 'pistol' && (
+            <>
+              <Text style={styles.weaponNameLabel}>
+                {WEAPON_PROFILES[equippedWeaponId]?.displayName ?? equippedWeaponId}
+              </Text>
+              <Text style={[styles.rarityLabel, { color: TIER_COLORS[equippedWeaponRarity] }]}>
+                {equippedWeaponRarity.charAt(0).toUpperCase() + equippedWeaponRarity.slice(1)}
+              </Text>
+            </>
+          )}
         </View>
       )}
 
@@ -87,8 +103,11 @@ const styles = StyleSheet.create({
     fontWeight: FONT_WEIGHT_BOLD,
     fontVariant: ['tabular-nums'],
   },
-  weaponBox: {
+  weaponSection: {
     position: 'absolute',
+    alignItems: 'center',
+  },
+  weaponBox: {
     width: 96,
     height: 96,
     backgroundColor: 'rgba(0,0,0,0.55)',
@@ -99,6 +118,25 @@ const styles = StyleSheet.create({
   weaponIcon: {
     width: 76,
     height: 76,
+  },
+  weaponNameLabel: {
+    color: palette.accentGold,
+    fontSize: 18,
+    fontFamily: PIXEL_FONT_FAMILY,
+    fontWeight: FONT_WEIGHT_BOLD,
+    textShadowColor: '#000',
+    textShadowRadius: 2,
+    textShadowOffset: { width: 1, height: 1 },
+    marginTop: 3,
+  },
+  rarityLabel: {
+    fontSize: 13,
+    fontFamily: PIXEL_FONT_FAMILY,
+    fontWeight: FONT_WEIGHT_BOLD,
+    letterSpacing: 1,
+    textShadowColor: '#000',
+    textShadowRadius: 2,
+    textShadowOffset: { width: 1, height: 1 },
   },
   statsPanel: {
     position: 'absolute',

@@ -633,6 +633,7 @@ export default function GameCanvas({ width, height }: Props) {
   const [displayBackpackStacks, setDisplayBackpackStacks] = useState(0);
   const [displayAdRevivesUsed, setDisplayAdRevivesUsed] = useState(0);
   const [displayEquippedWeaponId, setDisplayEquippedWeaponId] = useState('pistol');
+  const [displayEquippedWeaponRarity, setDisplayEquippedWeaponRarity] = useState<CrateTier>('common');
 
   // ─── Level-up modal display state (React, updated by 100ms timer) ─────────
   const [displayPendingLevelUp, setDisplayPendingLevelUp] = useState(false);
@@ -691,6 +692,7 @@ export default function GameCanvas({ width, height }: Props) {
       setDisplayXp(Math.floor(player.xp));
       setDisplayLevel(player.level);
       setDisplayEquippedWeaponId(player.equippedWeaponId);
+      setDisplayEquippedWeaponRarity(player.equippedWeaponRarity);
       setDisplayIsDead(state.isDead);
       setDisplayBackpackStacks(state.player.skillStacks['gear_backpack'] ?? 0);
       setDisplayAdRevivesUsed(state.adRevivesUsed);
@@ -2089,6 +2091,7 @@ export default function GameCanvas({ width, height }: Props) {
           elapsed={displayElapsed}
           kills={displayKillCount}
           equippedWeaponId={displayEquippedWeaponId}
+          equippedWeaponRarity={displayEquippedWeaponRarity}
         />
 
         {/* Revive prompt — replaces the old YOU DIED overlay.
