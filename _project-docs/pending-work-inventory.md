@@ -92,7 +92,7 @@ All UI work. Persistence decisions made here.
 ### UI rebuild (from original Phase 7 scope)
 - **Custom UI rebuild — all screens, HUD, menus.** Replace current debug overlay and modal default fonts with custom kit-asset UI.
 - **SafeAreaProvider RNCSafeAreaProvider registration.** HUD hardcoded offsets need to use SafeAreaProvider properly.
-- **Debug overlay replacement.** Current plain <Text> with hardcoded insets → kit HUD assets.
+- **Debug overlay replacement.** Current plain `<Text>` with hardcoded insets → custom UI using kit color palette (`#0a0d08`, `#c9a356`, `#cc3333`) and pixel font, NOT kit HUD layout PNGs. Per locked decision (May 12 2026, progress log line 53): all Phase 7 UI is custom built. Kit-first principle still applies to in-world sprites (weapons, throwables, enemies, props, environment) — it does NOT apply to UI elements.
 - **Level-up modal typography.** RN default font → pixel font pass.
 - **Pistol and SMG weapon icons at 64×64 vs others at 80×80** — slight modal size mismatch. Fix sizing or accept.
 
