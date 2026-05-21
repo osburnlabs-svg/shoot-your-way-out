@@ -305,8 +305,6 @@ export const EffectSprites = {
     require('../../assets/effects/muzzle_flash/panzer_fire_2.png'),
     require('../../assets/effects/muzzle_flash/panzer_fire_3.png'),
   ],
-  /** Thrown grenade sprite (32×32) — used for all three throwable types in flight. */
-  grenade: require('../../assets/effects/grenade/1.png'),
 } as const;
 
 /**
