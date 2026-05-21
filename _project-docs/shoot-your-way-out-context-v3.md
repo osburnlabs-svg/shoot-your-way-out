@@ -570,20 +570,7 @@ Per-map tints layer on top via Skia color matrix.
 
 ## HUD
 
-Composed using kit GUI assets. All visible HUD elements:
-
-- **Top-left:** Money panel (`Money Panel HUD.png` + `Money Icon.png`) showing current score
-- **Top-center:** Time elapsed (mm:ss) and kill count
-- **Top-right:** Weapon icon (one of the 5 `WEAPON ICONS/` PNGs based on equipped tier)
-- **Bottom-left:** HP/Armor bars (using `HP ARMOR AMMO HUD.png` strip)
-- **Bottom-center:** XP bar with current level
-- **Bottom-right:** Active skill chips (small icons stacked horizontally)
-- **Top-right corner:** **Minimap** (`Minimap BG.png`) with player (A-Soldier green), enemies (E-* red), helicopter boss (E-Helicopter red), bomber (E-Air red), pickups (N-* yellow). 60×40 pixels, ~10% screen size.
-- **Boss wave UI:** Boss HP bar slides in from top, "ENRAGED" badge appears in phase 2
-- **Banners:** "BOSS WAVE — HIGH VALUE TARGET INBOUND" (20s warning), "INCOMING ORDNANCE" (bomber strafe warning)
-- **Bonus indicator:** if a run modifier is active (from rewarded ad), `Bonus 01-03.png` icon shows top-left near time
-
-Safe area insets are respected — iPhone notch and dynamic island get padding. HUD elements never overlap interactive zones (drag area).
+Scope locked in `pending-work-inventory.md` Phase 7 section (commit 8913333, 2026-05-21). Earlier v3 HUD description (kit-asset HUD with armor bars, skill chips, minimap, boss UI) is obsolete — superseded by kit-UI-abandoned decision (May 12 2026, progress log line 53) and scope cuts (May 13 2026 — boss UI removed). For HUD data sources: Money displays `player.score` (no separate money field exists in Phase 7), weapon icon reads `player.equippedWeaponId` (not `weaponPose` — that's the animation-only field), killCount is on GameState (not PlayerState), XP bar fill formula in `src/data/balance.ts:65`.
 
 ---
 
