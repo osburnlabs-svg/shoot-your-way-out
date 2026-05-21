@@ -2052,6 +2052,18 @@ All Phase 5.5 inventory items shipped or formally scrapped. Game is gameplay-com
 - Single-focused-commit discipline held across all four commits + one revert.
 - Polish-mode guardrail (no architectural changes, no scope expansion mid-task, no "while we're in there") held. One scope expansion happened (frag-only → all three throwables), but it was a deliberate product decision made before any code was written, not mid-commit drift.
 
+### Phase 6 — Session 2 (2026-05-21)
+
+**Status:** Item 4 (pond) disposition decided — deferred to v1.1. Items 5 (vignette) and 6 (code review pass) still open.
+
+**Decided this session:**
+
+- **Item 4 (pond) deferred to v1.1.** Brainstorm + verification revealed the pond is not naturally polish-mode-shaped: requires novel scale override, novel circle collision radius (largest in pool by ~2.6×), and either new placement logic or shifts existing structure PRNG stream. Full investigation in inventory item 4. Water features will be considered as a real v1.1 feature with proper scope, not retrofitted polish.
+
+**Working norm reinforced:**
+
+- **Brainstorm mode + build mode as session modes** (carried over from prior chats, not yet in v3 doc). Brainstorm mode for exploration without scope reflexes; build mode for execution discipline. Triggers: "brainstorm mode" / "back to build mode." To be formalized in v3 context doc in a future commit alongside the in-session doc-updates norm.
+
 ---
 
 ## Phase 7 — UI + persistence + analytics
