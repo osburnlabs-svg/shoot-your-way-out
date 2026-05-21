@@ -72,7 +72,7 @@ import {
 } from 'react-native-reanimated';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 
-import { HeroSprites, EnemySprites, PickupSprites, EffectSprites, TileSprites, EnvSprites, FlyoverSprites } from '../lib/sprites';
+import { HeroSprites, EnemySprites, PickupSprites, EffectSprites, TileSprites, EnvSprites, FlyoverSprites, GuiSprites } from '../lib/sprites';
 import type { HeroWeaponPose } from '../lib/sprites';
 import { loadMap } from '../lib/mapLoader';
 import { SKILLS, SKILL_IDS, getEffectiveStats } from '../data/skills';
@@ -431,6 +431,10 @@ export default function GameCanvas({ width, height }: Props) {
   const bulletImage = useImage(EffectSprites.bullet);
   // Grenade launcher projectile: single static frame (rocket-f1.png, 3×12 px).
   const rocketF1Image = useImage(EffectSprites.rocketF1);
+  // Throwable in-flight sprites — reuse skill icon assets (64×64 each).
+  const fragImage    = useImage(GuiSprites.skillIcons.throwables_frag);
+  const molotovImage = useImage(GuiSprites.skillIcons.throwables_molotov);
+  const smokeImage   = useImage(GuiSprites.skillIcons.throwables_smoke);
   // Tank turret rocket (Phase 5 G5): 2-frame body animation — kept for future use.
   const rocket0 = useImage(EffectSprites.rocket[0]);
   const rocket1 = useImage(EffectSprites.rocket[1]);
@@ -1883,10 +1887,23 @@ export default function GameCanvas({ width, height }: Props) {
           {/* Inactive/detonating slots sit at (-9999,-9999) — invisible.   */}
           {allThrowableTransforms.map((transform, i) => {
             const t = throwableSlotData[i]!;
-            const color = t.type ? THROWABLE_COLORS[t.type] : '#000000';
+            const img = t.type === 'frag'    ? fragImage
+                      : t.type === 'molotov' ? molotovImage
+                      : t.type === 'smoke'   ? smokeImage
+                      : null;
+            if (!img) return null;
+            const tw = img.width();
+            const th = img.height();
             return (
               <Group key={`throw-fly-${i}`} transform={transform}>
-                <Circle cx={0} cy={0} r={5} color={color} />
+                <Image
+                  image={img}
+                  x={-tw / 2}
+                  y={-th / 2}
+                  width={tw}
+                  height={th}
+                  sampling={{ filter: FilterMode.Nearest, mipmap: MipmapMode.None }}
+                />
               </Group>
             );
           })}
