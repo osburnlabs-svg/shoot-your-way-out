@@ -180,17 +180,6 @@ function formatElapsed(totalSec: number): string {
   return `${m}:${s < 10 ? '0' : ''}${s}`;
 }
 
-/**
- * Throwable in-flight circle colors — defined locally (not in gameConstants) as
- * they are purely visual/render concerns. Smoke/Molotov zone colors are also here.
- * G5 TODO: remove debug spawn buttons that reference these; colors stay for flight circles.
- */
-const THROWABLE_COLORS = {
-  frag:    '#e8c040', // yellow-gold
-  smoke:   '#a0c8a0', // pale green-grey
-  molotov: '#e06020', // orange-red
-};
-
 type Props = {
   width: number;
   height: number;
