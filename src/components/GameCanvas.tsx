@@ -59,6 +59,8 @@ import {
   Group,
   Image,
   MipmapMode,
+  RadialGradient,
+  Rect,
   Skia,
   useImage,
 } from '@shopify/react-native-skia';
@@ -2113,6 +2115,18 @@ export default function GameCanvas({ width, height }: Props) {
               </Group>
             );
           })()}
+
+          {/* ── Vignette — static screen-edge darkening for atmospheric framing ── */}
+          {/* Screen-space (not in camera Group). Tuning: edge alpha 0.35,          */}
+          {/* radius = 0.7 × screen diagonal. Increase alpha or decrease multiplier  */}
+          {/* to darken more; decrease alpha or increase multiplier to lighten.       */}
+          <Rect x={0} y={0} width={width} height={height}>
+            <RadialGradient
+              c={{ x: width / 2, y: height / 2 }}
+              r={Math.sqrt(width * width + height * height) * 0.7}
+              colors={['transparent', 'rgba(0,0,0,0.35)']}
+            />
+          </Rect>
 
         </Canvas>
 
