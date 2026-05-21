@@ -31,6 +31,7 @@ import {
 import type { SkillId } from '../data/skills';
 import { SKILLS } from '../data/skills';
 import { GuiSprites } from '../lib/sprites';
+import { PIXEL_FONT_FAMILY } from '../data/theme';
 
 // ─── Layout constants ─────────────────────────────────────────────────────────
 
@@ -120,7 +121,7 @@ const styles = StyleSheet.create({
   header: {
     color: '#c9a356',
     fontSize: 32,
-    fontWeight: 'bold',
+    fontFamily: PIXEL_FONT_FAMILY,
     textAlign: 'center',
     textShadowColor: '#000000',
     textShadowRadius: 4,
@@ -148,7 +149,7 @@ const styles = StyleSheet.create({
   name: {
     color: '#ffffff',
     fontSize: 12,
-    fontWeight: 'bold',
+    fontFamily: PIXEL_FONT_FAMILY,
     textAlign: 'center',
     textShadowColor: '#000000',
     textShadowRadius: 2,
@@ -158,6 +159,7 @@ const styles = StyleSheet.create({
   level: {
     color: '#ffd700',
     fontSize: 11,
+    fontFamily: PIXEL_FONT_FAMILY,
     textAlign: 'center',
     textShadowColor: '#000000',
     textShadowRadius: 2,

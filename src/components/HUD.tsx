@@ -3,7 +3,7 @@ import { View, Text, Image, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { xpForLevel } from '../data/balance';
 import { GuiSprites } from '../lib/sprites';
-import { palette, PIXEL_FONT_FAMILY, FONT_WEIGHT_BOLD } from '../data/theme';
+import { palette, PIXEL_FONT_FAMILY } from '../data/theme';
 import { WEAPON_PROFILES } from '../data/weapons';
 import { TIER_COLORS } from '../data/gameConstants';
 import type { CrateTier } from '../data/gameConstants';
@@ -100,7 +100,6 @@ const styles = StyleSheet.create({
     color: palette.accentGold,
     fontSize: 11,
     fontFamily: PIXEL_FONT_FAMILY,
-    fontWeight: FONT_WEIGHT_BOLD,
     fontVariant: ['tabular-nums'],
   },
   weaponSection: {
@@ -123,7 +122,6 @@ const styles = StyleSheet.create({
     color: palette.accentGold,
     fontSize: 18,
     fontFamily: PIXEL_FONT_FAMILY,
-    fontWeight: FONT_WEIGHT_BOLD,
     textShadowColor: '#000',
     textShadowRadius: 2,
     textShadowOffset: { width: 1, height: 1 },
@@ -132,7 +130,6 @@ const styles = StyleSheet.create({
   rarityLabel: {
     fontSize: 13,
     fontFamily: PIXEL_FONT_FAMILY,
-    fontWeight: FONT_WEIGHT_BOLD,
     letterSpacing: 1,
     textShadowColor: '#000',
     textShadowRadius: 2,
@@ -150,7 +147,6 @@ const styles = StyleSheet.create({
     color: palette.accentGold,
     fontSize: 13,
     fontFamily: PIXEL_FONT_FAMILY,
-    fontWeight: FONT_WEIGHT_BOLD,
     fontVariant: ['tabular-nums'],
   },
 });

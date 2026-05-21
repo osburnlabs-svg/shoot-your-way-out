@@ -21,6 +21,7 @@ import {
   TouchableOpacity,
   StyleSheet,
 } from 'react-native';
+import { PIXEL_FONT_FAMILY } from '../data/theme';
 
 type Props = {
   visible: boolean;
@@ -105,7 +106,7 @@ const styles = StyleSheet.create({
   header: {
     color: '#c9a356',
     fontSize: 32,
-    fontWeight: 'bold',
+    fontFamily: PIXEL_FONT_FAMILY,
     textAlign: 'center',
     textShadowColor: '#000000',
     textShadowRadius: 4,
@@ -126,7 +127,7 @@ const styles = StyleSheet.create({
   buttonText: {
     color: '#ffffff',
     fontSize: 14,
-    fontWeight: 'bold',
+    fontFamily: PIXEL_FONT_FAMILY,
     textShadowColor: '#000000',
     textShadowRadius: 2,
     textShadowOffset: { width: 1, height: 1 },
