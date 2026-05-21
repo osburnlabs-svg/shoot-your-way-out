@@ -96,6 +96,10 @@ All UI work. Persistence decisions made here.
 
   **HUD display scope (locked 2026-05-21).** Top-left: equipped weapon icon (single icon, not inventory strip — keeps current single-weapon gameplay unchanged). Top-right: Money, HP, Level, Time, Kills as numbers, plus XP-as-bar (visual fill only, no number). Dropped from HUD: Score number, raw XP number, FPS, Enemies, Frame. No underlying mechanic changes — pickups continue to award both XP and score internally. Money persistence wiring is Phase 9 per strategy doc Section 5.3; Phase 7 HUD displays money as per-run counter until persistence lands.
 
+  ✅ Shipped 2026-05-21 across commits acdd453 (HUD scaffold + debug overlay removal), bb0beba (icon size tuning), 5c29ecb (weapon name + rarity labels matching CrateRevealModal), 43c96c7 (legendary rarity color changed from gold to orange #ff8c00 for visual distinction from accent gold). HUD consumes useSafeAreaInsets() — SafeAreaProvider integration goal from inventory line 95 is now fulfilled.
+
+- **Pixel font app-wide swap.** Source font confirmed by Mo: VT323 (royalty-free pixel font). Currently PIXEL_FONT_FAMILY in theme.ts is undefined, falling back to RN system bold throughout HUD and all modals. Swap requires: (1) add VT323 .ttf to assets/fonts/, (2) load via expo-font + useFonts in App.tsx, (3) update PIXEL_FONT_FAMILY constant in theme.ts to the loaded font name. Single dedicated commit; touches App.tsx and theme.ts only — HUD and all modals pick up the change automatically via the constant. Watch for readability at small sizes (HUD stat text ~13pt) — pixel fonts are thin and may need size bump if VT323 reads poorly at default sizes.
+
 - **Level-up modal typography.** RN default font → pixel font pass.
 - **Pistol and SMG weapon icons at 64×64 vs others at 80×80** — slight modal size mismatch. Fix sizing or accept.
 
