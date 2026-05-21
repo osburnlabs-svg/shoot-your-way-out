@@ -110,6 +110,7 @@ const styles = StyleSheet.create({
   header: {
     color: '#c9a356',
     fontSize: 29,
+    lineHeight: 29,
     fontFamily: PIXEL_FONT_FAMILY,
     letterSpacing: 2,
     textAlign: 'center',
@@ -126,6 +127,7 @@ const styles = StyleSheet.create({
   weaponName: {
     color: '#c9a356',
     fontSize: 23,
+    lineHeight: 25,
     fontFamily: PIXEL_FONT_FAMILY,
     textAlign: 'center',
     textShadowColor: '#000000',
@@ -161,6 +163,7 @@ const styles = StyleSheet.create({
   buttonText: {
     color: '#ffffff',
     fontSize: 18,
+    lineHeight: 18,
     fontFamily: PIXEL_FONT_FAMILY,
     textShadowColor: '#000000',
     textShadowRadius: 2,
@@ -170,6 +173,7 @@ const styles = StyleSheet.create({
   scrapSubtext: {
     color: '#aaaaaa',
     fontSize: 12,
+    lineHeight: 13,
     fontFamily: PIXEL_FONT_FAMILY,
     textAlign: 'center',
   },

@@ -99,6 +99,7 @@ const styles = StyleSheet.create({
   xpLevelLabel: {
     color: palette.accentGold,
     fontSize: 14,
+    lineHeight: 14,
     fontFamily: PIXEL_FONT_FAMILY,
     fontVariant: ['tabular-nums'],
   },
@@ -121,6 +122,7 @@ const styles = StyleSheet.create({
   weaponNameLabel: {
     color: palette.accentGold,
     fontSize: 23,
+    lineHeight: 25,
     fontFamily: PIXEL_FONT_FAMILY,
     textShadowColor: '#000',
     textShadowRadius: 2,
@@ -146,6 +148,7 @@ const styles = StyleSheet.create({
   statLine: {
     color: palette.accentGold,
     fontSize: 17,
+    lineHeight: 19,
     fontFamily: PIXEL_FONT_FAMILY,
     fontVariant: ['tabular-nums'],
   },

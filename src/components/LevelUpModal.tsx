@@ -37,7 +37,7 @@ import { PIXEL_FONT_FAMILY } from '../data/theme';
 
 /** Card dimensions. Sized for readability at arm's length on a mobile screen. */
 const CARD_W = 105;
-const CARD_H = 140;
+const CARD_H = 168;
 
 /** Gap between the header text and the card row. */
 const HEADER_CARD_GAP = 20;
@@ -121,6 +121,7 @@ const styles = StyleSheet.create({
   header: {
     color: '#c9a356',
     fontSize: 42,
+    lineHeight: 42,
     fontFamily: PIXEL_FONT_FAMILY,
     textAlign: 'center',
     textShadowColor: '#000000',
@@ -149,6 +150,7 @@ const styles = StyleSheet.create({
   name: {
     color: '#ffffff',
     fontSize: 16,
+    lineHeight: 16,
     fontFamily: PIXEL_FONT_FAMILY,
     textAlign: 'center',
     textShadowColor: '#000000',
@@ -159,6 +161,7 @@ const styles = StyleSheet.create({
   level: {
     color: '#ffd700',
     fontSize: 14,
+    lineHeight: 14,
     fontFamily: PIXEL_FONT_FAMILY,
     textAlign: 'center',
     textShadowColor: '#000000',
@@ -168,6 +171,7 @@ const styles = StyleSheet.create({
   desc: {
     color: '#d0d0d0',
     fontSize: 12,
+    lineHeight: 12,
     fontFamily: PIXEL_FONT_FAMILY,
     textAlign: 'center',
     textShadowColor: '#000000',

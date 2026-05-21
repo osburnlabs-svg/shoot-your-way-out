@@ -106,6 +106,7 @@ const styles = StyleSheet.create({
   header: {
     color: '#c9a356',
     fontSize: 42,
+    lineHeight: 42,
     fontFamily: PIXEL_FONT_FAMILY,
     textAlign: 'center',
     textShadowColor: '#000000',
@@ -127,6 +128,7 @@ const styles = StyleSheet.create({
   buttonText: {
     color: '#ffffff',
     fontSize: 18,
+    lineHeight: 18,
     fontFamily: PIXEL_FONT_FAMILY,
     textShadowColor: '#000000',
     textShadowRadius: 2,
