@@ -35,8 +35,8 @@ export default function HUD({ money, hp, level, xp, elapsed, kills, equippedWeap
 
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="none">
-      {/* XP progress bar — spans full width just below safe-area top inset. */}
-      <View style={[styles.xpRow, { top: topEdge, left: insets.left + 10, right: insets.right + 10 }]}>
+      {/* XP progress bar — top-right, above stats panel. */}
+      <View style={[styles.xpRow, { top: topEdge, right: insets.right + 10 }]}>
         <View style={styles.xpBarOuter}>
           <View style={[styles.xpBarFill, { width: `${Math.round(xpFill * 100)}%` as any }]} />
         </View>
@@ -67,6 +67,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     height: 14,
+    width: 110,
   },
   xpBarOuter: {
     flex: 1,
@@ -88,16 +89,16 @@ const styles = StyleSheet.create({
   },
   weaponBox: {
     position: 'absolute',
-    width: 40,
-    height: 40,
+    width: 72,
+    height: 72,
     backgroundColor: 'rgba(0,0,0,0.55)',
-    borderRadius: 4,
+    borderRadius: 6,
     alignItems: 'center',
     justifyContent: 'center',
   },
   weaponIcon: {
-    width: 32,
-    height: 32,
+    width: 56,
+    height: 56,
   },
   statsPanel: {
     position: 'absolute',
