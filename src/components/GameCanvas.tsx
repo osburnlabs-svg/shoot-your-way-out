@@ -2117,14 +2117,14 @@ export default function GameCanvas({ width, height }: Props) {
           })()}
 
           {/* ── Vignette — static screen-edge darkening for atmospheric framing ── */}
-          {/* Screen-space (not in camera Group). Tuning: edge alpha 0.8,           */}
+          {/* Screen-space (not in camera Group). Tuning: edge alpha 0.95,          */}
           {/* radius = 0.85 × screen diagonal. Increase alpha or decrease multiplier */}
           {/* to darken more; decrease alpha or increase multiplier to lighten.       */}
           <Rect x={0} y={0} width={width} height={height}>
             <RadialGradient
               c={{ x: width / 2, y: height / 2 }}
               r={Math.sqrt(width * width + height * height) * 0.85}
-              colors={['transparent', 'rgba(0,0,0,0.8)']}
+              colors={['transparent', 'rgba(0,0,0,0.95)']}
             />
           </Rect>
 
