@@ -45,6 +45,22 @@ Each doc update is its own focused commit, separate from code commits. Same sing
 
 *Mechanics.* CC reads the v3 doc sections in scope plus the relevant code files. Produces a findings report: what the doc claims, what the code actually does, where they disagree. Mo reviews findings, approves corrections. Corrections land as a single focused doc commit. Then implementation prompts begin.
 
+**UI principles (mobile game best practices, boring is good).** All UI in this game follows shipped mobile game conventions. Players do not want novelty in menus — they want speed, clarity, and predictable patterns. The principles below apply to all UI work in Phase 7 and beyond.
+
+*Layout.* HUD: corner-pinned, minimal. Top corners for stats. Bottom for context buttons. Center reserved for gameplay and momentary action callouts only. Menus: single-column vertical layouts. Mobile screens are narrow; never split horizontally except for icon+label pairings. One primary action per screen — visually dominant (big button, full-width or near-full-width, distinct color from secondary actions). Secondary actions are smaller, lower contrast, often text-link style. No nested menus. Settings is its own screen, not a sub-sheet inside pause menu.
+
+*Touch targets.* Minimum tap target 44pt × 44pt. Ideally 60pt+ for primary actions. Generous spacing between interactive elements (12pt+ between adjacent buttons). Thumbs are imprecise.
+
+*Motion.* No animations longer than 250ms. Players want to move on. Modal background dims to ~70% black (matches existing LevelUpModal, ReviveModal, CrateRevealModal pattern). No bouncy, elastic, or decorative animations. Snap or fade only.
+
+*Standard patterns for the screens this game needs.* Pause menu: Resume, Settings, Quit. Three buttons, vertical stack, full-width. Resume is the primary action (dominant). Death screen: Stats summary at top, primary "Try Again" or "Watch Ad to Continue" button, secondary "Main Menu" link below. Main menu: Game logo, big "Play" / "Deploy" button (primary), smaller secondary buttons (Settings, About, optional shop/flea market in v1.1+). Loading screen: Game logo or static image, small loading indicator, optional tip text — no mini-games, no progress bars unless actual loading progress can be measured. Settings: Sound (music + SFX sliders), haptics toggle (if applicable), reset progress (with confirmation), credits link. Vertical scrolling list.
+
+*Visual language.* Kit color palette: `#0a0d08` (background dark), `#c9a356` (gold accent), `#cc3333` (action red). Locked from May 12 2026 decision (progress log line 53). Pixel font throughout — no mixing with RN default font. No kit layout PNGs as UI panels — palette and typography only.
+
+*When in doubt, copy the convention from a shipped mobile game in the same genre.* Survivor-likes and arcade shooters have well-established UI patterns. If a UI question doesn't have an obvious answer from these principles, the answer is "what does Vampire Survivors / Brotato / Archero do?" — not "what would be creative or interesting here."
+
+*What this protects.* UI work is the easiest place for creative ambition to inflate scope. A "fancy" pause menu adds days of work and zero player value. These principles cap scope at "competently boring" — which is the correct target for a side-project mobile game prioritizing ship velocity.
+
 **The three-stage workflow.** Work on this project flows through three stages, in order. Skipping a stage tends to produce wrong-direction work that's expensive to undo.
 
 1. **Strategic planning (Mo + Claude in chat).** Scope, decisions, tradeoffs, design direction. No code is written. Claude pushes back where appropriate and surfaces things Mo might not see; Mo drives direction and catches strategic drift. Output: an aligned understanding of what to build and why, plus locked decisions on anything contestable.
