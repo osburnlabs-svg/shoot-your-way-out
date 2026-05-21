@@ -50,7 +50,7 @@
  */
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import {
   Atlas,
   Canvas,
@@ -80,6 +80,7 @@ import { loadMap } from '../lib/mapLoader';
 import { SKILLS, SKILL_IDS, getEffectiveStats } from '../data/skills';
 import type { SkillId } from '../data/skills';
 import { WEAPON_PROFILES } from '../data/weapons';
+import HUD from './HUD';
 import LevelUpModal from './LevelUpModal';
 import ReviveModal from './ReviveModal';
 import CrateRevealModal from './CrateRevealModal';
@@ -162,25 +163,6 @@ import {
   useThrowableSlotTransform,
   useEnemySlotFlash,
 } from '../lib/slotHooks';
-
-// Cycle order and display labels for the debug weapon button.
-const WEAPON_CYCLE: HeroWeaponPose[] = [
-  'pistol', 'rifle', 'machinegun', 'grenade_launcher', 'flamethrower',
-];
-const WEAPON_LABELS: Record<HeroWeaponPose, string> = {
-  pistol: 'Pistol',
-  rifle: 'Rifle',
-  machinegun: 'MachineGun',
-  grenade_launcher: 'Grenade Launcher',
-  flamethrower: 'Flamethrower',
-};
-
-/** Format elapsed seconds as M:SS for the debug overlay. */
-function formatElapsed(totalSec: number): string {
-  const m = Math.floor(totalSec / 60);
-  const s = totalSec % 60;
-  return `${m}:${s < 10 ? '0' : ''}${s}`;
-}
 
 type Props = {
   width: number;
@@ -576,7 +558,7 @@ export default function GameCanvas({ width, height }: Props) {
   const inputVectorY = useSharedValue(0);
   const inputActive = useSharedValue(false);
 
-  // ─── FPS tracking (UI thread) ──────────────────────────────────────────────
+  // ─── HUD update bridge — rate-limits worklet→JS syncs to once per second ───
   const fpsAccumMs = useSharedValue(0);
   const fpsFrameCount = useSharedValue(0);
 
@@ -592,19 +574,13 @@ export default function GameCanvas({ width, height }: Props) {
   }>({ active: false, startX: 0, startY: 0, endX: 0, endY: 0, angle: 0 });
   const heliProgress = useSharedValue(0);
 
-  // ─── Debug display (React state, ~once/sec) ────────────────────────────────
-  const [displayFps, setDisplayFps] = useState(0);
+  // ─── HUD timing counters (React state, bridged from worklet ~once/sec) ─────
   const [displayElapsed, setDisplayElapsed] = useState(0);
-  const [displayFrameCount, setDisplayFrameCount] = useState(0);
-  const [displayEnemyCount, setDisplayEnemyCount] = useState(0);
   const [displayKillCount, setDisplayKillCount] = useState(0);
 
-  const updateDebugDisplay = useCallback(
-    (fps: number, elapsedSec: number, frames: number, enemyCount: number, killCount: number) => {
-      setDisplayFps(fps);
+  const updateHudCounters = useCallback(
+    (elapsedSec: number, killCount: number) => {
       setDisplayElapsed(elapsedSec);
-      setDisplayFrameCount(frames);
-      setDisplayEnemyCount(enemyCount);
       setDisplayKillCount(killCount);
     },
     [],
@@ -656,6 +632,7 @@ export default function GameCanvas({ width, height }: Props) {
   const [displayIsDead, setDisplayIsDead] = useState(false);
   const [displayBackpackStacks, setDisplayBackpackStacks] = useState(0);
   const [displayAdRevivesUsed, setDisplayAdRevivesUsed] = useState(0);
+  const [displayEquippedWeaponId, setDisplayEquippedWeaponId] = useState('pistol');
 
   // ─── Level-up modal display state (React, updated by 100ms timer) ─────────
   const [displayPendingLevelUp, setDisplayPendingLevelUp] = useState(false);
@@ -713,6 +690,7 @@ export default function GameCanvas({ width, height }: Props) {
       setDisplayScore(Math.floor(player.score));
       setDisplayXp(Math.floor(player.xp));
       setDisplayLevel(player.level);
+      setDisplayEquippedWeaponId(player.equippedWeaponId);
       setDisplayIsDead(state.isDead);
       setDisplayBackpackStacks(state.player.skillStacks['gear_backpack'] ?? 0);
       setDisplayAdRevivesUsed(state.adRevivesUsed);
@@ -1356,20 +1334,6 @@ export default function GameCanvas({ width, height }: Props) {
   );
   const [rocketFrame, setRocketFrame] = useState(0);
 
-  // ─── Debug weapon cycle button ─────────────────────────────────────────────
-  // KNOWN BUG (tech debt): mutates weaponPose (animation) only — does NOT update
-  // equippedWeaponId (combat stats). Cycling shows a different pose but fires with
-  // the previously equipped weapon's stats. Phase 7 removes this button entirely.
-  const cycleWeapon = useCallback(() => {
-    const current = gameState.value.player.weaponPose;
-    const idx = WEAPON_CYCLE.indexOf(current);
-    const next = WEAPON_CYCLE[(idx + 1) % WEAPON_CYCLE.length];
-    gameState.value = {
-      ...gameState.value,
-      player: { ...gameState.value.player, weaponPose: next },
-    };
-  }, [gameState]);
-
   // ─── Crate reveal handlers ─────────────────────────────────────────────────
   // Both mutate gameState.value on the JS thread during the pendingCrateReveal
   // freeze window — same pattern as handleSkillSelect / handleFreeRevive.
@@ -1568,25 +1532,11 @@ export default function GameCanvas({ width, height }: Props) {
     state = updateGameState(state, TICK_INTERVAL_MS, collisionDataShared.value);
     gameState.value = state;
 
-    // FPS + debug counters — bridge to React once per second.
-    // fpsAccumMs tracks tick-time (not vsync-time) so the displayed FPS reads ~30.
+    // HUD counters — bridge elapsed time and kill count to React once per second.
     fpsAccumMs.value += TICK_INTERVAL_MS;
     fpsFrameCount.value += 1;
     if (fpsAccumMs.value >= 1000) {
-      const fps = Math.round((fpsFrameCount.value / fpsAccumMs.value) * 1000);
-      // Count only alive enemies for the display (dying ones are finishing their animation).
-      let aliveCount = 0;
-      for (let i = 0; i < state.enemies.length; i++) {
-        const e = state.enemies[i];
-        if (e && e.status === 'alive') aliveCount += 1;
-      }
-      runOnJS(updateDebugDisplay)(
-        fps,
-        Math.round(state.elapsedMs / 1000),
-        state.frameCount,
-        aliveCount,
-        state.killCount,
-      );
+      runOnJS(updateHudCounters)(Math.round(state.elapsedMs / 1000), state.killCount);
       fpsAccumMs.value = 0;
       fpsFrameCount.value = 0;
     }
@@ -2130,37 +2080,16 @@ export default function GameCanvas({ width, height }: Props) {
 
         </Canvas>
 
-        {/* Debug weapon cycle button — top-left.
-            NOTE: mutates weaponPose only, NOT equippedWeaponId — animation changes
-            but combat stats do not. Unreliable as a weapon indicator. Phase 7 removes this.
-            TODO Phase 4: remove once LevelUpModal + CrateRevealOverlay wire
-            real weapon equipping from player progression. */}
-        <Pressable
-          style={[styles.debugOverlay, styles.weaponButton, { top: 50, left: 10 }]}
-          onPress={cycleWeapon}
-        >
-          <Text style={styles.debugText}>
-            Weapon: {WEAPON_LABELS[spriteState.weaponPose]}
-          </Text>
-          <Text style={[styles.debugText, styles.tapHint]}>tap to cycle</Text>
-        </Pressable>
-
-        {/* Debug overlay — top-right. */}
-        {/* TODO Phase 7: replace hardcoded insets with real safe-area values. */}
-        <View
-          style={[styles.debugOverlay, { top: 50, right: 10 }]}
-          pointerEvents="none"
-        >
-          <Text style={styles.debugText}>FPS: {displayFps}</Text>
-          <Text style={styles.debugText}>HP: {displayHp}</Text>
-          <Text style={styles.debugText}>Score: {displayScore}</Text>
-          <Text style={styles.debugText}>XP: {displayXp}</Text>
-          <Text style={styles.debugText}>Level: {displayLevel}</Text>
-          <Text style={styles.debugText}>Enemies: {displayEnemyCount}</Text>
-          <Text style={styles.debugText}>Kills: {displayKillCount}</Text>
-          <Text style={styles.debugText}>Time: {formatElapsed(displayElapsed)}</Text>
-          <Text style={styles.debugText}>Frame: {displayFrameCount}</Text>
-        </View>
+        {/* HUD — real game overlay, replaces debug scaffold. */}
+        <HUD
+          money={displayScore}
+          hp={displayHp}
+          level={displayLevel}
+          xp={displayXp}
+          elapsed={displayElapsed}
+          kills={displayKillCount}
+          equippedWeaponId={displayEquippedWeaponId}
+        />
 
         {/* Revive prompt — replaces the old YOU DIED overlay.
             ReviveModal renders null when !visible, so no layout cost when hidden. */}
@@ -2197,23 +2126,4 @@ export default function GameCanvas({ width, height }: Props) {
 }
 
 const styles = StyleSheet.create({
-  debugOverlay: {
-    position: 'absolute',
-    backgroundColor: 'rgba(0,0,0,0.55)',
-    paddingHorizontal: 8,
-    paddingVertical: 5,
-    borderRadius: 4,
-  },
-  weaponButton: {
-    alignItems: 'flex-start',
-  },
-  debugText: {
-    color: '#4CAF50',
-    fontSize: 11,
-    fontVariant: ['tabular-nums'],
-  },
-  tapHint: {
-    color: '#888',
-    fontSize: 9,
-  },
 });
