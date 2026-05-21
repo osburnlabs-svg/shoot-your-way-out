@@ -48,7 +48,7 @@ Post-Phase-5.5 triage locked Phase 6 as a lean polish + cleanup phase. Most orig
 
 1. **Dead code removal.** ✅ Shipped (commit 0c042ae). Removed stale mapTints per-map keys (compound, outskirts, treeline) from theme.ts. Original scope also included tileGrid field removal, but pre-review investigation confirmed tileGrid is load-bearing (read by GameCanvas viewport culling); that part of the scope was correctly dropped. See Phase 5.5 carry-over note for full explanation.
 
-2. **Bullet rendering verification.** Verify bullets are using kit asset, not Skia Circle primitive. Mo recalls Circle was swapped to kit asset already. If confirmed swapped, mark closed in this inventory and skip. If still Circle, swap.
+2. **Bullet rendering verification.** ✅ Closed (no commit needed). Confirmed by Mo at Phase 6 start: bullet sprite swap from Skia `<Circle>` primitive to kit asset was already shipped in an earlier phase. Original inventory entry was scope-triage drift. No verification or swap needed.
 
 3. **Grenade sprite swap.** gp25 (Rocket Launcher) projectile currently uses `rocket-f1.png`. Swap to dedicated grenade sprite at `_project-docs/kits/tds-modern-pixel-game-kit/tds-modern-hero-weapons-and-props/Effects/Grenade Launcher Shot/1.png`. Other non-rocket weapons keep GunnerBullet.
 
