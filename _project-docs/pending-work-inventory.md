@@ -40,42 +40,47 @@ Canonical source for all forward-looking work on Shoot Your Way Out. Reference t
 - **theme.ts per-map tint keys stale** — moved to Phase 6 Theme polish section.
 - **Auto-weapon-upgrade alternative design** — no longer relevant; crate-plus-rarity system provides sufficient weapon progression variety.
 
-## Phase 6 — Visual Polish & Atmosphere
+## Phase 6 — Visual Polish & Cleanup
 
-After gameplay completion. Visual-only items.
+Post-Phase-5.5 triage locked Phase 6 as a lean polish + cleanup phase. Most original items deferred to v1.1 or scrapped. Phase 7 (UI Rebuild) starts after Phase 6 closes.
 
-### Tech debt and cleanup carried from Phase 5.5
-- **Code review and optimization pass.** Mo flagged in Session 6 — general code health review before visual work begins. No specific issues identified; open-ended review pass.
-- **Rarity v2 visual treatment.** Glow effect or background shade on weapon icon in CrateRevealModal. Colored border was removed in 4c43cba (label alone ships for v1); more visual differentiation is a Phase 6 polish candidate. Validate need on device — label alone may be sufficient.
-- **100ms timer structural coupling.** `setInterval` in `GameCanvas` handles too many concerns. Phase 6+ refactor candidate: split into domain-specific timers with appropriate cadences.
-- **tileGrid dead code removal.** `tileGrid` field in `mapGenerator.ts`, `mapTypes.ts`, `mapLoader.ts` — unused since tile Atlas replaced it. One cleanup commit.
-- **`MOLOTOV_FIRE_FRAME_DURATION_MS` rename to `FLAME_ZONE_FRAME_DURATION_MS`.** Cosmetic — the constant drives flame zone animation, not Molotov. One-line rename + grep sweep to update references.
-- **`SCAV_WALK_FRAME_DURATION_MS` sampling misalignment.** Not a multiple of the 100ms sprite timer interval (same class as the flame frame fix). Visually masked by the continuous walk loop (no start/end stall), so lower priority than flame was.
-- **Muzzle flash + bullet origin** — Note from original Phase 6 scope. Player muzzle flash shipped in Phase 5.5 (commits 623f4bd, 745cb70). Bullet origin correction SCRAPPED (visually irrelevant with hero auto-rotation). Verify this item is fully closed before Phase 6 visual pass begins.
+### Active Phase 6 deliverables (in implementation order)
 
-### Color and asset polish
-- **Bullet sprite color change.** GunnerBullet sand-colored, blends into desert map. Edit PNG in Photopea to high-contrast color (yellow or white recommended). Five-minute task.
-- **Grenade sprite swap and color edit.** Swap from custom-made to kit asset at `_project-docs/kits/tds-modern-pixel-game-kit/tds-modern-hero-weapons-and-props/Effects/Grenade Launcher Shot/1.png` (single brown grenade frame). Then Photopea color edit for desert visibility.
-- **Rocket exhaust trail frames.** Kit ships rocket-f1/f2/f3.png exhaust frames; only 2-frame body loop wired currently. Wire the exhaust trail.
-- **Bullets render as oriented Rect, not Circle.** Current 4px Circle reads less convincingly than a ~2×8px oriented Rect would. Visual polish.
+1. **Dead code removal.** tileGrid field in mapGenerator.ts, mapTypes.ts, mapLoader.ts (unused since tile Atlas replaced it). theme.ts per-map tint keys (compound/outskirts/treeline — stale from before biome system). One commit.
 
-### Atmospheric (from original Phase 6 scope)
-- **Fog of war.** Visibility falloff at distance.
-- **Rain particles + drifting clouds.** Weather effects. NOTE: lightning flash + thunder SFX cut to v1.1.
-- **Vignette.** Screen edge darkening.
-- **Muzzle flashes + bullet origin correction.** Fully resolved in Phase 5.5: player muzzle flash shipped (commits 623f4bd, 745cb70); bullet origin correction scrapped (visually irrelevant with auto-rotation). ✅ Closed.
-- **Explosion + smoke rendering.** For rocket impacts, tank fire, etc.
+2. **Bullet rendering verification.** Verify bullets are using kit asset, not Skia Circle primitive. Mo recalls Circle was swapped to kit asset already. If confirmed swapped, mark closed in this inventory and skip. If still Circle, swap.
 
-### Environmental polish (deferred from G2/G3/G4)
-- **Transition tiles.** GrassToRoad, SandToRoad, DirtToRoad + road decals (_0005_RoadDecals.png).
-- **Sandbags.** Oriented placement near building doors (not random scatter). Collision.
-- **Pristine parked civilian cars along roads.** Visual-only.
-- **Cluster tree spawning.** Resolved via v1 density bump (commit 8972100) — at 70–100 trees, random placement produces natural Poisson clumping without explicit cluster logic. Intentional cluster logic deferred to v1.1+ only if post-launch visual feel surfaces it as a real problem.
-- **Water as centerpiece prop.** Map variety.
-- **Water border at map edge.** Visual map boundary.
+3. **Grenade sprite swap.** gp25 (Rocket Launcher) projectile currently uses `rocket-f1.png`. Swap to dedicated grenade sprite at `_project-docs/kits/tds-modern-pixel-game-kit/tds-modern-hero-weapons-and-props/Effects/Grenade Launcher Shot/1.png`. Other non-rocket weapons keep GunnerBullet.
 
-### Theme polish
-- **theme.ts per-map tint keys.** Currently has stale compound/outskirts/treeline keys. Convert to weather-variant tints.
+4. **Pond as static prop.** Add water variety via a single pond sprite as a prop type. Asset: `_project-docs/kits/tds-modern-pixel-game-kit/tds-modern-tilesets-environment/PNG/Tiles/_0000_WTiles.png` — confirmed by Mo as a single rounded pond shape, not a tileset. Implementation: treat as circle-collision prop similar to trees. Spawn count: 2 per run. Z-order: below vegetation, above floor tiles. New prop pool entry (WATER_POOL) with builder function buildWaterFeatures().
+
+5. **Vignette.** Screen-edge darkening overlay for atmospheric framing. Static image or Skia radial gradient; rendered above gameplay, below HUD.
+
+6. **Code review and optimization pass.** Open-ended health pass. Performed last so it covers all Phase 6 changes plus existing code. Surface findings for Mo to triage; do not auto-fix everything.
+
+### Scrapped from original Phase 6 scope (do not implement)
+
+Triaged out in strategy session post-Phase-5.5:
+
+- **Rarity v2 visual treatment (glow/shade).** Label-only ships for v1; deferred to v1.1 if post-launch feedback warrants.
+- **100ms timer structural coupling refactor.** Deferred indefinitely — no measurable problem; cost outweighs benefit at current scale.
+- **MOLOTOV_FIRE_FRAME_DURATION_MS rename to FLAME_ZONE_FRAME_DURATION_MS.** Cosmetic only; not worth a commit cycle for v1.
+- **SCAV_WALK_FRAME_DURATION_MS misalignment.** Visually masked by continuous walk loop; documented and deferred.
+- **Bullet sprite color change (sand-vs-desert blend).** Mo accepts current color.
+- **Rocket exhaust trail frames.** Skipped.
+- **Fog of war.** Deferred to v1.1.
+- **Rain particles + drifting clouds.** Deferred to v1.1.
+- **Explosion + smoke rendering polish.** Open-ended item with no specific concern; skipped unless surfaced in Phase 6 code review.
+- **Transition tiles (grass-to-road, sand-to-road, etc.).** Skipped.
+- **Sandbags with collision orientation.** Skipped.
+- **Pristine parked civilian cars.** Skipped.
+- **Cluster tree spawning logic.** Already resolved via v1 density bump (commit 8972100); confirm closed.
+- **Water as tile / biome integration.** Replaced by single pond prop above (much smaller scope).
+- **Water border at map edge.** Skipped.
+
+### Closed
+
+- **Muzzle flashes + bullet origin correction.** Shipped in Phase 5.5 (commits 623f4bd, 745cb70). Confirmed closed.
 
 ## Phase 7 — UI Rebuild + Run Management
 
@@ -94,6 +99,36 @@ All UI work. Persistence decisions made here.
 - **End-run flow.** Stop timers, clean up state, transition to main menu.
 - **Death screen polish.** Add "return to main menu" alongside existing redeploy button.
 - **Loading screen.** Blank frame (~1-3s) on mount reads as crash to new players.
+
+### Phase 7 design direction (brainstormed post-Phase-5.5; not yet locked)
+
+Design intent captured from strategy chat. Final decisions deferred to Phase 7 kickoff brainstorm.
+
+**Main menu screen.**
+- Background art direction: atmospheric scene OR hero silhouette with ambient elements (Mo to source via AI generation — Midjourney/Runway/Pika).
+- Background format: MP4 video for subtle looping ambient (smoke drifts, flame flicker). NOT GIF (color palette and React Native support issues on Android).
+- Resolution target: 2560×1440 (ideal for high-DPI devices), 1920×1080 minimum.
+- Implementation library: expo-av Video component (already supported in stack).
+- UI elements layer on top with darkening overlay for text readability.
+- Sourcing happens outside the dev loop on Mo's pace; implementation is a small commit when asset arrives.
+
+**Loading screen.**
+- Triggered after Deploy button (not on app cold start — that's covered by Expo splash).
+- Single random tip per load on mount (not rotating during single load — Project Zomboid style rotation overkill for sub-3-second loads).
+- "Loading..." text with cycling dots animation (`.`, `..`, `...` cycling every ~400ms via setState).
+- Background image: placeholder dark color until art sourced; eventually a static image (could be visual variant of menu background).
+- Tip content: starts with 15-20 tips. Mix of mechanical depth (rarity stacking, skill synergies), strategic, gameplay hints, lore/atmosphere. Tips array easily appended post-launch.
+
+**Splash / logo (covered by Phase 9 ship prep — flagged here for cross-reference).**
+- Implementation path: Option A — replace Expo splash image via app.json config. Simplest path; no custom transition logic.
+- Logo asset: 1024×1024 minimum, transparent background, dark background color in splash config matching game aesthetic.
+- Logo sourcing: Fiverr/99designs ($50-300), commissioned freelancer ($300-1000), or AI generation + manual cleanup. Mo's call.
+- Blocked on: game name and studio name decisions (see parking lot in v3 doc).
+
+**Pause menu.**
+- Match existing modal dark style (consistent with crate reveal, level-up modals).
+- Buttons: Resume, End Run (return to main menu).
+- Game state freeze: enemies, projectiles, timers all paused.
 
 ### Persistence and analytics
 - **Persistence layer.** Save system. Open question: none vs light persistence (high scores, kill counts) vs meta-progression (unlocks). Decide before phase starts.

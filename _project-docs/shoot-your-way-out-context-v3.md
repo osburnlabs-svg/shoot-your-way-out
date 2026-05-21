@@ -1191,6 +1191,19 @@ syo_install_date: string                  // for analytics cohort
 
 ---
 
+## Open Questions / Parking Lot
+
+Items that need a decision before the relevant phase begins. No decisions locked here — this is the holding area.
+
+- **App display name** — "Shoot Your Way Out" tentative final game name; needs lock before Phase 7 menu work and Phase 9 ship prep. Shortened icon label TBD (character limit on iOS/Android home screen is ~12 chars).
+- **Studio name** — "OsburnLabsGaming" referenced in dev paths; needs lock as public-facing brand identity before logo work begins.
+- **Logo design** — sourcing options discussed in strategy chat post-Phase-5.5: Fiverr/99designs ($50–300), commissioned freelancer ($300–1000), or AI generation + manual cleanup. Blocked on game name + studio name decisions. Implementation path: replace Expo splash image via app.json config (Phase 9 ship prep).
+- **Bundle identifier** — com.osburnlabs.shootyourwayout pending app store account setup in Phase 9.
+- **Specific music track licensing per source** — verify per-track before use. Sources in scope: Free Music Archive (CC-BY metal), OpenGameArt.org (CC0/CC-BY), Kenney audio packs (CC0). Avoid Ollie Beanz (license excludes video games).
+- **Will we use haptic feedback in v1 or defer to v1.1?** — currently deferred to v2.0+ in v1 Scope Summary. Revisit if playtesting surfaces it as a meaningful feel improvement.
+
+---
+
 ## Roadmap — Post-Launch Template Use
 
 After Shoot Your Way Out ships, the engine becomes a template for game #2. Steps to ship game #2 in one day:
