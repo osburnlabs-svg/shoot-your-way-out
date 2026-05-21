@@ -25,6 +25,18 @@ This project is built by a non-technical solo developer working with Claude as t
 
 **Communication style:** Mo prefers honest tradeoffs over confident recommendations. If two approaches are reasonable, say so. If you're uncertain, say so. Don't bury caveats. Don't paper over disagreements with the docs — the doc has known errata and Mo will catch drift faster than you will.
 
+**In-session doc updates.** Doc updates land in-session, as their own commit, immediately after the relevant change or finding. Not batched, not deferred to end-of-session, not promised for later. Hot context produces accurate edits; cold context produces approximations. If a doc claim is confirmed wrong during a session, the correction ships before the session continues. If an item ships and changes inventory state, the inventory update ships next, not "soon." End-of-session doc updates were the source of significant doc drift during Phase 5; the in-session-immediate pattern was confirmed during Phase 6 as the working norm.
+
+Each doc update is its own focused commit, separate from code commits. Same single-focused-change discipline applies to docs as to code. A doc update that bundles "mark item X complete + add new known issue Y + fix typo Z" is three commits, not one.
+
+**Brainstorm mode vs. build mode.** Sessions operate in one of two modes — build mode (default) or brainstorm mode (signaled). Build mode is the standard execution posture: scope discipline, push back on additions, validate against locked decisions. Brainstorm mode is for open exploration: no scope reflexes, no "that's not in this phase" pushback. Ideas explored on their merits.
+
+*Triggers.* Mo signals entry with "brainstorm mode" or "brainstorming session." Mo signals exit with "back to build mode" or equivalent. Claude follows the signal explicitly — does not stay in build mode out of caution when brainstorm has been requested, and does not stay in brainstorm mode when build has been requested.
+
+*In brainstorm mode.* No "this isn't in scope" reflexes. Ideas float by default. Claude is still honest — if an idea has a real problem (technically infeasible, conflicts with the game's identity, bad for retention), Claude says so as part of exploring, not as a gate. Ideas that graduate from "fun riff" to "we should remember this" are explicitly noted by Mo, who then says so and the idea gets captured in the appropriate doc. Otherwise ideas float and get dropped.
+
+*Frame.* This project is a side project meant to be fun. Side projects only work if they stay fun. The strategy doc is a thinking space, not a monetization spec. Treating every casual idea like a scope-creep threat kills the fun and filters interesting ideas before they get a chance.
+
 **The three-stage workflow.** Work on this project flows through three stages, in order. Skipping a stage tends to produce wrong-direction work that's expensive to undo.
 
 1. **Strategic planning (Mo + Claude in chat).** Scope, decisions, tradeoffs, design direction. No code is written. Claude pushes back where appropriate and surfaces things Mo might not see; Mo drives direction and catches strategic drift. Output: an aligned understanding of what to build and why, plus locked decisions on anything contestable.
