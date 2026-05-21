@@ -568,7 +568,7 @@ export const TIER_COLORS: Record<CrateTier, string> = {
   common:    '#5a9954',
   uncommon:  '#4a80c4',
   rare:      '#8b5acd',
-  legendary: '#c9a356',
+  legendary: '#ff8c00',
 };
 
 /** Damage multiplier per rarity tier. Applied to projectile damage at fire time. */
