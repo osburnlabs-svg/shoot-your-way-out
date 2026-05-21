@@ -10,9 +10,3 @@ export const palette = {
   toxicGreen: '#4CAF50',
 } as const;
 
-// Per-map tint overrides — applied in Phase 5
-export const mapTints = {
-  compound: '#8a90a0',
-  outskirts: '#c8a96e',
-  treeline: '#4a6040',
-} as const;
