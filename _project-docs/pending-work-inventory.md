@@ -28,7 +28,7 @@ Canonical source for all forward-looking work on Shoot Your Way Out. Reference t
 - **Code review and optimization pass.** Mo flagged in Session 6 — general code health review before Phase 6 visual work begins.
 - **Rarity v2 visual treatment.** Glow effect or background shade as Phase 6 polish candidate. Colored border removed in 4c43cba (label alone ships for v1); more visual differentiation is optional polish for Phase 6.
 - **100ms timer structural coupling.** `setInterval` in `GameCanvas` handles too many concerns (hero sprite, vitals, level-up, crate reveal, enemy slots, throwable slots, zone slots, rocket flags). Phase 6+ refactor candidate.
-- **tileGrid dead code removal.** `tileGrid` field survives in `mapGenerator.ts`, `mapTypes.ts`, and `mapLoader.ts` but is no longer used for rendering (tile Atlas replaced it). Dead code.
+- **tileGrid storage relocation (Phase 5 G2) — NOT dead code.** Phase 5 G2 moved tileGrid out of the GameState SharedValue into React state in GameCanvas.tsx (commit d91b4ce) per the JSI serialization rule. It is still actively read by the viewport culling useMemo in GameCanvas.tsx that builds the visible tile Atlas arrays each frame. The data is load-bearing — the field name "moved" was previously misread in scope triage as "removed." No action needed. Investigated and confirmed live during Phase 6 Item 1 (commit 0c042ae).
 - **GameCanvas.tsx file refactor decision.** ~30k tokens — targeted split vs full code-organization pass. Deferred indefinitely per project memory; do not resume without Mo reopening it.
 - **`MOLOTOV_FIRE_FRAME_DURATION_MS` rename.** Stale constant name — Molotov uses static `explodeImages[2]`, not this constant; it drives flame zone animation only. Accurate name: `FLAME_ZONE_FRAME_DURATION_MS`. Cosmetic cleanup, deferred.
 - **`SCAV_WALK_FRAME_DURATION_MS` sampling misalignment.** Technically not a multiple of the 100ms sprite timer interval (same class of issue as the flame frame fix), but visually masked by the continuous walk loop (no start/end stall pattern where misalignment is visible). Low priority; document and defer.
@@ -46,7 +46,7 @@ Post-Phase-5.5 triage locked Phase 6 as a lean polish + cleanup phase. Most orig
 
 ### Active Phase 6 deliverables (in implementation order)
 
-1. **Dead code removal.** tileGrid field in mapGenerator.ts, mapTypes.ts, mapLoader.ts (unused since tile Atlas replaced it). theme.ts per-map tint keys (compound/outskirts/treeline — stale from before biome system). One commit.
+1. **Dead code removal.** ✅ Shipped (commit 0c042ae). Removed stale mapTints per-map keys (compound, outskirts, treeline) from theme.ts. Original scope also included tileGrid field removal, but pre-review investigation confirmed tileGrid is load-bearing (read by GameCanvas viewport culling); that part of the scope was correctly dropped. See Phase 5.5 carry-over note for full explanation.
 
 2. **Bullet rendering verification.** Verify bullets are using kit asset, not Skia Circle primitive. Mo recalls Circle was swapped to kit asset already. If confirmed swapped, mark closed in this inventory and skip. If still Circle, swap.
 
