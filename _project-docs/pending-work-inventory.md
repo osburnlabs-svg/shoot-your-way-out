@@ -91,6 +91,9 @@ All UI work. Persistence decisions made here.
 
 ### UI rebuild (from original Phase 7 scope)
 - **Custom UI rebuild — all screens, HUD, menus.** Replace current debug overlay and modal default fonts with custom UI using kit color palette (`#0a0d08`, `#c9a356`, `#cc3333`) and pixel font. NOT kit layout PNGs. Per locked decision May 12 2026 (progress log line 53).
+
+  Main menu shipped 2026-05-22. Commits abd9b91 + 6a50c2f. Boots to menu instead of game. Background image `assets/ui/screens/MainMenu.png` rendering full-screen (cover mode). Money display top-right ($0 placeholder until Phase 9 persistence). Buttons: DEPLOY (functional → game), FLEA MARKET / UPGRADE / SETTINGS (disabled stubs). Routing via `useState<'menu' | 'game'>` in App.tsx per v3 tech stack ("Plain React state, no expo-router"). Background scaling required explicit `width`/`height` alongside `absoluteFillObject` — RN Image sizes from `width`/`height`, not edge constraints.
+
 - **SafeAreaProvider RNCSafeAreaProvider registration.** ✅ Shipped (commit 3c39cdf, verified 2026-05-21). `<SafeAreaProvider>` wraps `<GestureHandlerRootView>` in App.tsx. Hardcoded inset values in GameCanvas.tsx remain — in scope for the HUD rebuild commit that follows. See progress log v3 Errata item 7 for resolution history.
 - **Debug overlay replacement.** Current plain `<Text>` with hardcoded insets → custom UI using kit color palette (`#0a0d08`, `#c9a356`, `#cc3333`) and pixel font, NOT kit HUD layout PNGs. Per locked decision (May 12 2026, progress log line 53): all Phase 7 UI is custom built. Kit-first principle still applies to in-world sprites (weapons, throwables, enemies, props, environment) — it does NOT apply to UI elements.
 
