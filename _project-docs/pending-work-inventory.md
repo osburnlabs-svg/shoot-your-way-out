@@ -179,6 +179,7 @@ Final phase before launch. All audio integration here.
 - **Rewarded ad SDK** (AdMob).
 - **Entitlement caching.**
 - **flea_currency + last_claim_date persistent data.**
+- **Daily login bonus value tuning** (note from 2026-05-22 brainstorm). Current strategy doc placeholder values ($50 free / $300 paid) are misaligned against actual gameplay economy. In-run money pickup gives ~$10/kill; many runs exceed 100 kills, putting active-play earnings at $1000+/run. A $50 daily login bonus is ~5% of one run's earnings — too small to incentivize daily return. Real tuning required during Phase 9 (when login bonus first ships) against measured play data. Tuning question: should bonus be comparable to active play (rewarding consistency) or substantially less (active play dominant). No values locked yet.
 
 ### Ship prep
 - **AdMob account.** $0, ready before Phase 9 work.
@@ -196,6 +197,7 @@ Per strategy-monetization-v1.md.
 - Login bonus logic (free $50/day, paid $300/day — placeholders)
 - Paywall gate
 - Balance pass
+- **Flea market free-paid split: skills universal, weapons Upgrade-gated** (note from 2026-05-22 brainstorm). Locked direction (not yet documented in strategy doc): skills purchasable by all players, weapon purchases require Upgrade entitlement. Rationale: skill picks drive build variety (core gameplay differentiator, free players need full access); weapon picks affect starter loadout (strategic convenience, fits paid perk). Implementation: flea market UI shows two sections, weapon section locked overlay for non-Upgrade players, entitlement check on purchase attempt. Strategy doc Section 4 currently describes weapons + skills both purchasable without gating — needs update during Phase 9/10 planning.
 
 ## Doc Hygiene
 
