@@ -178,7 +178,7 @@ Shoot Your Way Out is **game #1 of a series of mobile games**. We are building a
 | Ads | `react-native-google-mobile-ads` (AdMob) | Standard, supports rewarded + banner |
 | IAP | `expo-in-app-purchases` (or `react-native-iap` if SDK 54 compat issues) | TBD at Phase 9 |
 | Analytics | PostHog or Amplitude (free tier) | Decided at Phase 1 |
-| Routing | Plain React state (no `expo-router`) | Three screens, file-based routing is overkill |
+| Routing | Plain React state (no `expo-router`) | ~5-6 screens (Main Menu, Loading, Game, Pause, Game Over, Settings stub), file-based routing is overkill |
 | Frame rate | 30fps cap via time accumulator (Phase 5.5) | SurfaceFlinger buffer stuffing at 60fps caused stutter — 30fps is the fix, not a constraint |
 
 **Capacitor is dropped** — that was for wrapping the web app, irrelevant since we're going native.
@@ -576,79 +576,25 @@ Scope locked in `pending-work-inventory.md` Phase 7 section (commit 8913333, 202
 
 ## Screens & Flow
 
-```
-[Loading] → [Main Menu] → [Pre-Run Modal] → [Game] ⇄ [Pause] → [Game Over] → loop back to Main Menu
-```
+Locked screen flow: `[Main Menu] → [Loading] → [Game] ⇄ [Pause] → [Game Over] → [Main Menu]`. Pre-Run Modal deferred to Phase 9 (when ad SDK is wired). All Phase 7 screens are custom builds using kit color palette (`#0a0d08`, `#c9a356`, `#cc3333`) and VT323 pixel font. No kit layout PNGs — kit-UI direction abandoned May 12 2026 (progress log line 53).
 
-**Loading Screen** — Uses `Loading Screen/Background.png`, `Loading Bar BG/Loading Bar.png`. Replaces `Test Logo.png` with our logo (TBD). Preloads all SFX into memory during this screen.
+**Main Menu.** Background image at `assets/ui/screens/MainMenu.png`. Persistent money display (placeholder value until Phase 9 persistence wired). Buttons in vertical stack: DEPLOY (primary, functional — triggers loading screen then game), FLEA MARKET (disabled stub, Phase 10), UPGRADE (disabled stub, Phase 10), SETTINGS (disabled stub, Phase 9). No meta-stats panel — concept scrapped, persistent money display replaces it.
 
-**Main Menu** — Uses kit's `Main menu/` assets. Layout:
-- Centered title (custom text rendered in pixel font)
-- Meta-stats panel (high score, best time, total kills, total runs) using `Inventory Stats.png` styling
-- DEPLOY button (`BTN PLAY.png`) — large, prominent
-- Settings button (`BTN SETTINGS.png`) — corner
-- Support the Dev button — small, corner ("☕ Support" — see Monetization)
-- Background music: menu loop track
+**Loading Screen.** Bridges the blank-frame gap on GameCanvas mount. Background image at `assets/ui/screens/LoadingScreen.png`. Triggered after Deploy button tap on main menu (NOT on app cold start — Expo splash handles cold start, swap planned for Phase 9 ship prep). Content: game logo placeholder until Phase 9 logo art lands, "Loading..." text with cycling dots animation (`.`, `..`, `...` at ~400ms via setState), random tip text chosen on mount from a 15–20 tip array (does not rotate during a single load). `audioEngine.preloadSFX()` called here — no-op until Phase 9 audio lands.
 
-**Pre-Run Modal** — Appears after tapping DEPLOY on Main Menu. Single-screen offer: "Watch ad for a perk?" with 3 random modifier options (Bonus Loadout / +50% XP / Cursed Run). One-tap skip. Tapping DEPLOY or skipping starts the run immediately — the procedural map generator runs at this point.
+**Game.** Existing GameCanvas. HUD shipped Phase 7 (custom build, kit palette + VT323). See HUD scope in `pending-work-inventory.md` (locked commit 8913333).
 
-**Game** — Full gameplay with HUD overlay. Music: combat loop. On boss spawn, ducks combat → boss loop. Returns to combat on boss death.
+**Pause.** Custom overlay consistent with existing modal style (semi-transparent dark background, rounded panel, VT323). Buttons: RESUME (primary), END RUN. No Settings button in Phase 7. Triggered by pause icon in HUD corner. No kit layout PNGs.
 
-**Pause Menu** — Uses kit's `Pause menu/PAUSE PRESET.png` overlay with `BTN BACK.png` (resume), `BTN MENU.png` (quit to main), `BTN SETTINGS.png`. Triggered by tap on pause icon (`BTN MENU HUD.png`) in HUD corner.
+**Game Over.** Existing ReviveModal (`src/components/ReviveModal.tsx`) — already built, kit palette + VT323, watch-ad revive prompt and existing Redeploy button. Phase 7 work: add "Return to Main Menu" button alongside existing Redeploy. Run stats display is existing modal content. No custom rebuild — additive change only.
 
-**Settings** — Uses kit's `Settings/` assets. Two volume sliders (Music + SFX), three checkboxes (Vibration, Weather Effects, Show FPS — for debug). `BTN OK.png` saves and closes.
-
-**Game Over** — Uses kit's `Mission Failed/BG.png`. Shows:
-- Hero death animation playing in center (4-frame loop)
-- Stats: score, time survived, level reached, kills
-- "NEW HIGH SCORE" star badge if applicable (uses `Star.png`)
-- Two buttons: REDEPLOY (instant restart same map), RETURN TO HQ (back to main menu)
-- **Revive prompt** if first death: "Watch ad to revive?" (rewarded ad, free first time, ad second time — see Monetization)
-- Music: short game-over sting, then silence or menu music return
+**Settings.** Deferred entirely to Phase 9. Phase 7 main menu Settings button is a disabled stub. When it ships: custom vertical list with kit palette + VT323, music and SFX volume sliders, plus credits and privacy policy link. No kit layout PNGs.
 
 ---
 
-## Monetization (4 touchpoints, all opt-in except menu banner)
+## Monetization
 
-### 1. "Support the Dev" IAP — $2.99 one-time
-- Removes all ads permanently
-- Permanent +5% XP boost on every run (small enough not to feel pay-to-win, big enough to feel like thanks)
-- Button: small, polite, on main menu corner ("☕ Support" with subtle gold accent matching kit palette)
-- Implementation: `expo-in-app-purchases`, single non-consumable product `support_dev_v1`
-- Persistence: AsyncStorage flag `support_unlocked: true`
-
-### 2. Pre-run Rewarded Ad — Run Modifiers
-- Shown on pre-run modal (appears after tapping DEPLOY on Main Menu)
-- "Watch ad for a perk?" with 3 random options:
-  - **Bonus loadout** — start with tier-2 weapon already equipped
-  - **+50% XP run** — accelerates skill unlocks for one run
-  - **Cursed run** — enemies +30% HP and +30% damage, score 2× (high-skill option)
-- Player can skip, run starts normal
-- One ad max per run
-
-### 3. Mid-run Rewarded Ad — Revive
-- On death, if it's the player's first death this run: "Continue? (Watch ad)"
-- Player gets full HP, brief invulnerability (3s), respawns at center
-- One revive max per run on free tier
-- "Backpack" skill stacks add additional revives (those are free)
-
-### 4. Banner Ad — Main Menu only
-- AdMob banner at bottom of main menu
-- **Never shown:** in-game, on game-over screen, on pause menu, during loading
-- Game-over especially is off-limits — players are emotional, ads there are predatory
-- Hidden entirely if Support IAP purchased
-
-### Architecture: `lib/monetization.ts`
-Single module abstracting AdMob + IAP behind a simple interface:
-```typescript
-monetization.showRewardedAd(callback): Promise<{ rewarded: boolean }>
-monetization.showBanner(): void
-monetization.hideBanner(): void
-monetization.purchaseSupport(): Promise<{ success: boolean }>
-monetization.isSupportUnlocked(): boolean
-```
-
-This is engine code. Game #2 inherits all four touchpoints by swapping product IDs.
+Design superseded by `strategy-monetization-v1.md` — that doc is the authoritative source. Summary: single IAP gates daily login bonus multiplier (free $50/day, paid $300/day — 6× advantage). Flea market is not paywalled. NO banner ads, NO forced interstitials. Rewarded ad touchpoints (player-initiated): in-run revive, pre-run buff (start with one random skill). Pre-run buff ad lives inside flea market screen per strategy doc.
 
 ---
 
