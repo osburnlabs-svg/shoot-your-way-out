@@ -14,7 +14,7 @@ export default function MenuScreen({ onDeploy }: Props) {
     <View style={styles.root}>
       <Image
         source={require('../../assets/ui/screens/MainMenu.png')}
-        style={StyleSheet.absoluteFillObject}
+        style={styles.bgImage}
         resizeMode="cover"
       />
       <View
@@ -60,6 +60,13 @@ const styles = StyleSheet.create({
   root: {
     flex: 1,
     backgroundColor: palette.backgroundDark,
+  },
+  bgImage: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    width: '100%',
+    height: '100%',
   },
   content: {
     flex: 1,
