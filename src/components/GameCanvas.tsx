@@ -1513,7 +1513,7 @@ export default function GameCanvas({ width, height, onReturnToMenu }: Props) {
   // ─── Game loop ─────────────────────────────────────────────────────────────
   useFrameCallback((frameInfo) => {
     const dtMs = frameInfo.timeSincePreviousFrame ?? 0;
-    if (dtMs <= 0) return; // skip spurious zero-dt frames (JS-thread timer activity triggers extra UI-thread callbacks)
+    if (dtMs < 8) return; // drop spurious sub-8ms callbacks; Reanimated fires extra UI-thread frames on JS-thread bursts (e.g. skill-pick setState), dtMs <= 0 guard alone doesn't catch small-but-positive clusters
 
     // 30fps throttle — accumulate vsync time; fire a game tick only when at
     // least one TICK_INTERVAL_MS has elapsed. Remainder carries forward so
