@@ -2093,6 +2093,7 @@ export default function GameCanvas({ width, height, onReturnToMenu }: Props) {
           kills={displayKillCount}
           equippedWeaponId={displayEquippedWeaponId}
           equippedWeaponRarity={displayEquippedWeaponRarity}
+          onLeaveRaid={onReturnToMenu}
         />
 
         {/* Revive prompt — replaces the old YOU DIED overlay.

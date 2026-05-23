@@ -1,5 +1,5 @@
-import React from 'react';
-import { View, Text, Image, StyleSheet } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, Image, StyleSheet, TouchableOpacity } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { xpForLevel } from '../data/balance';
 import { GuiSprites } from '../lib/sprites';
@@ -17,6 +17,7 @@ type Props = {
   kills: number;
   equippedWeaponId: string;
   equippedWeaponRarity: CrateTier;
+  onLeaveRaid: () => void;
 };
 
 function formatTime(totalSec: number): string {
@@ -25,8 +26,9 @@ function formatTime(totalSec: number): string {
   return `${m}:${s < 10 ? '0' : ''}${s}`;
 }
 
-export default function HUD({ money, hp, level, xp, elapsed, kills, equippedWeaponId, equippedWeaponRarity }: Props) {
+export default function HUD({ money, hp, level, xp, elapsed, kills, equippedWeaponId, equippedWeaponRarity, onLeaveRaid }: Props) {
   const insets = useSafeAreaInsets();
+  const [confirmVisible, setConfirmVisible] = useState(false);
 
   const xpFloor = xpForLevel(level);
   const xpCeil  = xpForLevel(level + 1);
@@ -38,7 +40,7 @@ export default function HUD({ money, hp, level, xp, elapsed, kills, equippedWeap
   const topEdge = insets.top + 4;
 
   return (
-    <View style={StyleSheet.absoluteFill} pointerEvents="none">
+    <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
       {/* XP progress bar — top-right, above stats panel. */}
       <View style={[styles.xpRow, { top: topEdge, right: insets.right + 10 }]}>
         <View style={styles.xpBarOuter}>
@@ -47,9 +49,17 @@ export default function HUD({ money, hp, level, xp, elapsed, kills, equippedWeap
         <Text style={styles.xpLevelLabel}> Lvl {level}</Text>
       </View>
 
-      {/* Weapon section — top-left, below XP bar: icon box + optional name/rarity labels. */}
+      {/* Weapon section — top-left. Column: LEAVE RAID button → rectangle weapon box → name/rarity. */}
       {weaponIcon != null && (
-        <View style={[styles.weaponSection, { top: topEdge + 18, left: insets.left + 10 }]}>
+        <View style={[styles.weaponSection, { top: topEdge, left: insets.left + 10 }]}>
+          <TouchableOpacity
+            style={styles.leaveRaidBtn}
+            onPress={() => setConfirmVisible(true)}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.leaveRaidText}>LEAVE RAID</Text>
+          </TouchableOpacity>
+
           <View style={styles.weaponBox}>
             <Image source={weaponIcon} style={styles.weaponIcon} resizeMode="contain" />
           </View>
@@ -71,6 +81,30 @@ export default function HUD({ money, hp, level, xp, elapsed, kills, equippedWeap
         <Text style={styles.statLine}>Time: {formatTime(elapsed)}</Text>
         <Text style={styles.statLine}>Kills: {kills}</Text>
       </View>
+
+      {/* Leave raid confirmation — full-screen overlay, game continues behind it. */}
+      {confirmVisible && (
+        <View style={styles.confirmOverlay}>
+          <View style={styles.confirmDim} />
+          <View style={styles.confirmPanel}>
+            <Text style={styles.confirmHeader}>LEAVE THIS RAID?</Text>
+            <TouchableOpacity
+              style={styles.confirmBtn}
+              onPress={onLeaveRaid}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.confirmBtnText}>LEAVE</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.confirmCancelLink}
+              onPress={() => setConfirmVisible(false)}
+              activeOpacity={0.6}
+            >
+              <Text style={styles.confirmCancelText}>STAY IN RAID</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
     </View>
   );
 }
@@ -105,17 +139,33 @@ const styles = StyleSheet.create({
     position: 'absolute',
     alignItems: 'center',
   },
+  leaveRaidBtn: {
+    width: 96,
+    height: 44,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  leaveRaidText: {
+    fontFamily: PIXEL_FONT_FAMILY,
+    fontSize: 18,
+    color: palette.accentGold,
+    letterSpacing: 1,
+    textShadowColor: '#000',
+    textShadowRadius: 2,
+    textShadowOffset: { width: 1, height: 1 },
+  },
   weaponBox: {
     width: 96,
-    height: 96,
+    height: 72,
     backgroundColor: 'rgba(0,0,0,0.55)',
     borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'hidden',
   },
   weaponIcon: {
     width: 76,
-    height: 76,
+    height: 60,
   },
   weaponNameLabel: {
     color: palette.accentGold,
@@ -149,5 +199,54 @@ const styles = StyleSheet.create({
     lineHeight: 19,
     fontFamily: PIXEL_FONT_FAMILY,
     fontVariant: ['tabular-nums'],
+  },
+  confirmOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  confirmDim: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.70)',
+  },
+  confirmPanel: {
+    backgroundColor: 'rgba(10, 13, 8, 0.92)',
+    borderRadius: 8,
+    paddingHorizontal: 32,
+    paddingVertical: 28,
+    alignItems: 'center',
+    gap: 16,
+  },
+  confirmHeader: {
+    fontFamily: PIXEL_FONT_FAMILY,
+    fontSize: 32,
+    color: palette.accentGold,
+    letterSpacing: 2,
+    marginBottom: 8,
+  },
+  confirmBtn: {
+    width: 180,
+    height: 52,
+    backgroundColor: 'rgba(10, 13, 8, 0.85)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  confirmBtnText: {
+    fontFamily: PIXEL_FONT_FAMILY,
+    fontSize: 18,
+    lineHeight: 18,
+    color: '#ffffff',
+    letterSpacing: 1,
+  },
+  confirmCancelLink: {
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+  },
+  confirmCancelText: {
+    fontFamily: PIXEL_FONT_FAMILY,
+    fontSize: 15,
+    lineHeight: 15,
+    color: '#888888',
+    letterSpacing: 1,
   },
 });
