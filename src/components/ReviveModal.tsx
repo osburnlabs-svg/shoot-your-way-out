@@ -32,6 +32,7 @@ type Props = {
   onFreeRevive: () => void;
   onAdRevive: () => void;
   onRedeploy: () => void;
+  onReturnToMenu: () => void;
 };
 
 export default function ReviveModal({
@@ -41,6 +42,7 @@ export default function ReviveModal({
   onFreeRevive,
   onAdRevive,
   onRedeploy,
+  onReturnToMenu,
 }: Props) {
   if (!visible) return null;
 
@@ -83,6 +85,14 @@ export default function ReviveModal({
           activeOpacity={0.7}
         >
           <Text style={styles.buttonText}>REDEPLOY</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.menuLink}
+          onPress={onReturnToMenu}
+          activeOpacity={0.6}
+        >
+          <Text style={styles.menuLinkText}>RETURN TO MENU</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -133,6 +143,18 @@ const styles = StyleSheet.create({
     textShadowColor: '#000000',
     textShadowRadius: 2,
     textShadowOffset: { width: 1, height: 1 },
+    letterSpacing: 1,
+  },
+  menuLink: {
+    marginTop: 4,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+  },
+  menuLinkText: {
+    color: '#888888',
+    fontSize: 15,
+    lineHeight: 15,
+    fontFamily: PIXEL_FONT_FAMILY,
     letterSpacing: 1,
   },
 });

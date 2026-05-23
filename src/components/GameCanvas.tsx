@@ -167,9 +167,10 @@ import {
 type Props = {
   width: number;
   height: number;
+  onReturnToMenu: () => void;
 };
 
-export default function GameCanvas({ width, height }: Props) {
+export default function GameCanvas({ width, height, onReturnToMenu }: Props) {
   // ─── Hero sprite images (loaded once at mount) ────────────────────────────
   const walk0 = useImage(HeroSprites.walk[0]);
   const walk1 = useImage(HeroSprites.walk[1]);
@@ -2103,6 +2104,7 @@ export default function GameCanvas({ width, height }: Props) {
           onFreeRevive={handleFreeRevive}
           onAdRevive={handleAdRevive}
           onRedeploy={handleRedeploy}
+          onReturnToMenu={onReturnToMenu}
         />
 
         {/* Level-up modal — unmounts when not pending (returns null internally too).

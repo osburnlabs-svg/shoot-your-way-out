@@ -16,12 +16,16 @@ import React from 'react';
 import { StyleSheet, useWindowDimensions, View } from 'react-native';
 import GameCanvas from '../components/GameCanvas';
 
-export default function GameScreen() {
+type Props = {
+  onReturnToMenu: () => void;
+};
+
+export default function GameScreen({ onReturnToMenu }: Props) {
   const { width, height } = useWindowDimensions();
 
   return (
     <View style={styles.container}>
-      <GameCanvas width={width} height={height} />
+      <GameCanvas width={width} height={height} onReturnToMenu={onReturnToMenu} />
     </View>
   );
 }

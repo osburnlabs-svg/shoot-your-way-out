@@ -33,7 +33,7 @@ export default function App() {
         <StatusBar style="light" />
         {screen === 'menu' && <MenuScreen onDeploy={() => setScreen('loading')} />}
         {screen === 'loading' && <LoadingScreen onComplete={() => setScreen('game')} />}
-        {screen === 'game' && <GameScreen />}
+        {screen === 'game' && <GameScreen onReturnToMenu={() => setScreen('menu')} />}
       </GestureHandlerRootView>
     </SafeAreaProvider>
   );
