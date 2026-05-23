@@ -13,18 +13,11 @@ export type SettingsData = {
   weather: boolean;
 };
 
-export type HighScorePerMap = {
-  compound: number;
-  outskirts: number;
-  treeline: number;
-};
-
 const KEYS = {
   highScore: 'syo_high_score',
   bestTime: 'syo_best_time',
   totalKills: 'syo_total_kills',
   totalRuns: 'syo_total_runs',
-  highScorePerMap: 'syo_high_score_per_map',
   settings: 'syo_settings',
   supportUnlocked: 'syo_support_unlocked',
   revivesRemainingSession: 'syo_revives_remaining_session',
@@ -61,10 +54,6 @@ export const persistence = {
 
   getTotalRuns: () => get<number>(KEYS.totalRuns, 0),
   setTotalRuns: (v: number) => set(KEYS.totalRuns, v),
-
-  getHighScorePerMap: () =>
-    get<HighScorePerMap>(KEYS.highScorePerMap, { compound: 0, outskirts: 0, treeline: 0 }),
-  setHighScorePerMap: (v: HighScorePerMap) => set(KEYS.highScorePerMap, v),
 
   getSettings: () =>
     get<SettingsData>(KEYS.settings, {
