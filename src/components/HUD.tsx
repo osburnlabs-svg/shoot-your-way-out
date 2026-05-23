@@ -61,7 +61,7 @@ export default function HUD({ money, hp, level, xp, elapsed, kills, equippedWeap
           </TouchableOpacity>
 
           <View style={styles.weaponBox}>
-            <Image source={weaponIcon} style={styles.weaponIcon} resizeMode="contain" />
+            <Image source={weaponIcon} style={styles.weaponIcon} resizeMode="cover" />
           </View>
           <Text style={styles.weaponNameLabel}>
             {WEAPON_PROFILES[equippedWeaponId]?.displayName ?? equippedWeaponId}
@@ -147,7 +147,7 @@ const styles = StyleSheet.create({
   },
   leaveRaidText: {
     fontFamily: PIXEL_FONT_FAMILY,
-    fontSize: 18,
+    fontSize: 17,
     color: palette.accentGold,
     letterSpacing: 1,
     textShadowColor: '#000',
@@ -164,8 +164,8 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   weaponIcon: {
-    width: 76,
-    height: 60,
+    width: 88,
+    height: 66,
   },
   weaponNameLabel: {
     color: palette.accentGold,
