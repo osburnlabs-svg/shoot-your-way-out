@@ -70,6 +70,7 @@ import {
   useFrameCallback,
   useSharedValue,
   withTiming,
+  type FrameInfo,
   type SharedValue,
 } from 'react-native-reanimated';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
@@ -1511,9 +1512,18 @@ export default function GameCanvas({ width, height, onReturnToMenu }: Props) {
   ]);
 
   // ─── Game loop ─────────────────────────────────────────────────────────────
-  useFrameCallback((frameInfo) => {
+  // Stable useCallback reference is required. An inline arrow passed to
+  // useFrameCallback causes Reanimated's internal useEffect([callback]) to
+  // re-run on every React render. Each re-run queues an async runOnUI
+  // de-register + re-register; during the async gap both the old and new IDs
+  // are simultaneously active in activeFrameCallbacks, so the tick body fires
+  // twice per vsync — doubling game speed (including the HUD timer) for the
+  // rest of the run. useCallback([]) gives a stable reference so the
+  // useEffect never re-runs after mount.
+  const gameLoopCallback = useCallback((frameInfo: FrameInfo) => {
+    'worklet';
     const dtMs = frameInfo.timeSincePreviousFrame ?? 0;
-    if (dtMs < 8) return; // drop spurious sub-8ms callbacks; Reanimated fires extra UI-thread frames on JS-thread bursts (e.g. skill-pick setState), dtMs <= 0 guard alone doesn't catch small-but-positive clusters
+    if (dtMs <= 0) return; // skip genuine zero-dt frames
 
     // 30fps throttle — accumulate vsync time; fire a game tick only when at
     // least one TICK_INTERVAL_MS has elapsed. Remainder carries forward so
@@ -1543,7 +1553,9 @@ export default function GameCanvas({ width, height, onReturnToMenu }: Props) {
       fpsAccumMs.value = 0;
       fpsFrameCount.value = 0;
     }
-  });
+  }, []);
+
+  useFrameCallback(gameLoopCallback);
 
   // ─── Hero render ──────────────────────────────────────────────────────────
   const bodyImage = spriteState.isMoving ? (walkImages[spriteState.frame] ?? null) : null;
