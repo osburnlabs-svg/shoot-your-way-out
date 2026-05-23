@@ -183,10 +183,10 @@ export const SKILLS: Record<SkillId, SkillDefinition> = {
   provisions_painkillers: {
     id: 'provisions_painkillers',
     displayName: 'Painkillers',
-    description: '+2 HP/sec regen',
+    description: '+1 HP/sec regen',
     category: 'provisions',
     maxStacks: 3,
-    effect: { hpRegenPerSecAdd: 2 },
+    effect: { hpRegenPerSecAdd: 1 },
   },
   provisions_stims: {
     id: 'provisions_stims',

@@ -413,7 +413,7 @@ function buildBarrels(rng: () => number, buildings: PlacedEntity[]): PlacedEntit
 
   const placed: PlacedEntity[] = [];
   for (const building of buildings) {
-    const clusterCount = 3 + Math.floor(rng() * 3); // 3–5 per building
+    const clusterCount = 1 + Math.floor(rng() * 2); // 1–2 per building (~15 total at median map size)
     const scaledHalf = scaledHalfSize(building);
     const clusterPlaced: PlacedEntity[] = [];
     let barrelPlaced = 0;
