@@ -11,11 +11,12 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import MenuScreen from './screens/MenuScreen';
+import LoadingScreen from './screens/LoadingScreen';
 import GameScreen from './screens/GameScreen';
 
 // Screen state machine — Phase 7 routing.
-// Boot → MenuScreen. Deploy → GameScreen. Loading screen sits between them in the next Phase 7 commit.
-type Screen = 'menu' | 'game';
+// Boot → MenuScreen → LoadingScreen (countdown) → GameScreen.
+type Screen = 'menu' | 'loading' | 'game';
 
 export default function App() {
   const [fontsLoaded, fontError] = useFonts({
@@ -23,14 +24,15 @@ export default function App() {
   });
   const [screen, setScreen] = useState<Screen>('menu');
 
-  // Render nothing until fonts are ready. Loading screen replaces this null return in a later Phase 7 commit.
+  // Render nothing until fonts are ready — Expo splash covers this gap.
   if (!fontsLoaded && !fontError) return null;
 
   return (
     <SafeAreaProvider>
       <GestureHandlerRootView style={{ flex: 1 }}>
         <StatusBar style="light" />
-        {screen === 'menu' && <MenuScreen onDeploy={() => setScreen('game')} />}
+        {screen === 'menu' && <MenuScreen onDeploy={() => setScreen('loading')} />}
+        {screen === 'loading' && <LoadingScreen onComplete={() => setScreen('game')} />}
         {screen === 'game' && <GameScreen />}
       </GestureHandlerRootView>
     </SafeAreaProvider>
