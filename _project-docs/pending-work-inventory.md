@@ -153,7 +153,6 @@ Design intent captured from strategy chat. Final decisions deferred to Phase 7 k
 
 ### Persistence and analytics
 - **Persistence layer.** Save system. Open question: none vs light persistence (high scores, kill counts) vs meta-progression (unlocks). Decide before phase starts.
-- **persistence.ts stale highScorePerMap.** Type and getter exist (compound/outskirts/treeline keys) but never written or read. Clean up.
 - **Minimap.**
 - **PostHog analytics.**
 
