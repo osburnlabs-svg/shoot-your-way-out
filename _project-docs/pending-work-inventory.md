@@ -113,7 +113,7 @@ All UI work. Persistence decisions made here.
 - **Pause menu.** New UI screen. Game state freeze (enemies, projectiles, timers). Buttons: resume, end run.
 - **End-run flow.** Stop timers, clean up state, transition to main menu.
 - **Death screen polish.** Add "return to main menu" alongside existing redeploy button.
-- **Loading screen.** Blank frame (~1-3s) on mount reads as crash to new players.
+- **Loading screen.** Blank frame (~1-3s) on mount reads as crash to new players. ✅ Shipped 2026-05-23. Commit d9d4e62. Tarkov-style "DEPLOYING IN" label with centered countdown number (3 → 2 → 1), fixed ~1 second per number, fires onComplete after 3s total. Background image at assets/ui/screens/LoadingScreen.png (swappable in-place — replacing the file overwrites without code change). Inserted into App.tsx routing between menu and game. Visual: "DEPLOYING IN" label at 40px VT323 letterSpacing 4, countdown number at 128px VT323 lineHeight 140 (prevents top-clip), both centered as a grouped block. Three setTimeout calls in useEffect with cleanup on unmount.
 
 ### Phase 7 design direction (brainstormed post-Phase-5.5; not yet locked)
 
