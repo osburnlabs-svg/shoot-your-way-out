@@ -168,7 +168,7 @@ import {
 type Props = {
   width: number;
   height: number;
-  onReturnToMenu: () => void;
+  onReturnToMenu: (earnedMoney: number) => void;
 };
 
 export default function GameCanvas({ width, height, onReturnToMenu }: Props) {
@@ -1462,6 +1462,10 @@ export default function GameCanvas({ width, height, onReturnToMenu }: Props) {
     gameState.value = createInitialGameState(width, height, initialMapData.tanks, initialMapData.solidPropExclusions);
   }, [gameState, width, height, initialMapData]);
 
+  const handleReturnToMenu = useCallback(() => {
+    onReturnToMenu(Math.floor(gameState.value.player.score));
+  }, [onReturnToMenu, gameState]);
+
   // ─── Virtual joystick gesture ──────────────────────────────────────────────
   const panGesture = Gesture.Pan()
     .onBegin((e) => {
@@ -2108,7 +2112,7 @@ export default function GameCanvas({ width, height, onReturnToMenu }: Props) {
           kills={displayKillCount}
           equippedWeaponId={displayEquippedWeaponId}
           equippedWeaponRarity={displayEquippedWeaponRarity}
-          onLeaveRaid={onReturnToMenu}
+          onLeaveRaid={handleReturnToMenu}
         />
 
         {/* Revive prompt — replaces the old YOU DIED overlay.
@@ -2120,7 +2124,7 @@ export default function GameCanvas({ width, height, onReturnToMenu }: Props) {
           onFreeRevive={handleFreeRevive}
           onAdRevive={handleAdRevive}
           onRedeploy={handleRedeploy}
-          onReturnToMenu={onReturnToMenu}
+          onReturnToMenu={handleReturnToMenu}
         />
 
         {/* Level-up modal — unmounts when not pending (returns null internally too).

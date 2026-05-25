@@ -23,6 +23,7 @@ const KEYS = {
   revivesRemainingSession: 'syo_revives_remaining_session',
   seenTutorial: 'syo_seen_tutorial',
   installDate: 'syo_install_date',
+  fleaCurrency: 'syo_flea_currency',
 } as const;
 
 async function get<T>(key: string, fallback: T): Promise<T> {
@@ -75,4 +76,10 @@ export const persistence = {
 
   getInstallDate: () => get<string | null>(KEYS.installDate, null),
   setInstallDate: (v: string) => set(KEYS.installDate, v),
+
+  getMoney: () => get<number>(KEYS.fleaCurrency, 0),
+  addMoney: async (amount: number): Promise<void> => {
+    const current = await get<number>(KEYS.fleaCurrency, 0);
+    await set(KEYS.fleaCurrency, current + amount);
+  },
 };

@@ -5,9 +5,10 @@ import { palette, PIXEL_FONT_FAMILY } from '../data/theme';
 
 type Props = {
   onDeploy: () => void;
+  money: number;
 };
 
-export default function MenuScreen({ onDeploy }: Props) {
+export default function MenuScreen({ onDeploy, money }: Props) {
   const insets = useSafeAreaInsets();
 
   return (
@@ -23,9 +24,9 @@ export default function MenuScreen({ onDeploy }: Props) {
           { paddingTop: insets.top + 16, paddingBottom: insets.bottom + 32 },
         ]}
       >
-        {/* Money display — top right, placeholder until Phase 9 persistence */}
+        {/* Accumulated flea market currency — persisted across runs. */}
         <View style={styles.moneyRow}>
-          <Text style={styles.moneyText}>$0</Text>
+          <Text style={styles.moneyText}>${money}</Text>
         </View>
 
         <View style={styles.spacer} />

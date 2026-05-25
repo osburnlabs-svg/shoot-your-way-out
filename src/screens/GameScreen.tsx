@@ -17,7 +17,7 @@ import { StyleSheet, useWindowDimensions, View } from 'react-native';
 import GameCanvas from '../components/GameCanvas';
 
 type Props = {
-  onReturnToMenu: () => void;
+  onReturnToMenu: (earnedMoney: number) => void;
 };
 
 export default function GameScreen({ onReturnToMenu }: Props) {

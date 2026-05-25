@@ -4,7 +4,7 @@
 import 'react-native-reanimated';
 import 'react-native-gesture-handler';
 
-import React, { useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { useFonts } from 'expo-font';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -13,6 +13,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import MenuScreen from './screens/MenuScreen';
 import LoadingScreen from './screens/LoadingScreen';
 import GameScreen from './screens/GameScreen';
+import { persistence } from './lib/persistence';
 
 // Screen state machine — Phase 7 routing.
 // Boot → MenuScreen → LoadingScreen (countdown) → GameScreen.
@@ -23,6 +24,18 @@ export default function App() {
     'VT323-Regular': require('../assets/fonts/VT323-Regular.ttf'),
   });
   const [screen, setScreen] = useState<Screen>('menu');
+  const [persistedMoney, setPersistedMoney] = useState(0);
+
+  useEffect(() => {
+    persistence.getMoney().then(setPersistedMoney);
+  }, []);
+
+  const handleReturnToMenu = useCallback(async (earnedMoney: number) => {
+    await persistence.addMoney(earnedMoney);
+    const total = await persistence.getMoney();
+    setPersistedMoney(total);
+    setScreen('menu');
+  }, []);
 
   // Render nothing until fonts are ready — Expo splash covers this gap.
   if (!fontsLoaded && !fontError) return null;
@@ -31,9 +44,9 @@ export default function App() {
     <SafeAreaProvider>
       <GestureHandlerRootView style={{ flex: 1 }}>
         <StatusBar style="light" />
-        {screen === 'menu' && <MenuScreen onDeploy={() => setScreen('loading')} />}
+        {screen === 'menu' && <MenuScreen onDeploy={() => setScreen('loading')} money={persistedMoney} />}
         {screen === 'loading' && <LoadingScreen onComplete={() => setScreen('game')} />}
-        {screen === 'game' && <GameScreen onReturnToMenu={() => setScreen('menu')} />}
+        {screen === 'game' && <GameScreen onReturnToMenu={handleReturnToMenu} />}
       </GestureHandlerRootView>
     </SafeAreaProvider>
   );
