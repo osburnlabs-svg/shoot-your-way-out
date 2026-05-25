@@ -1527,9 +1527,12 @@ export default function GameCanvas({ width, height, onReturnToMenu }: Props) {
 
     // 30fps throttle — accumulate vsync time; fire a game tick only when at
     // least one TICK_INTERVAL_MS has elapsed. Remainder carries forward so
-    // wall-clock timing stays accurate without drift. The Math.min(dtMs, 50)
-    // cap prevents a giant physics jump after a backgrounded-app resume.
-    tickAccMs.value += Math.min(dtMs, 50);
+    // wall-clock timing stays accurate without drift. Cap at 20ms: the worklets
+    // RAF polyfill fires stale __flushAnimationFrame calls during touch events,
+    // resetting previousFrameTimestamp and inflating subsequent dtMs to 30-40ms;
+    // 20ms clamps those to one-frame-worth without cutting 60Hz (16.67ms) or
+    // 120Hz (8.33ms) frames.
+    tickAccMs.value += Math.min(dtMs, 20);
     if (tickAccMs.value < TICK_INTERVAL_MS) return;
     tickAccMs.value -= TICK_INTERVAL_MS;
 
