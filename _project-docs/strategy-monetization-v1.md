@@ -164,26 +164,26 @@ In-run money pickups drop from kills. Each pickup grants both XP (existing behav
 
 This number re-tunes during Phase 9/10 against actual Phase 5+ run length and enemy density. The shape is:
 
-- Free player average run: ~50-150 in-run currency + $50 daily login bonus (on first run each calendar day)
-- Paid player average run: ~50-150 in-run currency + $300 daily login bonus (on first run each calendar day)
-- A cheap skill costs ~1-3 free daily cycles OR less than 1 paid daily cycle
+- Free player average run: ~50-150 in-run currency + $1,000 daily login bonus (on first run each calendar day)
+- Paid player average run: ~50-150 in-run currency + $5,000 daily login bonus (on first run each calendar day)
+- A cheap skill costs roughly 1 free daily cycle; paid players accumulate at 5× rate
 
 ### 5.2 Daily Login Bonus
 
 All players receive a flea-market currency stipend on first login each calendar day (device-local time — same exploit-tolerance accepted for the original quest rotation design).
 
-- **Free players:** $50/day (placeholder — tune in Phase 10)
-- **Paid players (one-time IAP):** $300/day (placeholder)
+- **Free players:** $1,000/day (rough-tuned 2026-05-25 against Phase 7 earn-rate data; verify against flea market item pricing in Phase 10)
+- **Paid players (one-time IAP):** $5,000/day (rough-tuned 2026-05-25; verify against flea market item pricing in Phase 10)
 
 **Design rules:**
 - No streak mechanics, no calendar bonuses, no escalating rewards. Keep it minimal for v1.
 - v1.1+ may add streak counters if retention data supports it.
 - Implementation: persistent `last_claim_date` field (ISO date string) on player data. On app launch, compare device date to `last_claim_date`. If a new calendar day, grant bonus and update the field. Single function, no server required.
-- The 6× paid/free multiplier is the paywall's economic expression. Paid players fill the flea market significantly faster — enough to feel meaningfully different, not so extreme it trivializes the free grind.
+- The 5× paid/free multiplier is the paywall's economic expression. Paid players fill the flea market significantly faster — enough to feel meaningfully different, not so extreme it trivializes the free grind.
 
 ### 5.3 Currency persistence
 
-`flea_currency: number` on persistent player data. Survives between runs, never resets. `last_claim_date: string` stores the last day the login bonus was claimed (ISO date, device-local). Both fields added in Phase 9 alongside IAP integration.
+`flea_currency: number` on persistent player data. Survives between runs, never resets. Shipped Phase 7 (commit a452ab8) — `getMoney()` and `addMoney(amount)` in `src/lib/persistence.ts`, key `syo_flea_currency`. `last_claim_date: string` stores the last day the login bonus was claimed (ISO date, device-local) — added in Phase 9 alongside IAP integration.
 
 ### 5.4 Balance philosophy
 

@@ -113,6 +113,9 @@ All UI work. Persistence decisions made here.
 - **Death screen polish.** Add "return to main menu" alongside existing redeploy button. ✅ Shipped 2026-05-23. Commit 86b42c0. Added "RETURN TO MENU" text-link button to ReviveModal below the existing card-style buttons (Free Revive, Watch Ad, Redeploy). Muted grey, fontSize 15, 44pt+ touch target. Callback threaded ReviveModal → GameCanvas → GameScreen → App.tsx → setScreen('menu'). Fresh map on next Deploy via GameScreen unmount/remount triggering loadMap(Date.now()) — no seed logic changes needed. Redeploy unchanged (still same-map restart with fresh player state).
 - **Loading screen.** Blank frame (~1-3s) on mount reads as crash to new players. ✅ Shipped 2026-05-23. Commit d9d4e62. Tarkov-style "DEPLOYING IN" label with centered countdown number (3 → 2 → 1), fixed ~1 second per number, fires onComplete after 3s total. Background image at assets/ui/screens/LoadingScreen.png (swappable in-place — replacing the file overwrites without code change). Inserted into App.tsx routing between menu and game. Visual: "DEPLOYING IN" label at 40px VT323 letterSpacing 4, countdown number at 128px VT323 lineHeight 140 (prevents top-clip), both centered as a grouped block. Three setTimeout calls in useEffect with cleanup on unmount.
 
+### Balance tuning
+- **Money drop + enemy HP (commit b9cc3b2).** ✅ Shipped 2026-05-25. Two value tweaks from Phase 7 playtesting: (1) `MONEY_SMALL_SCORE` 10 → 5 in `combatEngine.ts` — earn rate was ~$430/min pre-tune, target ~$215/min post-tune; (2) enemy base HP ×1.2 across all four types (scav 20→24, raider 40→48, sniperA 50→60, sniperB 40→48) — AFK survival with rare Assault Rifle was indefinite pre-tune, all weapon tiers now fail AFK post-tune. Crate scrap reward (+50) deliberately left unchanged: scrapping forfeits an upgrade and the reward should feel worth it.
+
 ### Phase 7 investigations & reference
 
 - **Gameplay speed-up after skill pickup** — ✅ Fully resolved 2026-05-25 (five sessions). Bug: all gameplay (player, enemies, timer) accelerated ~2× after first skill pickup; persisted for rest of run; ~50% reproduction rate across Phase 7 testing.
@@ -162,12 +165,15 @@ Design intent captured from strategy chat. Final decisions deferred to Phase 7 k
 - Game state freeze: enemies, projectiles, timers all paused.
 
 ### Persistence and analytics
-- **Persistence layer.** Save system. Open question: none vs light persistence (high scores, kill counts) vs meta-progression (unlocks). Decide before phase starts.
+- **Persistence layer.** ✅ Shipped (commits a452ab8 + eecf912). Money-only per locked Phase 7 scope. AsyncStorage via existing `persistence.ts` pattern — `getMoney()` and `addMoney(amount)` writing to `syo_flea_currency` key. `addMoney` called at raid-end via `handleReturnToMenu` wrapper in GameCanvas (covers both LEAVE RAID and RETURN TO MENU paths), awaited in App.tsx before menu transition to prevent read-before-write race. Accumulated total displays on main menu with locale-aware thousands separators (`toLocaleString()`). Crate scrap reward (+50) unchanged — deliberate player-choice mechanic.
 - **Minimap.**
 - **PostHog analytics.**
 
 ### Inventory and weapons
 - **Weapon selector / inventory.** Player has one active weapon; EQUIP just swaps; no inventory strip. Build alongside HUD rewrite.
+
+---
+*✅ Phase 7 COMPLETE — closed 2026-05-25. All UI rebuild items shipped. Persistence layer (money-only) shipped. Balance tuned (commit b9cc3b2). Phase 7 investigations resolved. Minimap and PostHog analytics deferred to Phase 9. Known-safe HEAD at close: b9cc3b2.*
 
 ## Phase 8 — Folded into Phase 9
 
@@ -188,13 +194,15 @@ Final phase before launch. All audio integration here.
 - **Projectile compact array pattern.** Projectiles still use compact array pattern (unlike pickups which were fixed). Post-launch template cleanup.
 - **Asset loading consolidation (texture atlases).** Replace individual useImage calls with TexturePacker atlas. Do NOT do earlier — final asset list isn't locked until end of Phase 8/9.
 - **Full codebase code review + optimization pass.** Folded from Phase 6 item 6 (scrapped session 2). Scope: entire codebase. Output format: findings-only report with disposition per finding (ship in Phase 9 / defer to v1.1 / scrap). Disposition rule for findings: ship only if risk-free + localized + (trivial-mechanical OR measurable perf win). All other findings defer or scrap. Hard constraints: no proposed changes to the 30fps cap, hybrid collision pools, or anything settled in Phase 5 stutter work.
+- **Late-game asset-dense stutter — investigate during code review.** Sporadic stutter observed in late-game (~5 min) in asset-dense map areas (Phase 7 playtest). Suspect ranking from Phase 7 CC analysis: (1) 100ms setInterval fanout × enemy slot occupancy — highest plausibility, first diagnostic is `performance.now()` bracket on setInterval body; (2) Sniper ramp sustaining `SNIPER_MAX_ACTIVE = 5` late-game; (3) Static prop collision density × enemy count; (4) Reanimated UI-thread GC churn; (5) Pickup slot saturation. Start with suspect 1 — low effort, high signal.
+- **Camera tracking smoothness — investigate during code review.** Late Phase 7 observation: fast left-right movement reveals black edges at viewport boundaries, suggesting the camera lags behind player position. Investigate whether camera lerp parameters need tuning or whether the map render area needs an extended buffer beyond the current viewport extents.
 
 ### Monetization (per strategy-monetization-v1.md)
 - **IAP SDK integration** (react-native-iap).
 - **Rewarded ad SDK** (AdMob).
 - **Entitlement caching.**
 - **flea_currency + last_claim_date persistent data.**
-- **Daily login bonus value tuning** (note from 2026-05-22 brainstorm). Current strategy doc placeholder values ($50 free / $300 paid) are misaligned against actual gameplay economy. In-run money pickup gives ~$10/kill; many runs exceed 100 kills, putting active-play earnings at $1000+/run. A $50 daily login bonus is ~5% of one run's earnings — too small to incentivize daily return. Real tuning required during Phase 9 (when login bonus first ships) against measured play data. Tuning question: should bonus be comparable to active play (rewarding consistency) or substantially less (active play dominant). No values locked yet.
+- **Daily login bonus value tuning** (note from 2026-05-22 brainstorm). Strategy doc rough-tuned 2026-05-25: $1,000/day free, $5,000/day paid (5× multiplier). Based on Phase 7 earn-rate data (~$215/min post-tune). Final tuning against flea market item pricing in Phase 10 — bonus amounts and item prices must be calibrated together.
 
 ### Ship prep
 - **AdMob account.** $0, ready before Phase 9 work.
@@ -209,7 +217,7 @@ Final phase before launch. All audio integration here.
 Per strategy-monetization-v1.md.
 - Currency drop logic
 - Flea market UI
-- Login bonus logic (free $50/day, paid $300/day — placeholders)
+- Login bonus logic (free $1,000/day, paid $5,000/day — rough-tuned; final balance pass in Phase 10)
 - Paywall gate
 - Balance pass
 - **Flea market free-paid split: skills universal, weapons Upgrade-gated** (note from 2026-05-22 brainstorm). Locked direction (not yet documented in strategy doc): skills purchasable by all players, weapon purchases require Upgrade entitlement. Rationale: skill picks drive build variety (core gameplay differentiator, free players need full access); weapon picks affect starter loadout (strategic convenience, fits paid perk). Implementation: flea market UI shows two sections, weapon section locked overlay for non-Upgrade players, entitlement check on purchase attempt. Strategy doc Section 4 currently describes weapons + skills both purchasable without gating — needs update during Phase 9/10 planning.
@@ -224,7 +232,7 @@ Items needed to keep project docs accurate and trustworthy. Not gameplay work; n
 
 ## Open Brainstorm Items (Need Decision Before Relevant Phase)
 
-- **Persistence between runs.** None / light / meta-progression. Decide before Phase 7.
+- **Persistence between runs.** ✅ Decided and implemented in Phase 7 — money-only (flea market currency). No high scores, no kill counts, no meta-progression. See persistence layer entry in Phase 7 section.
 - **Audio aesthetic.** 8-bit chiptune vs realistic SFX. Decide before Phase 9.
 - **Specific monetization values.** IAP price ($4.99 vs $9.99), in-run currency drop rate, flea market item prices, daily login bonus amounts, server-time vs device-time, etc. Per strategy doc Section 9. Decide during Phase 9 planning.
 - **What happens to flea-market starter items if player dies before run starts.** Per strategy doc Section 9.
@@ -242,7 +250,6 @@ Items needed to keep project docs accurate and trustworthy. Not gameplay work; n
 - **Small trees AABB collision (item K in progress-log).** No reported issue. Move to circle pool if specific variant shows inconsistency.
 - **Camera Group child count threshold.** 28 Atlas children confirmed fine. Re-evaluate if count grows post-launch.
 - **useFrameCallback spurious zero-dt invocations.** Real cause identified and resolved: worklets RAF polyfill fires stale-timestamp frames during touch events, inflating dtMs to 30-40ms (see Phase 7 speed-up bug investigation, commit 016b1ad). The existing `<= 0` guard is intentional defensive coverage for zero/null dtMs edge cases — not a workaround for that bug. No further investigation needed unless a Reanimated major version bump changes polyfill behavior.
-- **Late-game asset-dense stutter — suspect ranking** — ⏸️ Not investigating now; reference material if it ever becomes worth diagnosing. Mo observed sporadic stutter in late-game (~5 min) in asset-dense map areas. Ranked suspects from CC architectural analysis 2026-05-23: (1) 100ms setInterval fanout × enemy slot occupancy — highest plausibility; interval at `GameCanvas.tsx:677` drives 20+ `setState` calls per tick, per-slot loops over `ENEMY_SOFT_CAP = 50` enemies plus JSX conditional render tree grow heavier as more slots populate; diagnostic easy (`performance.now()` bracket around setInterval body, compare minute 1 vs minute 5). (2) Sniper ramp (45s → 120s) — `SNIPER_MAX_ACTIVE = 5` sustained late-game, more enemy projectiles in shared array, more collision checks against walls. (3) Static prop collision density × enemy count — amplifier, not time-correlated alone, explains asset-dense-area specificity. (4) Reanimated UI-thread GC churn — live heap grows with enemy slot occupancy, marginal but layered. (5) Pickup slot saturation — up to 50 active pickups late-game, ~9× magnet math vs minute 1. Ranks 6–8 (GameState spread baseline, `getEffectiveStats`, projectile/zone accumulation) ruled out as time-correlated suspects. Recommended first diagnostic if investigation opens: suspect 1, `performance.now()` bracket — low effort, high signal, redirects cleanly if not the cause.
 - **Hit flash visual tuning.** HIT_FLASH_RADIUS_PX=7 unvalidated starting point. Tune when Mo signs off.
 - **Lightning flash + thunder SFX.** Cut to v1.1.
 - **Helicopter boss (phased attacks).** Replaced by ambient flyby (shipped). Do not re-implement without documented scope reversal.
