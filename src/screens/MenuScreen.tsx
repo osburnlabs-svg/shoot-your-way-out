@@ -26,7 +26,7 @@ export default function MenuScreen({ onDeploy, money }: Props) {
       >
         {/* Accumulated flea market currency — persisted across runs. */}
         <View style={styles.moneyRow}>
-          <Text style={styles.moneyText}>${money}</Text>
+          <Text style={styles.moneyText}>${money.toLocaleString()}</Text>
         </View>
 
         <View style={styles.spacer} />
