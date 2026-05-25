@@ -32,8 +32,8 @@ export const ENEMY_PROFILES: Record<EnemyType, EnemyProfile> = {
   scav: {
     id: 'scav',
     displayName: 'Scav',
-    // hp=20: dies in 2 shots at pistol damage=12 (20/12=1.67→2 shots)
-    hp: 20,
+    // hp=24: dies in 2 shots at pistol damage=12 (24/12=2.0→2 shots)
+    hp: 24,
     moveSpeed: 1.2,
     // contactDamage=5: 10 HP/sec from one overlapping Scav — player has time to react
     contactDamage: 5,
@@ -42,8 +42,8 @@ export const ENEMY_PROFILES: Record<EnemyType, EnemyProfile> = {
   raider: {
     id: 'raider',
     displayName: 'Raider',
-    // hp=40: dies in 4 shots at pistol damage=12 (40/12=3.33→4 shots)
-    hp: 40,
+    // hp=48: dies in 4 shots at pistol damage=12 (48/12=4.0→4 shots)
+    hp: 48,
     moveSpeed: 1.8,
     // contactDamage=12: meaningfully more threatening than Scav; 24 HP/sec from one Raider
     contactDamage: 12,
@@ -52,8 +52,8 @@ export const ENEMY_PROFILES: Record<EnemyType, EnemyProfile> = {
   sniperA: {
     id: 'sniperA',
     displayName: 'Sniper',
-    // hp=50: 2.5× scav — tankier backline threat, takes ~5 pistol shots to drop
-    hp: 50,
+    // hp=60: 2.5× scav — tankier backline threat, takes 5 pistol shots to drop
+    hp: 60,
     moveSpeed: 0.8,
     contactDamage: 12,
     xpOnKill: 6,
@@ -61,8 +61,8 @@ export const ENEMY_PROFILES: Record<EnemyType, EnemyProfile> = {
   sniperB: {
     id: 'sniperB',
     displayName: 'Sniper',
-    // hp=40: 2× scav — slightly squishier than sniperA, still requires 4 pistol shots
-    hp: 40,
+    // hp=48: 2× scav — slightly squishier than sniperA, still requires 4 pistol shots
+    hp: 48,
     moveSpeed: 0.8,
     contactDamage: 12,
     xpOnKill: 6,

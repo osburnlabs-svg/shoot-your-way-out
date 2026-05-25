@@ -65,7 +65,7 @@ const PLAYER_ENEMY_COLLISION_R_SQ =
 const DIE_DURATION_MS = ENEMY_DIE_FRAME_COUNT * ENEMY_DIE_FRAME_DURATION_MS;
 
 /** Score and XP value of a Money Small pickup. */
-const MONEY_SMALL_SCORE = 10;
+const MONEY_SMALL_SCORE = 5;
 const MONEY_SMALL_XP = 10;
 
 export function tickCombat(state: GameState, dtMs: number): GameState {
