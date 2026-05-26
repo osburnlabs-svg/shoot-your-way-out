@@ -20,8 +20,8 @@ export default function MenuScreen({ onDeploy, onFleaMarket, money, bonusMessage
     toastOpacity.setValue(0);
     const anim = Animated.sequence([
       Animated.timing(toastOpacity, { toValue: 1, duration: 200, useNativeDriver: true }),
-      Animated.delay(2000),
-      Animated.timing(toastOpacity, { toValue: 0, duration: 300, useNativeDriver: true }),
+      Animated.delay(4500),
+      Animated.timing(toastOpacity, { toValue: 0, duration: 500, useNativeDriver: true }),
     ]);
     anim.start(() => onBonusDismissed());
     return () => anim.stop();
@@ -177,7 +177,7 @@ const styles = StyleSheet.create({
   },
   toastText: {
     fontFamily: PIXEL_FONT_FAMILY,
-    fontSize: 20,
+    fontSize: 26,
     color: palette.accentGold,
     letterSpacing: 2,
   },
