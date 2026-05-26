@@ -16,7 +16,6 @@ import GameScreen from './screens/GameScreen';
 import FleaMarketScreen from './screens/FleaMarketScreen';
 import { persistence } from './lib/persistence';
 import type { SkillId } from './data/skills';
-import { getTodayKey, getDailyInventory } from './lib/fleaMarket';
 
 // Screen state machine — Phase 8 routing.
 // Boot → MenuScreen → LoadingScreen (countdown) → GameScreen.
@@ -33,16 +32,6 @@ export default function App() {
 
   useEffect(() => {
     persistence.getMoney().then(setPersistedMoney);
-  }, []);
-
-  // [P8-DIAG] Verify date helper and deterministic shuffle on mount. Remove in Part 2 cleanup.
-  useEffect(() => {
-    const todayKey = getTodayKey();
-    const inv1 = getDailyInventory(todayKey);
-    const inv2 = getDailyInventory(todayKey);
-    console.log('[P8-DIAG] today key:', todayKey);
-    console.log('[P8-DIAG] daily inventory (call 1):', inv1);
-    console.log('[P8-DIAG] daily inventory (call 2 — must match call 1):', inv2);
   }, []);
 
   const handleOpenFleaMarket = useCallback(() => {
@@ -72,14 +61,10 @@ export default function App() {
     const skills = ([adSkill, purchasedSkill] as Array<SkillId | null>).filter(
       (s): s is SkillId => s !== null,
     );
-    // [P8-DIAG] Log consumed slots. Remove in Part 2 cleanup.
-    console.log('[P8-DIAG] deploy: pendingAdSkill=', adSkill, 'pendingPurchasedSkill=', purchasedSkill, '→ starterSkills=', skills);
     await Promise.all([
       persistence.clearPendingAdSkill(),
       persistence.clearPendingPurchasedSkill(),
     ]);
-    // [P8-DIAG] Confirm clears committed before game starts.
-    console.log('[P8-DIAG] deploy: pending slots cleared, starting game with', skills.length, 'starter skill(s)');
     setStarterSkills(skills);
     setScreen('loading');
   }, []);
