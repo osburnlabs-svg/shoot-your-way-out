@@ -2084,11 +2084,46 @@ Phase 7 started. SafeAreaProvider registration shipped (commit 3c39cdf) — reso
 
 ---
 
-## Phase 8 — [TBD — original content cut]
+## Phase 8 — Flea Market + Audio
 
-**Goal:** ~~Helicopter boss spawning every 2 minutes with both phases (normal + enraged), Gas Bomb hazard randomly spawning, Bomber strafe events between bosses, hero death animation polish.~~ All cut per Scope Cuts 2026-05-13: helicopter boss replaced by ambient flyover (shipped Phase 5); bomber strafe replaced by static prop (shipped Phase 5 G2); Gas Bomb cut entirely with no replacement. Phase 8 scope to be redetermined during Phase 7 planning.
+**Goal:** Two remaining gameplay mechanics before production work begins in Phase 9: flea market (skills only, 15-of-25 daily rotation, per-skill pricing, per-raid gate, pre-run ad stub) and audio (SFX coverage, music layers, sourcing strategy — brainstorm before implementation). Daily login bonus and Operator License IAP stub also land in this phase. See pending-work-inventory.md Phase 8 section for full scope. See strategy-monetization-v1.md §4 for flea market design.
 
-**Status:** Not started
+**Status:** 🟡 In progress (started 2026-05-26)
+
+### Phase 8 — Session 1 (2026-05-26)
+
+**Status:** Phase 8 kickoff. Strategy session locking flea market pricing, gate logic, pre-run ad scope. Per-phase v3 audit completed. Three doc commits landed. No code commits.
+
+**Decided this session:**
+
+- **Flea market per-skill pricing — 3 flat tiers, locked.** Premium $5,000 (7 skills: Plate Carrier, Heavy Plate, Helmet, Backpack, Field Medic Kit, Frag Grenade, Hollow Points). Standard $3,000 (9 skills: Armor-Piercing Rounds, Holographic, Ceramic Insert, MRE, Energy Bar, Tactical Boots, Painkillers, Smoke Grenade, Molotov). Cheap $2,000 (9 skills: Red Dot, ACOG, Suppressor, FMJ Ammo, Subsonic Rounds, Tracer Rounds, Knee Pads, Stims, Comms Headset). Distribution 7/9/9 = 25. Tier criteria: felt power at 1 stack, floor value as starter, universality, defensive bias toward premium. Pricing intentionally steep to drive players toward the ad path for the free skill; flea market becomes considered/saved-for. Phase 10 re-tunes against live data.
+- **Per-raid purchase gate — 1 purchase per raid.** Implemented via `pendingPurchasedSkill: skillId | null` slot on persistent player data. When non-null, all BUY buttons disabled; purchased card shows "PURCHASED" overlay. Slot survives across app sessions (AsyncStorage); consumed and cleared on Deploy.
+- **Pre-run ad — added to Phase 8 scope as stubbed.** WATCH AD button lives inside the flea market screen (sibling to purchased skill slot). Phase 8 implementation is stubbed: tap grants a random skill from 25-pool immediately, no actual ad video. Per-raid gate via `pendingAdSkill: skillId | null`, same persistence/consumption behavior as purchase slot. Real AdMob integration is Phase 9.
+- **Max 2 starter skills per raid.** 1 ad (random) + 1 purchase (chosen). If they match, stacks normally (existing skill stacking, no special handling). On Deploy: apply both pending slots → clear both → raid starts.
+- **No refunds, no re-rolls.** Money spent stays spent. Ad watched stays watched (no re-watch to re-roll random). Matches existing "device-local date, accept the cheese" philosophy.
+- **State model — Phase 8 persistent fields.** `money` (already shipped Phase 7), `pendingAdSkill: skillId | null` (new), `pendingPurchasedSkill: skillId | null` (new), `lastClaimDate: 'YYYY-MM-DD' | null` (new, daily bonus). Moved `lastClaimDate` to Phase 8 from Phase 9 (was internally inconsistent in strategy doc §5.3 vs §8).
+- **Flea market screen routing pattern (locked from audit 2-C).** New dedicated screen state. `App.tsx` Screen type extends to `'menu' | 'loading' | 'game' | 'flea_market'`. Full-screen, menu unmounts. Pattern matches existing routing (Loading is also full-screen, not overlay). FLEA MARKET menu button becomes `<Pressable>`; back button on flea market returns to menu.
+- **Starter skill injection mechanism (locked from audit 4-GAP).** `createInitialGameState` accepts optional `starterSkills: SkillId[]` parameter. Each ID increments `skillStacks` by 1 in initial state. If skill has `onSelectEffect.healHp`, applies to initial HP. Empty array (default) = current behavior. Chosen over post-mount `useEffect` mutation to keep JSI boundary clean and maintain functional purity of state initialization.
+- **Ad daily-limit handling deferred to Phase 9.** No app-imposed cap for v1 — only per-raid gate. Real ad-network fill-rate and no-fill UX is a Phase 9 research item.
+
+**Shipped this session (doc commits only, no code):**
+
+- **f13c0d7** — Phase 8 scope lock-in: Phase 8 inventory section replaced with full locked scope (flea market, daily bonus, IAP stub, audio brainstorm placeholder); Phase 9 rewritten without Audio, with real IAP + AdMob + entitlement caching, expanded ship prep, Reanimated polyfill note; Phase 10 compressed to post-launch balance pass only. Strategy doc §4 rewritten (skills-only, 15/25 rotation, 5×3 layout, next-raid-only, device-local date seed); §6 table fixed ($50/$300 → $1K/$5K to match §5.2); §8 phase labels updated (Phase 10 → Phase 8 for flea market block); new §10 added with subscription framing note.
+- **76b67a0** — Phase 8 doc scope update: pricing table, gate logic, pre-run ad stub scope captured in strategy-monetization-v1.md and pending-work-inventory.md. Also folded in §5.3 `lastClaimDate` Phase 9 → Phase 8 fix and §5.1 arithmetic correction (1 free daily cycle → 2 free daily cycles, consequent to $2,000 cheap-tier pricing). Section 9 open questions collapsed from 7 to 3 — items resolved tonight removed; IAP price decision left explicitly open (not asserted locked, per pre-review catch).
+- **37cdbb8** — Phase 8 v3 audit corrections: 14 drift findings applied to shoot-your-way-out-context-v3.md. Screens & Flow updated (actual 3-state screen list, flea market routing pattern documented, FLEA MARKET stub Phase 10 → Phase 8 in 2 places, money display no-longer-placeholder, false `preloadSFX` claim removed). Skills section pointer-replaced the diverged per-skill table (Foregrip, Water Bottle, Night Vision removed — never existed in code; pointer to `skills.ts` as canonical source). LevelUpModal + HUD kit-asset claims removed. Monetization summary numbers updated to $1K/$5K/5×. Audio system Phase 6 → Phase 8, music heading 4 → 3 tracks (boss loop removed per v1 cut), cut-feature SFX removed. Starter skill injection mechanism documented.
+
+**Two flagged items for future doc pass (out of scope for 37cdbb8):**
+
+- Skill icons subsection in v3 still references "kit's Upgrade Preset" — stale phrase within an otherwise-untouched subsection. Add to inventory Doc Hygiene next inventory update.
+- Loading Screen paragraph claims "Loading... cycling dots animation + 15-20 tip array" — actual `LoadingScreen.tsx` is the Tarkov-style "DEPLOYING IN" 3-2-1 countdown shipped Phase 7. Add to inventory Doc Hygiene next inventory update.
+
+**Working norms reinforced this session:**
+
+- Pre-review checkpoint caught one real error (IAP $4.99 asserted as locked but never landed in docs — CC's audit of progress log and inventory found no record; correctly left open). Standard procedure; never skip.
+- Doc-update commit hot-context discipline held: all three commits landed same session as the decisions they recorded; no cold-context approximation.
+- Per-phase scoped audit (vs. full-doc audit) produced 14 actionable findings against verifiable code. Whole-doc audits historically never finish; scoped audits do.
+- "While we're in there" guardrail held with discipline: §5.1 arithmetic and music heading count both folded into their commits as direct consequences of the primary edit; the two flagged items (skill icons subsection, Loading Screen description) deliberately did NOT fold in despite being noticed, as they're new findings rather than arithmetic-of-the-edit.
+- Brainstorm mode → build mode transitions clean; pricing brainstorm exploration was fully open (3 pricing-model options argued), build mode locked decisions cleanly.
 
 ---
 
