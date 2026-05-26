@@ -34,14 +34,22 @@ export default function App() {
   const [persistedMoney, setPersistedMoney] = useState(0);
   const [starterSkills, setStarterSkills] = useState<SkillId[]>([]);
   const [bonusMessage, setBonusMessage] = useState<string | null>(null);
+  // Gates music routing until persisted volumes are loaded into the engine.
+  // Without this, playMusic fires on mount before init() resolves, so createAsync
+  // receives the default _musicVol instead of the persisted value.
+  const [audioReady, setAudioReady] = useState(false);
 
   useEffect(() => {
     persistence.getMoney().then(setPersistedMoney);
-    persistence.getSettings().then(s => audioEngine.init(s.music_volume, s.sfx_volume));
+    persistence.getSettings()
+      .then(s => audioEngine.init(s.music_volume, s.sfx_volume))
+      .then(() => setAudioReady(true));
   }, []);
 
   // Route music on screen transitions. flea_market shares the menu loop.
+  // Depends on audioReady so the initial 'menu' routing fires after volumes are set.
   useEffect(() => {
+    if (!audioReady) return;
     if (screen === 'menu' || screen === 'flea_market') {
       audioEngine.playMusic('menu');
     } else if (screen === 'game') {
@@ -49,7 +57,7 @@ export default function App() {
     } else if (screen === 'loading') {
       audioEngine.stopMusic();
     }
-  }, [screen]);
+  }, [screen, audioReady]);
 
   // Daily bonus auto-claim: fires on every menu mount, silently exits if already claimed today.
   useEffect(() => {
