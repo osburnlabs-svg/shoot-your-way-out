@@ -5,10 +5,11 @@ import { palette, PIXEL_FONT_FAMILY } from '../data/theme';
 
 type Props = {
   onDeploy: () => void;
+  onFleaMarket: () => void;
   money: number;
 };
 
-export default function MenuScreen({ onDeploy, money }: Props) {
+export default function MenuScreen({ onDeploy, onFleaMarket, money }: Props) {
   const insets = useSafeAreaInsets();
 
   return (
@@ -40,9 +41,12 @@ export default function MenuScreen({ onDeploy, money }: Props) {
             <Text style={styles.deployText}>DEPLOY</Text>
           </Pressable>
 
-          <View style={[styles.stubBtn, styles.disabled]}>
-            <Text style={styles.stubText}>FLEA MARKET</Text>
-          </View>
+          <Pressable
+            style={({ pressed }) => [styles.fleaMarketBtn, pressed && styles.fleaMarketBtnPressed]}
+            onPress={onFleaMarket}
+          >
+            <Text style={styles.fleaMarketBtnText}>FLEA MARKET</Text>
+          </Pressable>
 
           <View style={[styles.stubBtn, styles.disabled]}>
             <Text style={styles.stubText}>UPGRADE</Text>
@@ -119,6 +123,24 @@ const styles = StyleSheet.create({
     fontFamily: PIXEL_FONT_FAMILY,
     fontSize: 24,
     color: '#888888',
+    letterSpacing: 1,
+  },
+  fleaMarketBtn: {
+    height: 52,
+    backgroundColor: 'rgba(10, 13, 8, 0.6)',
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: palette.accentGold,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  fleaMarketBtnPressed: {
+    opacity: 0.75,
+  },
+  fleaMarketBtnText: {
+    fontFamily: PIXEL_FONT_FAMILY,
+    fontSize: 24,
+    color: palette.accentGold,
     letterSpacing: 1,
   },
 });

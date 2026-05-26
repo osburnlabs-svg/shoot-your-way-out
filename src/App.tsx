@@ -13,13 +13,15 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import MenuScreen from './screens/MenuScreen';
 import LoadingScreen from './screens/LoadingScreen';
 import GameScreen from './screens/GameScreen';
+import FleaMarketScreen from './screens/FleaMarketScreen';
 import { persistence } from './lib/persistence';
 import type { SkillId } from './data/skills';
 import { getTodayKey, getDailyInventory } from './lib/fleaMarket';
 
-// Screen state machine — Phase 7 routing.
+// Screen state machine — Phase 8 routing.
 // Boot → MenuScreen → LoadingScreen (countdown) → GameScreen.
-type Screen = 'menu' | 'loading' | 'game';
+// MenuScreen → FleaMarketScreen → MenuScreen (back, money refreshed).
+type Screen = 'menu' | 'loading' | 'game' | 'flea_market';
 
 export default function App() {
   const [fontsLoaded, fontError] = useFonts({
@@ -41,6 +43,16 @@ export default function App() {
     console.log('[P8-DIAG] today key:', todayKey);
     console.log('[P8-DIAG] daily inventory (call 1):', inv1);
     console.log('[P8-DIAG] daily inventory (call 2 — must match call 1):', inv2);
+  }, []);
+
+  const handleOpenFleaMarket = useCallback(() => {
+    setScreen('flea_market');
+  }, []);
+
+  const handleReturnFromFleaMarket = useCallback(async () => {
+    const total = await persistence.getMoney();
+    setPersistedMoney(total);
+    setScreen('menu');
   }, []);
 
   const handleReturnToMenu = useCallback(async (earnedMoney: number) => {
@@ -79,9 +91,10 @@ export default function App() {
     <SafeAreaProvider>
       <GestureHandlerRootView style={{ flex: 1 }}>
         <StatusBar style="light" />
-        {screen === 'menu' && <MenuScreen onDeploy={handleDeploy} money={persistedMoney} />}
+        {screen === 'menu' && <MenuScreen onDeploy={handleDeploy} onFleaMarket={handleOpenFleaMarket} money={persistedMoney} />}
         {screen === 'loading' && <LoadingScreen onComplete={() => setScreen('game')} />}
         {screen === 'game' && <GameScreen onReturnToMenu={handleReturnToMenu} starterSkills={starterSkills} />}
+        {screen === 'flea_market' && <FleaMarketScreen onBack={handleReturnFromFleaMarket} />}
       </GestureHandlerRootView>
     </SafeAreaProvider>
   );
