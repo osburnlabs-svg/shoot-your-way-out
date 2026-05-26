@@ -537,6 +537,7 @@ export function createInitialGameState(canvasWidth: number, canvasHeight: number
     provisions_stims: 0,
   };
   let initialHp = PLAYER_STARTING_HP;
+  let initialMaxHp = PLAYER_STARTING_HP;
   if (starterSkills && starterSkills.length > 0) {
     for (let i = 0; i < starterSkills.length; i++) {
       const id = starterSkills[i];
@@ -544,14 +545,16 @@ export function createInitialGameState(canvasWidth: number, canvasHeight: number
     }
     const startingWeapon = WEAPON_PROFILES[STARTING_WEAPON_ID];
     const effective = getEffectiveStats(initialSkillStacks, startingWeapon, PLAYER_STARTING_HP);
+    // Start at full HP relative to effective max (covers maxHpAdd skills like MRE, Stims).
+    initialHp = effective.maxHp;
+    initialMaxHp = effective.maxHp;
+    // onSelectEffect.healHp kept for forward compatibility; no-op when already at full HP.
     for (let i = 0; i < starterSkills.length; i++) {
       const skillDef = SKILLS[starterSkills[i]];
       if (skillDef.onSelectEffect?.healHp) {
         initialHp = Math.min(initialHp + skillDef.onSelectEffect.healHp, effective.maxHp);
       }
     }
-    // Clamp to effective max — handles max-HP-reducing skills (e.g. Stims).
-    initialHp = Math.min(initialHp, effective.maxHp);
   }
 
   return {
@@ -568,7 +571,7 @@ export function createInitialGameState(canvasWidth: number, canvasHeight: number
       equippedWeaponRarity: 'common',
       weaponCooldownMs: 0,
       hp: initialHp,
-      maxHp: PLAYER_STARTING_HP,
+      maxHp: initialMaxHp,
       score: 0,
       xp: 0,
       lastDamagedAtMs: 0,
