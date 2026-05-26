@@ -180,6 +180,7 @@ Design intent captured from strategy chat. Final decisions deferred to Phase 7 k
 Two remaining gameplay mechanics before production work begins in Phase 9.
 
 ### Flea market (scope locked 2026-05-25; pricing locked 2026-05-26)
+✅ **Shipped 2026-05-26** across 11 commits (f0983ea, 993b3f6, 5954440, dee9b13, 0cf7a64, 60cfaf4, f02c6e4, a4f5321, 8c81c05, 35bd7b4, 08a3a7b). 5×3 grid with 15-of-25 daily rotation seeded by device-local date; per-skill pricing ($5K/$3K/$2K tiers); per-raid purchase gate via `pendingPurchasedSkill` slot; WATCH AD stub with per-raid gate via `pendingAdSkill` slot; max 2 starter skills per raid (1 ad + 1 purchase) consumed on Deploy; Field Medic Kit excluded from starter pool (no-op at full HP); HP initialization bug fixed for passive maxHpAdd starters.
 - Skills only — no weapons, cosmetics, or consumables in v1. Defer to post-launch content updates.
 - Price-gated only. No Operator License content gating.
 - 15 of 25 skills available per day, daily rotation.
@@ -211,7 +212,7 @@ Two remaining gameplay mechanics before production work begins in Phase 9.
 
 ### Pre-run ad (stubbed for Phase 8)
 - WATCH AD button lives inside the flea market screen, sibling to the purchased skill slot.
-- Phase 8 stub behavior: tap immediately grants a random skill from the 25-skill pool (no actual ad video).
+- Phase 8 stub behavior: tap immediately grants a random skill from the 24-skill pool (Field Medic Kit excluded — no-op at full HP; no actual ad video).
 - Per-raid gate: `pendingAdSkill: skillId | null` on persistent player data. Non-null → button disabled, label reads "AD WATCHED." Survives app sessions; consumed and cleared on Deploy.
 - No app-imposed daily ad cap for v1 — only the per-raid gate. Real AdMob integration and daily-limit research is Phase 9.
 - If ad-granted skill matches purchased skill, they stack normally (existing skill stacking mechanic, no special handling).
@@ -264,6 +265,8 @@ Items needed to keep project docs accurate and trustworthy. Not gameplay work; n
 - **v3 context doc audit.** Compare key v3 statements against current code; identify and correct drifts. Known drifts confirmed during prior sessions: vegetation budget values and rain-suppression rule were corrected in the Phase 6 doc cleanup commit — see v3 doc line 481. Other drifts likely exist; that's what the audit is for.
 - **Close-out doc process improvement.** Codify a tighter end-of-session/end-of-phase doc update protocol so v3 doesn't drift from code again. Probably a new section in v3 or a working rule in the collaboration model. Draft in strategy chat before committing to docs.
 - **Sniper rooftop spawning (v3 stale).** Sniper rooftop spawning was removed as a Phase 5 G3 scope reduction; v3 context doc still describes it as active behavior. Confirmed stale during session 3 testing. Catch during v3 audit.
+- **v3 Skill icons subsection — stale "Upgrade Preset" reference.** The phrase "kit's Upgrade Preset" remains in the Skill icons subsection, stale from the pre-Phase-7 kit-UI era. Caught during 37cdbb8 audit; deliberately not folded in (single-focused-commit discipline). Catch in next v3 audit or doc cleanup pass.
+- **v3 Loading Screen paragraph drift.** Paragraph claims "Loading..." cycling dots animation + 15-20 tip array. Actual `LoadingScreen.tsx` (shipped Phase 7) is the Tarkov-style "DEPLOYING IN" 3-2-1 countdown. Caught during 37cdbb8 audit; deliberately not folded in. Catch in next v3 audit or doc cleanup pass.
 
 ## Open Brainstorm Items (Need Decision Before Relevant Phase)
 

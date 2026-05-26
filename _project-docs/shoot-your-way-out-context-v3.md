@@ -81,6 +81,12 @@ Each doc update is its own focused commit, separate from code commits. Same sing
 
 **When stages overlap.** Sometimes stage 1 and stage 2 collapse together — a tiny fix where the decision is obvious and the prompt is two lines. That's fine. The discipline isn't about adding ceremony to small tasks; it's about not skipping the checkpoint on tasks that actually need it. When in doubt, do all three stages. The cost of an unnecessary confirmation step is 30 seconds; the cost of a missed one can be hours.
 
+**Lean toward easiest implementation where possible.** When evaluating any decision — design, scope, or implementation — "easiest" is a primary axis, not a tiebreaker. If a more polished option costs meaningful complexity vs. a good-enough option, default to good-enough. Time-to-ship is a real cost; "we could do better" is not always worth paying for. Mo is willing to make exceptions on features if the more difficult path is genuinely warranted.
+
+*Exception: when "easier now" creates rework later, the "easier" frame is false — it's relocating work and adding revert risk in between. Name the relocation cost when proposing easy paths; Mo decides whether to override.*
+
+*What this protects.* Complexity creep. The gap between "works" and "elegant" is expensive and often invisible in a playtest. Default to shipping the thing that works.
+
 **Kit-first principle (in-world assets only).** The asset kits (`tds-modern-hero-weapons-and-props`, `tds-modern-tilesets-environment`, and the civilian cars pack) are the canonical source for in-world visual content — sprites for weapons, enemies, throwables, props, vehicles, environment, particle effects. Before building any custom in-world sprite or visual effect, check the kit first. If the kit ships an asset that fits the need, use the kit asset. Custom in-world art is only justified when no kit asset is appropriate AND the alternative is blocking progress. When a custom in-world asset is used as a temporary stub, call it out in the progress log so it doesn't get forgotten.
 
 *UI is the exception.* The kit-first principle does NOT apply to UI elements — HUD, menus, modals, panels, screens, navigation, settings, game-over screens. Per locked decision May 12 2026 (progress log line 53), all UI is built custom using the kit color palette (`#0a0d08`, `#c9a356`, `#cc3333`) and pixel font, not kit layout PNGs. Two kit UI attempts (BG.png weapon silhouette issue, ReviveModal Mission Failed art mismatch) confirmed kit UI panels do not fit the game's UI needs. Kit GUI assets remain registered in `GuiSprites` as reference but are not used as primary layout panels.
@@ -583,37 +589,30 @@ Game audio plays even when phone is on silent (standard for games). One-line con
 Audio.setAudioModeAsync({ playsInSilentModeIOS: true });
 ```
 
-### Music — 3 tracks needed (sourcing TBD, royalty-free metal/aggressive instrumental)
+### Music — 6 tracks needed (sourcing TBD, royalty-free metal/aggressive instrumental)
 1. **Menu loop** — moodier, slower, "before deployment" vibe
-2. **Combat loop** — driving, aggressive, plays during run
-3. **Game over sting** — short 3-5 second one-shot, not a loop
+2–6. **Combat pool (5 tracks)** — driving, aggressive; one track picked at random on raid start, plays through to end. No transitions on game state changes.
+
+**No game-over sting. No boss loop (boss cut from v1). Music volume controlled by user via Settings.**
 
 **Sourcing approach:** look at Free Music Archive (CC-BY metal), OpenGameArt.org (CC0/CC-BY game music), Kenney audio packs (CC0). Verify license per track before use. Avoid Ollie Beanz — his license excludes video games.
 
-### SFX — ~25 sounds needed
+### SFX — 5–6 sounds needed (lean categories)
 
-**Weapons (one base sound per tier, pitch-shift at runtime for variation):**
-- `shoot_pistol`, `shoot_rifle`, `shoot_mg`, `shoot_shotgun`, `shoot_grenade_launcher_thunk`, `grenade_whistle`, `flamethrower_whoosh` (looping while firing)
+- **Explosions** — one shared sound for frag grenade, Molotov, rocket launcher
+- **Footsteps** — subtle, paced to walk cycle
+- **Player hit** — grunt on taking damage
+- **Gunshots** — one shared gunshot sound; flamethrower as a separate looping variant
+- **Helicopter ambient** — looping low-pass ambient pass during gameplay
 
-**Combat:**
-- `impact_flesh`, `impact_metal`, `explosion_small`, `explosion_large`
-**Player:**
-- `footstep` (subtle, paced to walk cycle)
-- `hit_grunt`, `player_death`
-
-**UI:**
-- `pickup_pop`, `xp_absorb`, `level_up_chime`, `crate_open_reveal`, `button_click`, `menu_swoosh`
-
-**Ambient (loops during gameplay at low volume):**
-- `distant_gunfire` (sells the warzone)
-- `wind`
-
-*(Brainstorm: add `helicopter_flyby_ambient` — low-pass loop for Phase 8 ambient helicopter passes; no combat SFX needed since the flyby has no health pool or attacks)*
+*SFX volume controlled by user via Settings.*
 
 **Sourcing approach:**
 - **Sonniss GameAudioGDC bundles** — annual free release, explicit royalty-free commercial license, weapon sounds and explosions
 - **Freesound.org** — filter strictly to CC0
 - **Kenney audio packs** — UI sounds in CC0
+
+**Open question for Phase 8 audio brainstorm:** Settings panel is currently Phase 9-deferred. Audio without volume control on day one is bad UX. Two options: (a) audio ships without user volume control — Settings panel adds sliders in Phase 9; (b) Settings panel pulled into Phase 8 alongside audio so volume control ships with sounds. Decide before implementation.
 
 ### Architecture: `lib/audioEngine.ts`
 

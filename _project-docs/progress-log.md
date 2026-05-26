@@ -2088,7 +2088,7 @@ Phase 7 started. SafeAreaProvider registration shipped (commit 3c39cdf) — reso
 
 **Goal:** Two remaining gameplay mechanics before production work begins in Phase 9: flea market (skills only, 15-of-25 daily rotation, per-skill pricing, per-raid gate, pre-run ad stub) and audio (SFX coverage, music layers, sourcing strategy — brainstorm before implementation). Daily login bonus and Operator License IAP stub also land in this phase. See pending-work-inventory.md Phase 8 section for full scope. See strategy-monetization-v1.md §4 for flea market design.
 
-**Status:** 🟡 In progress (started 2026-05-26)
+**Status:** 🟡 In progress — flea market shipped, audio + daily bonus + IAP pending (started 2026-05-26)
 
 ### Phase 8 — Session 1 (2026-05-26)
 
@@ -2124,6 +2124,48 @@ Phase 7 started. SafeAreaProvider registration shipped (commit 3c39cdf) — reso
 - Per-phase scoped audit (vs. full-doc audit) produced 14 actionable findings against verifiable code. Whole-doc audits historically never finish; scoped audits do.
 - "While we're in there" guardrail held with discipline: §5.1 arithmetic and music heading count both folded into their commits as direct consequences of the primary edit; the two flagged items (skill icons subsection, Loading Screen description) deliberately did NOT fold in despite being noticed, as they're new findings rather than arithmetic-of-the-edit.
 - Brainstorm mode → build mode transitions clean; pricing brainstorm exploration was fully open (3 pricing-model options argued), build mode locked decisions cleanly.
+
+---
+
+### Phase 8 — Session 2 (2026-05-26)
+
+**Status:** Flea market Part 1 — persistence, utilities, and starter skill injection. Foundation for the flea market UI shipped and device-verified.
+
+**Shipped this session:**
+
+- **f0983ea** — Phase 8 persistence: 3 new slots (`pendingAdSkill`, `pendingPurchasedSkill`, `lastClaimDate`) added to persistence layer.
+- **993b3f6** — Flea market utilities: `getTodayKey()` (YYYY-MM-DD device-local helper) and `getDailyInventory()` (deterministic Fisher-Yates 15-of-25 shuffle using mulberry32 PRNG seeded from date integer).
+- **5954440** — Starter skill injection: `createInitialGameState` accepts optional `starterSkills: SkillId[]` parameter. Each ID increments `skillStacks` by 1; `onSelectEffect.healHp` applied to initial HP. Empty array = current behavior.
+- **dee9b13** — Deploy consume-and-clear wiring: `handleDeploy` in `App.tsx` reads, applies, and clears both pending slots before transitioning to loading screen. `[P8-DIAG]` diagnostic scaffolding added for Part 2 verification.
+
+**Device-verified:** today key returns YYYY-MM-DD device-local, daily inventory deterministic across two cold starts and within a session, deploy with null slots reads empty / applies empty / clears cleanly without error.
+
+**Working norms reinforced:** Pre-review checkpoint caught CC's initial plan to auto-seed pending slots on every cold start (would have created permanent test fixture); pushback yielded manual-trigger alternative. Mo's follow-up question "do I really need to test before UI?" cut through to the cleanest answer (no seed mechanism, three diagnostic logs only, end-to-end verification deferred to Part 2). Requirements-not-code prompt discipline reinforced mid-session — first draft prescribed file names / function signatures / algorithm choices; caught before sending; rewrite stated behaviors and properties only, left implementation to CC.
+
+---
+
+### Phase 8 — Session 3 (2026-05-26)
+
+**Status:** Flea market Part 2 (UI, 5 commits) + 2 bug-fix commits. Flea market deliverable complete.
+
+**Shipped Part 2:**
+
+- **0cf7a64** — Pricing data: `FLEA_MARKET_PRICES` record — 25 skills across 3 tiers ($5K/$3K/$2K) in new `src/data/fleaMarketPricing.ts`.
+- **60cfaf4** — Screen routing: `flea_market` state added to `App.tsx` Screen type; FLEA MARKET menu button wired; back navigation to menu with money refresh.
+- **f02c6e4** — Static layout (C1): 5×3 grid with `flexWrap`, sticky header outside ScrollView, WATCH AD placeholder section.
+- **a4f5321** — Interactivity (C2): BUY flow (`pendingPurchasedSkill` gate + `addMoney` persistence), WATCH AD stub (random grant from `FLEA_MARKET_POOL`), all 4 BUY gate states (`active`/`no_funds`/`gated`/`purchased`).
+- **8c81c05** — Cleanup: `[P8-DIAG]` scaffolding removed from `App.tsx`.
+
+**Shipped bug fixes:**
+
+- **35bd7b4** — Field Medic Kit excluded from flea market grid and ad random pool. `onSelectEffect.healHp: 25` is a no-op at raid start (player begins at full HP); skill remains in in-run level-up pool.
+- **08a3a7b** — HP initialization bug in `createInitialGameState`: passive `maxHpAdd` skills (MRE, Energy Bar) applied as starters were producing 100/115 displayed HP instead of 115/115. Fix introduces `initialMaxHp` variable, sets both `initialHp` and `initialMaxHp` to `effective.maxHp` after starter stacks applied, removes redundant final clamp. Also correctly handles Stims-as-starter (90/90).
+
+**Device-verified:** WATCH AD flow end-to-end across multiple cycles (random skill grants, AD WATCHED state persists across menu round-trips, clears on Deploy, button re-enables next raid). BUY purchase flow verified after grind to $2,000 — PURCHASED state persists, other cards dim, money deducts correctly in screen and menu, starter skill applies on next raid. MRE starter HP behavior device-verified 2026-05-26 via natural play — player starts at correct effective max HP. Energy Bar and Stims covered by same code path (`initialHp = effective.maxHp`), verified by extension.
+
+**Working norms reinforced:** Sticky-header pushback held (CC's initial plan put header inside scroll view; pushback argued money and back button are highest-pressure info and must stay visible during scroll). Single-large-commit pushback held (CC's initial plan had Part 2 Commit C bundling grid render + all interactivity + all gate logic; pushback yielded C1/C2 split — static screen verifiable independently from state mutation logic). Two real bugs caught: Field Medic Kit no-op caught by design discussion, HP init bug caught by code review. Both fixed cleanly in single small commits.
+
+*Session-level note: One of the cleanest implementation sessions in project history. 9 commits across two implementation parts plus 2 follow-up bug-fix commits = 11 commits total for the flea market deliverable. Zero reverts. Zero scope expansion. Felt-good UX on first device test. Pre-review + checkpoint discipline + Part 1/Part 2 split + commit-level rollback granularity all contributed.*
 
 ---
 
