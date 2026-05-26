@@ -10,8 +10,21 @@ type Props = {
   onBack: () => void;
 };
 
-// Mo: replace with specific per-file Pixabay attribution before Phase 9 ship.
-const PIXABAY_ATTRIBUTION = '(sound credits TBD)';
+const PIXABAY_ATTRIBUTION = [
+  'MUSIC',
+  '',
+  'Provided by Pixabay',
+  '  Emmraan',
+  '  OpenMindAudio',
+  '  Tunetank',
+  '  Alex_Kizenkov',
+  '  AlexGrohl',
+  '',
+  '',
+  'SOUND EFFECTS',
+  '',
+  'Kronbits — kronbits.itch.io/freesfx',
+].join('\n');
 
 // ─── Volume slider ─────────────────────────────────────────────────────────────
 // PanResponder-based: no native module, no APK rebuild.
@@ -164,10 +177,7 @@ export default function SettingsScreen({ onBack }: Props) {
 
         <View style={styles.credits}>
           <Text style={styles.creditsTitle}>CREDITS</Text>
-          <Text style={styles.creditsBody}>
-            {'Audio assets via Pixabay\n'}
-            {PIXABAY_ATTRIBUTION}
-          </Text>
+          <Text style={styles.creditsBody}>{PIXABAY_ATTRIBUTION}</Text>
         </View>
       </View>
     </View>
