@@ -164,6 +164,7 @@ import {
   useThrowableSlotTransform,
   useEnemySlotFlash,
 } from '../lib/slotHooks';
+import { audioEngine } from '../lib/audioEngine';
 
 type Props = {
   width: number;
@@ -956,6 +957,18 @@ export default function GameCanvas({ width, height, onReturnToMenu, starterSkill
     }, HELI_ROTOR_FRAME_MS);
     return () => clearInterval(id);
   }, [heliActive]);
+
+  // ─── Audio: helicopter ambient (single-shot on flyover start) ─────────────
+  useEffect(() => {
+    if (heliActive) audioEngine.playSFXJS('heli_ambient');
+  }, [heliActive]);
+
+  // ─── Audio: footsteps (350ms interval while player is moving) ─────────────
+  useEffect(() => {
+    if (!spriteState.isMoving) return;
+    const id = setInterval(() => audioEngine.playSFXJS('footstep'), 350);
+    return () => clearInterval(id);
+  }, [spriteState.isMoving]);
 
   // ─── Per-slot enemy transforms (UI thread, no runOnJS) ────────────────────
   // One useDerivedValue per slot. Only slots with an active enemy are rendered

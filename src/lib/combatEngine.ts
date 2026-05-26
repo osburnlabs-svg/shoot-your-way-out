@@ -210,7 +210,12 @@ export function tickCombat(state: GameState, dtMs: number): GameState {
 
     weaponCooldownMs = effective.cooldownMs;
     playerLastFiredAtMs = state.elapsedMs;
-    audioEngine.playSFX('shoot_pistol');
+    // rpo = flamethrower, gp25 = rocket (silent on fire — explosion plays on detonation)
+    if (weapon.id === 'rpo') {
+      audioEngine.playSFX('shoot_flamethrower');
+    } else if (weapon.id !== 'gp25') {
+      audioEngine.playSFX('shoot');
+    }
   }
 
   // ─── 4 & 5. Move projectiles, despawn range-expired ones ─────────────────
@@ -430,7 +435,7 @@ export function tickCombat(state: GameState, dtMs: number): GameState {
     );
     effectZones = tmpState.effectZones;
     nextEffectZoneId = tmpState.nextEffectZoneId;
-    audioEngine.playSFX('impact_flesh');
+    audioEngine.playSFX('explosion');
   }
 
   // ─── 8. Contact damage ────────────────────────────────────────────────────

@@ -36,6 +36,7 @@
  */
 
 import type { GameState, ThrowableState, EffectZoneState } from './gameEngine';
+import { audioEngine } from './audioEngine';
 import {
   THROWABLE_SLOT_COUNT,
   EFFECT_ZONE_SLOT_COUNT,
@@ -304,6 +305,7 @@ export function tickThrowables(state: GameState, _dtMs: number): GameState {
         nextPickupId = result.nextPickupId;
         killCount = result.killCount;
 
+        audioEngine.playSFX('explosion');
         newThrowables[i] = {
           id: t.id,
           type: t.type,
@@ -318,6 +320,7 @@ export function tickThrowables(state: GameState, _dtMs: number): GameState {
       } else {
         // Smoke or molotov — clear slot, create effect zone.
         newThrowables[i] = null;
+        if (t.type === 'molotov') audioEngine.playSFX('explosion');
 
         // Find free effect zone slot.
         let zoneSlot = -1;
