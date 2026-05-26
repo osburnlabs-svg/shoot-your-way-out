@@ -16,6 +16,7 @@ import GameScreen from './screens/GameScreen';
 import FleaMarketScreen from './screens/FleaMarketScreen';
 import { persistence } from './lib/persistence';
 import { getTodayKey } from './lib/fleaMarket';
+import { audioEngine } from './lib/audioEngine';
 import type { SkillId } from './data/skills';
 
 // Screen state machine — Phase 8 routing.
@@ -34,7 +35,19 @@ export default function App() {
 
   useEffect(() => {
     persistence.getMoney().then(setPersistedMoney);
+    persistence.getSettings().then(s => audioEngine.init(s.music_volume, s.sfx_volume));
   }, []);
+
+  // Route music on screen transitions. flea_market shares the menu loop.
+  useEffect(() => {
+    if (screen === 'menu' || screen === 'flea_market') {
+      audioEngine.playMusic('menu');
+    } else if (screen === 'game') {
+      audioEngine.playMusic('combat');
+    } else if (screen === 'loading') {
+      audioEngine.stopMusic();
+    }
+  }, [screen]);
 
   // Daily bonus auto-claim: fires on every menu mount, silently exits if already claimed today.
   useEffect(() => {
