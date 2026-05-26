@@ -103,7 +103,4 @@ export const persistence = {
   // [P8-STUB] Phase 9 replaces with real IAP receipt check (grep: P8-STUB)
   isOperatorLicensed: () => get<boolean>(KEYS.operatorLicensed, false),
   setOperatorLicensed: (v: boolean) => set(KEYS.operatorLicensed, v),
-
-  // [P8-DIAG] Testing helper — strip after Phase 8 verification (grep: P8-DIAG)
-  clearLastClaimDate: () => set(KEYS.lastClaimDate, null),
 };

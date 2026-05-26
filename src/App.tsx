@@ -18,15 +18,6 @@ import { persistence } from './lib/persistence';
 import { getTodayKey } from './lib/fleaMarket';
 import type { SkillId } from './data/skills';
 
-// [P8-DIAG] Debugger-console testing helpers — strip after Phase 8 verification (grep: P8-DIAG)
-// In Metro Hermes debugger console:
-//   global.__p8DiagResetBonus()           — clears lastClaimDate so next menu mount re-fires the bonus
-//   global.__p8DiagSetOperator(true/false) — toggles Operator License ($5K vs $1K daily bonus)
-if (__DEV__) {
-  (global as any).__p8DiagResetBonus = () => persistence.clearLastClaimDate();
-  (global as any).__p8DiagSetOperator = (v: boolean) => persistence.setOperatorLicensed(v);
-}
-
 // Screen state machine — Phase 8 routing.
 // Boot → MenuScreen → LoadingScreen (countdown) → GameScreen.
 // MenuScreen → FleaMarketScreen → MenuScreen (back, money refreshed).
