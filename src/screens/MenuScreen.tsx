@@ -6,12 +6,13 @@ import { palette, PIXEL_FONT_FAMILY } from '../data/theme';
 type Props = {
   onDeploy: () => void;
   onFleaMarket: () => void;
+  onSettings: () => void;
   money: number;
   bonusMessage: string | null;
   onBonusDismissed: () => void;
 };
 
-export default function MenuScreen({ onDeploy, onFleaMarket, money, bonusMessage, onBonusDismissed }: Props) {
+export default function MenuScreen({ onDeploy, onFleaMarket, onSettings, money, bonusMessage, onBonusDismissed }: Props) {
   const insets = useSafeAreaInsets();
   const toastOpacity = useRef(new Animated.Value(0)).current;
 
@@ -74,9 +75,12 @@ export default function MenuScreen({ onDeploy, onFleaMarket, money, bonusMessage
             <Text style={styles.stubText}>UPGRADE</Text>
           </View>
 
-          <View style={[styles.stubBtn, styles.disabled]}>
-            <Text style={styles.stubText}>SETTINGS</Text>
-          </View>
+          <Pressable
+            style={({ pressed }) => [styles.fleaMarketBtn, pressed && styles.fleaMarketBtnPressed]}
+            onPress={onSettings}
+          >
+            <Text style={styles.fleaMarketBtnText}>SETTINGS</Text>
+          </Pressable>
         </View>
       </View>
     </View>

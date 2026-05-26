@@ -14,6 +14,7 @@ import MenuScreen from './screens/MenuScreen';
 import LoadingScreen from './screens/LoadingScreen';
 import GameScreen from './screens/GameScreen';
 import FleaMarketScreen from './screens/FleaMarketScreen';
+import SettingsScreen from './screens/SettingsScreen';
 import { persistence } from './lib/persistence';
 import { getTodayKey } from './lib/fleaMarket';
 import { audioEngine } from './lib/audioEngine';
@@ -22,7 +23,8 @@ import type { SkillId } from './data/skills';
 // Screen state machine — Phase 8 routing.
 // Boot → MenuScreen → LoadingScreen (countdown) → GameScreen.
 // MenuScreen → FleaMarketScreen → MenuScreen (back, money refreshed).
-type Screen = 'menu' | 'loading' | 'game' | 'flea_market';
+// MenuScreen → SettingsScreen → MenuScreen (back).
+type Screen = 'menu' | 'loading' | 'game' | 'flea_market' | 'settings';
 
 export default function App() {
   const [fontsLoaded, fontError] = useFonts({
@@ -83,6 +85,14 @@ export default function App() {
     setScreen('flea_market');
   }, []);
 
+  const handleOpenSettings = useCallback(() => {
+    setScreen('settings');
+  }, []);
+
+  const handleReturnFromSettings = useCallback(() => {
+    setScreen('menu');
+  }, []);
+
   const handleReturnFromFleaMarket = useCallback(async () => {
     const total = await persistence.getMoney();
     setPersistedMoney(total);
@@ -125,6 +135,7 @@ export default function App() {
           <MenuScreen
             onDeploy={handleDeploy}
             onFleaMarket={handleOpenFleaMarket}
+            onSettings={handleOpenSettings}
             money={persistedMoney}
             bonusMessage={bonusMessage}
             onBonusDismissed={handleBonusDismissed}
@@ -133,6 +144,7 @@ export default function App() {
         {screen === 'loading' && <LoadingScreen onComplete={() => setScreen('game')} />}
         {screen === 'game' && <GameScreen onReturnToMenu={handleReturnToMenu} starterSkills={starterSkills} />}
         {screen === 'flea_market' && <FleaMarketScreen onBack={handleReturnFromFleaMarket} />}
+        {screen === 'settings' && <SettingsScreen onBack={handleReturnFromSettings} />}
       </GestureHandlerRootView>
     </SafeAreaProvider>
   );
