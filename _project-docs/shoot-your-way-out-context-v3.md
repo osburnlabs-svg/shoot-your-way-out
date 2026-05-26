@@ -373,42 +373,13 @@ Numbers are starting values, balanced during playtesting.
 
 GP-25 and Flamethrower are **crate-exclusive** — never granted by leveling. This makes finding them feel rare and creates run-to-run variance without breaking the floor.
 
-### Skills — 20-skill pool
+### Skills — 25-skill pool
 
-Skills are stackable modifiers selected via the level-up modal (3 random choices on level up, max 5 stacks per skill unless noted). Modal uses the kit's pre-built `Upgrade Preset.png`.
+Skills are stackable modifiers selected via the level-up modal (3 random choices on level up, max 5 stacks per skill unless noted).
 
-**AMMO category (damage modifiers)**
-- **5.45 BT (AP rounds)** — +20% damage per stack
-- **7.62 BP (hollow points)** — +25% crit chance per stack
-- **Tracer rounds** — bullets pierce 1 extra enemy per stack
-- **Subsonic rounds** — +10% fire rate per stack
+See `src/data/skills.ts` for the canonical 25-skill pool — names, descriptions, categories, maxStacks, and effect definitions. That file is authoritative; do not maintain a duplicate list here.
 
-**OPTICS & WEAPON MODS category (range/accuracy)**
-- **Red Dot Sight** — +15% range per stack
-- **PSO Scope** — +30% range, -10% fire rate per stack (sniper trade-off)
-- **Suppressor** — +10% damage to first enemy hit per stack
-- **Foregrip** — -25% spread per stack
-
-**THROWABLES & EXPLOSIVES category (new attack patterns)**
-- **Frag Grenade** — auto-throw at strongest nearby enemy every 8s; per-stack reduces cooldown 1s
-- **Smoke Grenade** — every 15s, drop smoke that slows enemies inside (uses `LightSmoke` sprite)
-- **Molotov** — every 12s, throw fire patch that does DoT (reuses Flamethrower flame frames)
-
-**GEAR category (defense/survivability)**
-- **Plate Carrier** — -10% damage taken per stack
-- **Tactical Boots** — +12% movement per stack
-- **Helmet** — 15% chance per stack to negate hits (caps at 60%)
-- **Backpack** — +1 max revive per stack (caps at 2)
-
-**PROVISIONS category (regen/utility)**
-- **MRE** — +15 max HP per stack
-- **Water Bottle** — +10% movement and fire rate for 30s after kill streak (refreshes)
-- **Painkillers** — +2 HP regen per stack
-- **Stims** — +5% damage per stack, but -2 HP/sec (high-risk)
-
-**SPECIALS (rare, max 1 stack)**
-- **Night Vision** — extended fog-of-war view, +10% all stats
-- **Comms Headset** — money pickups pull toward player from longer range
+**Phase 8 starter skill injection:** `createInitialGameState` accepts an optional `starterSkills: SkillId[]` parameter. `App.tsx` reads `pendingAdSkill` and `pendingPurchasedSkill` from AsyncStorage on Deploy, passes them through `GameScreen → GameCanvas → createInitialGameState`, then clears both slots. Max 2 starter skills per run.
 
 **Skill icons:** the kit's Upgrade Preset already shows weapons + heart (HP) + armor + helmet. We extend by reusing icon archetypes:
 - Damage skills → bullet/ammo icon
@@ -576,11 +547,11 @@ Scope locked in `pending-work-inventory.md` Phase 7 section (commit 8913333, 202
 
 ## Screens & Flow
 
-Locked screen flow: `[Main Menu] → [Loading] → [Game] ⇄ [Pause] → [Game Over] → [Main Menu]`. Pre-Run Modal deferred to Phase 9 (when ad SDK is wired). All Phase 7 screens are custom builds using kit color palette (`#0a0d08`, `#c9a356`, `#cc3333`) and VT323 pixel font. No kit layout PNGs — kit-UI direction abandoned May 12 2026 (progress log line 53).
+Actual App.tsx screen states (Phase 7): `'menu' | 'loading' | 'game'`. Pause and Game Over are overlays rendered on top of the game screen — they are NOT separate screen states in the state machine. `PauseScreen.tsx` and `GameOverScreen.tsx` exist as zombie stub files (`return null`) that are not referenced by `App.tsx`. Phase 8 extends the type to add `'flea_market'`. Pre-Run Modal deferred to Phase 9 (when ad SDK is wired). All Phase 7 screens are custom builds using kit color palette (`#0a0d08`, `#c9a356`, `#cc3333`) and VT323 pixel font. No kit layout PNGs — kit-UI direction abandoned May 12 2026 (progress log line 53).
 
-**Main Menu.** Background image at `assets/ui/screens/MainMenu.png`. Persistent money display (placeholder value until Phase 9 persistence wired). Buttons in vertical stack: DEPLOY (primary, functional — triggers loading screen then game), FLEA MARKET (disabled stub, Phase 10), UPGRADE (disabled stub, Phase 10), SETTINGS (disabled stub, Phase 9). No meta-stats panel — concept scrapped, persistent money display replaces it.
+**Main Menu.** Background image at `assets/ui/screens/MainMenu.png`. Persistent money display — live value from `syo_flea_currency` (AsyncStorage, wired Phase 7). Buttons in vertical stack: DEPLOY (primary, functional — triggers loading screen then game), FLEA MARKET (disabled stub, Phase 8 — will become `<Pressable>` setting screen to `'flea_market'`), UPGRADE (disabled stub, Phase 8), SETTINGS (disabled stub, Phase 9). No meta-stats panel — concept scrapped, persistent money display replaces it.
 
-**Loading Screen.** Bridges the blank-frame gap on GameCanvas mount. Background image at `assets/ui/screens/LoadingScreen.png`. Triggered after Deploy button tap on main menu (NOT on app cold start — Expo splash handles cold start, swap planned for Phase 9 ship prep). Content: game logo placeholder until Phase 9 logo art lands, "Loading..." text with cycling dots animation (`.`, `..`, `...` at ~400ms via setState), random tip text chosen on mount from a 15–20 tip array (does not rotate during a single load). `audioEngine.preloadSFX()` called here — no-op until Phase 9 audio lands.
+**Loading Screen.** Bridges the blank-frame gap on GameCanvas mount. Background image at `assets/ui/screens/LoadingScreen.png`. Triggered after Deploy button tap on main menu (NOT on app cold start — Expo splash handles cold start, swap planned for Phase 9 ship prep). Content: game logo placeholder until Phase 9 logo art lands, "Loading..." text with cycling dots animation (`.`, `..`, `...` at ~400ms via setState), random tip text chosen on mount from a 15–20 tip array (does not rotate during a single load).
 
 **Game.** Existing GameCanvas. HUD shipped Phase 7 (custom build, kit palette + VT323). See HUD scope in `pending-work-inventory.md` (locked commit 8913333).
 
@@ -594,7 +565,7 @@ Locked screen flow: `[Main Menu] → [Loading] → [Game] ⇄ [Pause] → [Game 
 
 ## Monetization
 
-Design superseded by `strategy-monetization-v1.md` — that doc is the authoritative source. Summary: single IAP gates daily login bonus multiplier (free $50/day, paid $300/day — 6× advantage). Flea market is not paywalled. NO banner ads, NO forced interstitials. Rewarded ad touchpoints (player-initiated): in-run revive, pre-run buff (start with one random skill). Pre-run buff ad lives inside flea market screen per strategy doc.
+Design superseded by `strategy-monetization-v1.md` — that doc is the authoritative source. Summary: single IAP gates daily login bonus multiplier (free $1,000/day, paid $5,000/day — 5× advantage). Flea market is not paywalled. NO banner ads, NO forced interstitials. Rewarded ad touchpoints (player-initiated): in-run revive, pre-run buff (start with one random skill). Pre-run buff ad lives inside flea market screen per strategy doc.
 
 ---
 
@@ -612,11 +583,10 @@ Game audio plays even when phone is on silent (standard for games). One-line con
 Audio.setAudioModeAsync({ playsInSilentModeIOS: true });
 ```
 
-### Music — 4 tracks needed (sourcing TBD, royalty-free metal/aggressive instrumental)
+### Music — 3 tracks needed (sourcing TBD, royalty-free metal/aggressive instrumental)
 1. **Menu loop** — moodier, slower, "before deployment" vibe
 2. **Combat loop** — driving, aggressive, plays during run
-3. **Boss loop** — heavier, kicks in when helicopter spawns, ducks back to combat on death
-4. **Game over sting** — short 3-5 second one-shot, not a loop
+3. **Game over sting** — short 3-5 second one-shot, not a loop
 
 **Sourcing approach:** look at Free Music Archive (CC-BY metal), OpenGameArt.org (CC0/CC-BY game music), Kenney audio packs (CC0). Verify license per track before use. Avoid Ollie Beanz — his license excludes video games.
 
@@ -627,9 +597,6 @@ Audio.setAudioModeAsync({ playsInSilentModeIOS: true });
 
 **Combat:**
 - `impact_flesh`, `impact_metal`, `explosion_small`, `explosion_large`
-- `helicopter_rotor` (loop during boss wave), `heli_rocket_launch`
-- `bomber_passby` (low rumble loop during strafe event)
-
 **Player:**
 - `footstep` (subtle, paced to walk cycle)
 - `hit_grunt`, `player_death`
@@ -639,7 +606,9 @@ Audio.setAudioModeAsync({ playsInSilentModeIOS: true });
 
 **Ambient (loops during gameplay at low volume):**
 - `distant_gunfire` (sells the warzone)
-- `wind` (Outskirts only)
+- `wind`
+
+*(Brainstorm: add `helicopter_flyby_ambient` — low-pass loop for Phase 8 ambient helicopter passes; no combat SFX needed since the flyby has no health pool or attacks)*
 
 **Sourcing approach:**
 - **Sonniss GameAudioGDC bundles** — annual free release, explicit royalty-free commercial license, weapon sounds and explosions
@@ -659,7 +628,7 @@ audioEngine.setSFXVolume(0-100): void
 audioEngine.stopAll(): void
 ```
 
-Stub implementation in Phase 1 (all methods are no-ops). Real implementation in Phase 6. This means Phases 2-5 can call `audioEngine.playSFX('shoot_pistol')` and have it silently do nothing — when Phase 6 wires it up, every existing call starts working.
+Stub implementation in Phase 1 (all methods are no-ops). Real implementation in Phase 8. This means Phases 2-5 can call `audioEngine.playSFX('shoot_pistol')` and have it silently do nothing — when Phase 6 wires it up, every existing call starts working.
 
 ---
 
@@ -700,9 +669,9 @@ shoot-your-way-out/
       PauseScreen.tsx
     components/
       GameCanvas.tsx             — Skia canvas, game loop orchestration
-      HUD.tsx                    — overlay HUD, composed of kit GUI assets
+      HUD.tsx                    — overlay HUD
       Minimap.tsx
-      LevelUpModal.tsx           — uses kit Upgrade Preset
+      LevelUpModal.tsx
       CrateRevealOverlay.tsx
       Button.tsx                 — kit-styled button wrapper
     lib/
@@ -722,7 +691,7 @@ shoot-your-way-out/
       persistence.ts             — AsyncStorage typed wrapper
     data/
       weapons.ts                 — 7 weapon stat profiles
-      skills.ts                  — 20 skill definitions
+      skills.ts                  — 25 skill definitions
       enemies.ts                 — 8 enemy types
       bosses.ts                  — Hunter (helicopter) definition
       hazards.ts                 — Gas Bomb, Bomber Strafe
