@@ -4,6 +4,7 @@
 // no native configuration needed beyond the package install.
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import type { SkillId } from '../data/skills';
 
 // Full schema — all keys used across the app
 export type SettingsData = {
@@ -24,6 +25,9 @@ const KEYS = {
   seenTutorial: 'syo_seen_tutorial',
   installDate: 'syo_install_date',
   fleaCurrency: 'syo_flea_currency',
+  pendingAdSkill: 'syo_pending_ad_skill',
+  pendingPurchasedSkill: 'syo_pending_purchased_skill',
+  lastClaimDate: 'syo_last_claim_date',
 } as const;
 
 async function get<T>(key: string, fallback: T): Promise<T> {
@@ -82,4 +86,16 @@ export const persistence = {
     const current = await get<number>(KEYS.fleaCurrency, 0);
     await set(KEYS.fleaCurrency, current + amount);
   },
+
+  // Phase 8 — flea market pending slots and daily bonus claim date.
+  getPendingAdSkill: () => get<SkillId | null>(KEYS.pendingAdSkill, null),
+  setPendingAdSkill: (id: SkillId) => set(KEYS.pendingAdSkill, id),
+  clearPendingAdSkill: () => set(KEYS.pendingAdSkill, null),
+
+  getPendingPurchasedSkill: () => get<SkillId | null>(KEYS.pendingPurchasedSkill, null),
+  setPendingPurchasedSkill: (id: SkillId) => set(KEYS.pendingPurchasedSkill, id),
+  clearPendingPurchasedSkill: () => set(KEYS.pendingPurchasedSkill, null),
+
+  getLastClaimDate: () => get<string | null>(KEYS.lastClaimDate, null),
+  setLastClaimDate: (v: string) => set(KEYS.lastClaimDate, v),
 };
