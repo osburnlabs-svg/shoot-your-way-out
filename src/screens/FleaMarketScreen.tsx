@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   Image,
   Pressable,
@@ -8,13 +8,26 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { SKILLS } from '../data/skills';
+import { SKILLS, SKILL_IDS } from '../data/skills';
 import type { SkillId } from '../data/skills';
 import { GuiSprites } from '../lib/sprites';
 import { getDailyInventory, getTodayKey } from '../lib/fleaMarket';
 import { FLEA_MARKET_PRICES } from '../data/fleaMarketPricing';
 import { persistence } from '../lib/persistence';
 import { palette, PIXEL_FONT_FAMILY } from '../data/theme';
+
+type BuyState = 'active' | 'no_funds' | 'gated' | 'purchased';
+
+function getBuyState(
+  id: SkillId,
+  money: number,
+  pendingPurchasedSkill: SkillId | null,
+): BuyState {
+  if (pendingPurchasedSkill === id) return 'purchased';
+  if (pendingPurchasedSkill !== null) return 'gated';
+  if (money < FLEA_MARKET_PRICES[id]) return 'no_funds';
+  return 'active';
+}
 
 type Props = {
   onBack: () => void;
@@ -25,10 +38,37 @@ export default function FleaMarketScreen({ onBack }: Props) {
   // Recomputed on mount — handles midnight rollover during play.
   const [inventory] = useState<SkillId[]>(() => getDailyInventory(getTodayKey()));
   const [money, setMoney] = useState(0);
+  const [pendingPurchasedSkill, setPendingPurchasedSkill] = useState<SkillId | null>(null);
+  const [pendingAdSkill, setPendingAdSkill] = useState<SkillId | null>(null);
 
   useEffect(() => {
-    persistence.getMoney().then(setMoney);
+    Promise.all([
+      persistence.getMoney(),
+      persistence.getPendingPurchasedSkill(),
+      persistence.getPendingAdSkill(),
+    ]).then(([m, purchased, ad]) => {
+      setMoney(m);
+      setPendingPurchasedSkill(purchased);
+      setPendingAdSkill(ad);
+    });
   }, []);
+
+  const handleBuy = useCallback(async (id: SkillId) => {
+    if (pendingPurchasedSkill !== null) return;
+    const price = FLEA_MARKET_PRICES[id];
+    if (money < price) return;
+    setMoney(m => m - price);
+    setPendingPurchasedSkill(id);
+    await persistence.addMoney(-price);
+    await persistence.setPendingPurchasedSkill(id);
+  }, [money, pendingPurchasedSkill]);
+
+  const handleWatchAd = useCallback(async () => {
+    if (pendingAdSkill !== null) return;
+    const grantedId = SKILL_IDS[Math.floor(Math.random() * SKILL_IDS.length)];
+    setPendingAdSkill(grantedId);
+    await persistence.setPendingAdSkill(grantedId);
+  }, [pendingAdSkill]);
 
   return (
     <View style={styles.root}>
@@ -56,10 +96,14 @@ export default function FleaMarketScreen({ onBack }: Props) {
             const skill = SKILLS[id];
             const price = FLEA_MARKET_PRICES[id];
             const icon = (GuiSprites.skillIcons as Record<SkillId, number>)[id];
+            const buyState = getBuyState(id, money, pendingPurchasedSkill);
 
             return (
-              <View key={id} style={styles.card}>
-                <View style={styles.cardInner}>
+              <View key={id} style={[styles.card, buyState === 'gated' && styles.cardGated]}>
+                <View style={[
+                  styles.cardInner,
+                  buyState === 'purchased' && styles.cardInnerPurchased,
+                ]}>
                   <Image
                     source={icon}
                     style={styles.cardIcon}
@@ -73,23 +117,68 @@ export default function FleaMarketScreen({ onBack }: Props) {
                     {skill.description}
                   </Text>
                   <Text style={styles.cardPrice}>${price.toLocaleString()}</Text>
-                  <View style={styles.buyBtnBase}>
-                    <Text style={styles.buyBtnText}>BUY</Text>
-                  </View>
+                  {buyState === 'purchased' ? (
+                    <View style={[styles.buyBtnBase, styles.buyBtnPurchased]}>
+                      <Text style={[styles.buyBtnText, styles.buyBtnPurchasedText]}>PURCHASED</Text>
+                    </View>
+                  ) : (
+                    <Pressable
+                      style={({ pressed }) => [
+                        styles.buyBtnBase,
+                        buyState === 'no_funds' && styles.buyBtnNoFunds,
+                        buyState === 'gated' && styles.buyBtnGated,
+                        pressed && styles.buyBtnPressed,
+                      ]}
+                      onPress={() => handleBuy(id)}
+                      disabled={buyState !== 'active'}
+                    >
+                      <Text style={[
+                        styles.buyBtnText,
+                        (buyState === 'no_funds' || buyState === 'gated') && styles.buyBtnDimText,
+                      ]}>
+                        BUY
+                      </Text>
+                    </Pressable>
+                  )}
                 </View>
               </View>
             );
           })}
         </View>
 
-        {/* WATCH AD section — non-interactive in C1, wired in C2 */}
+        {/* WATCH AD section */}
         <View style={styles.adSection}>
           <View style={styles.adDivider} />
           <Text style={styles.adSectionLabel}>PRE-RUN BUFF</Text>
-          <View style={[styles.adBtn, styles.adBtnDisabled]}>
-            <Text style={styles.adBtnText}>WATCH AD</Text>
-            <Text style={styles.adSubtext}>Start with 1 random skill</Text>
-          </View>
+          {pendingAdSkill !== null ? (
+            <View style={styles.adWatchedRow}>
+              <Image
+                source={(GuiSprites.skillIcons as Record<SkillId, number>)[pendingAdSkill]}
+                style={styles.adSkillIcon}
+                resizeMode="contain"
+                filterQuality="none"
+              />
+              <View style={styles.adSkillInfo}>
+                <Text style={styles.adSkillName}>{SKILLS[pendingAdSkill].displayName}</Text>
+                <Text style={styles.adSkillDesc}>{SKILLS[pendingAdSkill].description}</Text>
+              </View>
+              <View style={styles.adWatchedBadge}>
+                <Text style={styles.adWatchedBadgeText}>{'AD\nWATCHED'}</Text>
+              </View>
+            </View>
+          ) : (
+            <Pressable
+              style={({ pressed }) => [
+                styles.adBtn,
+                styles.adBtnActive,
+                pressed && styles.adBtnPressed,
+              ]}
+              onPress={handleWatchAd}
+            >
+              <Text style={[styles.adBtnText, styles.adBtnActiveText]}>WATCH AD</Text>
+              <Text style={styles.adSubtext}>Start with 1 random skill</Text>
+            </Pressable>
+          )}
         </View>
       </ScrollView>
     </View>
@@ -214,6 +303,37 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
   },
 
+  // ─── Card gate states ──────────────────────────────────────────────────────
+  cardGated: {
+    opacity: 0.42,
+  },
+  cardInnerPurchased: {
+    borderColor: palette.accentGold,
+  },
+  buyBtnPurchased: {
+    borderColor: palette.accentGold,
+    backgroundColor: 'rgba(201, 163, 86, 0.08)',
+  },
+  buyBtnPurchasedText: {
+    fontSize: 13,
+    color: palette.accentGold,
+    letterSpacing: 1,
+  },
+  buyBtnNoFunds: {
+    borderColor: palette.warningRed,
+    backgroundColor: 'rgba(204, 51, 51, 0.08)',
+  },
+  buyBtnGated: {
+    borderColor: '#2a2d28',
+    backgroundColor: 'transparent',
+  },
+  buyBtnPressed: {
+    opacity: 0.70,
+  },
+  buyBtnDimText: {
+    color: '#555555',
+  },
+
   // ─── Watch Ad section ──────────────────────────────────────────────────────
   adSection: {
     marginTop: 8,
@@ -241,8 +361,15 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 2,
   },
-  adBtnDisabled: {
-    opacity: 0.5,
+  adBtnActive: {
+    borderColor: palette.accentGold,
+    opacity: 1,
+  },
+  adBtnActiveText: {
+    color: palette.accentGold,
+  },
+  adBtnPressed: {
+    opacity: 0.70,
   },
   adBtnText: {
     fontFamily: PIXEL_FONT_FAMILY,
@@ -254,5 +381,53 @@ const styles = StyleSheet.create({
     fontFamily: PIXEL_FONT_FAMILY,
     fontSize: 14,
     color: '#888888',
+  },
+  adWatchedRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(10, 13, 8, 0.6)',
+    borderWidth: 1,
+    borderColor: palette.accentGold,
+    borderRadius: 4,
+    padding: 10,
+    gap: 10,
+  },
+  adSkillIcon: {
+    width: 44,
+    height: 44,
+  },
+  adSkillInfo: {
+    flex: 1,
+    gap: 2,
+  },
+  adSkillName: {
+    fontFamily: PIXEL_FONT_FAMILY,
+    fontSize: 16,
+    color: '#ffffff',
+    textShadowColor: '#000000',
+    textShadowRadius: 1,
+    textShadowOffset: { width: 1, height: 1 },
+  },
+  adSkillDesc: {
+    fontFamily: PIXEL_FONT_FAMILY,
+    fontSize: 13,
+    color: '#aaaaaa',
+  },
+  adWatchedBadge: {
+    backgroundColor: 'rgba(201, 163, 86, 0.08)',
+    borderWidth: 1,
+    borderColor: palette.accentGold,
+    borderRadius: 2,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  adWatchedBadgeText: {
+    fontFamily: PIXEL_FONT_FAMILY,
+    fontSize: 13,
+    color: palette.accentGold,
+    textAlign: 'center',
+    lineHeight: 14,
   },
 });
