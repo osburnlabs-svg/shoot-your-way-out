@@ -169,9 +169,10 @@ type Props = {
   width: number;
   height: number;
   onReturnToMenu: (earnedMoney: number) => void;
+  starterSkills?: SkillId[];
 };
 
-export default function GameCanvas({ width, height, onReturnToMenu }: Props) {
+export default function GameCanvas({ width, height, onReturnToMenu, starterSkills }: Props) {
   // ─── Hero sprite images (loaded once at mount) ────────────────────────────
   const walk0 = useImage(HeroSprites.walk[0]);
   const walk1 = useImage(HeroSprites.walk[1]);
@@ -451,7 +452,7 @@ export default function GameCanvas({ width, height, onReturnToMenu }: Props) {
   const [initialMapData] = useState(() => loadMap(Date.now()));
 
   // ─── Game state ────────────────────────────────────────────────────────────
-  const gameState = useSharedValue(createInitialGameState(width, height, initialMapData.tanks, initialMapData.solidPropExclusions));
+  const gameState = useSharedValue(createInitialGameState(width, height, initialMapData.tanks, initialMapData.solidPropExclusions, starterSkills ?? []));
 
   // ─── Collision data (static; built from map, never mutated after mount) ─────
   // Stored in a SharedValue so worklets can read it on the UI thread. Written
@@ -1459,7 +1460,7 @@ export default function GameCanvas({ width, height, onReturnToMenu }: Props) {
   const handleRedeploy = useCallback(() => {
     // Reuses the same map data — Phase 7 will generate a fresh map per restart
     // via the proper menu flow.
-    gameState.value = createInitialGameState(width, height, initialMapData.tanks, initialMapData.solidPropExclusions);
+    gameState.value = createInitialGameState(width, height, initialMapData.tanks, initialMapData.solidPropExclusions, []);
   }, [gameState, width, height, initialMapData]);
 
   const handleReturnToMenu = useCallback(() => {

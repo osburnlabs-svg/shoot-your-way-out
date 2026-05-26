@@ -15,17 +15,19 @@
 import React from 'react';
 import { StyleSheet, useWindowDimensions, View } from 'react-native';
 import GameCanvas from '../components/GameCanvas';
+import type { SkillId } from '../data/skills';
 
 type Props = {
   onReturnToMenu: (earnedMoney: number) => void;
+  starterSkills?: SkillId[];
 };
 
-export default function GameScreen({ onReturnToMenu }: Props) {
+export default function GameScreen({ onReturnToMenu, starterSkills }: Props) {
   const { width, height } = useWindowDimensions();
 
   return (
     <View style={styles.container}>
-      <GameCanvas width={width} height={height} onReturnToMenu={onReturnToMenu} />
+      <GameCanvas width={width} height={height} onReturnToMenu={onReturnToMenu} starterSkills={starterSkills} />
     </View>
   );
 }
