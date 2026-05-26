@@ -28,6 +28,7 @@ const KEYS = {
   pendingAdSkill: 'syo_pending_ad_skill',
   pendingPurchasedSkill: 'syo_pending_purchased_skill',
   lastClaimDate: 'syo_last_claim_date',
+  operatorLicensed: 'syo_operator_licensed',
 } as const;
 
 async function get<T>(key: string, fallback: T): Promise<T> {
@@ -98,4 +99,11 @@ export const persistence = {
 
   getLastClaimDate: () => get<string | null>(KEYS.lastClaimDate, null),
   setLastClaimDate: (v: string) => set(KEYS.lastClaimDate, v),
+
+  // [P8-STUB] Phase 9 replaces with real IAP receipt check (grep: P8-STUB)
+  isOperatorLicensed: () => get<boolean>(KEYS.operatorLicensed, false),
+  setOperatorLicensed: (v: boolean) => set(KEYS.operatorLicensed, v),
+
+  // [P8-DIAG] Testing helper — strip after Phase 8 verification (grep: P8-DIAG)
+  clearLastClaimDate: () => set(KEYS.lastClaimDate, null),
 };
