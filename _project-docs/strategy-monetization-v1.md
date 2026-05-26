@@ -118,39 +118,40 @@ Per-run vs cumulative:
 
 ### 4.1 Concept
 
-A pre-run shop where players spend earned currency to start a run with one bonus. Two purchase paths:
+A pre-run shop where players spend earned currency to start a run with one bonus skill applied.
 
-- **Watch an ad** → start with 1 random skill at 1 stack (existing planned mechanic, no change)
-- **Spend flea market currency** → start with 1 *chosen* skill at 1 stack OR start with a chosen weapon
+- **Skills only** — no weapons, cosmetics, or consumables in v1. Defer to post-launch content updates.
+- **Price-gated only.** No Operator License gate — all players access the flea market. Paid players accumulate currency faster via the daily login bonus multiplier.
+- **Purchased skills apply to next raid only.** Not permanent meta-progression. Cleared after raid start.
 
-Same gameplay effect (start with skill applied). Currency adds the ability to *choose which* skill.
+Separate pre-run ad path (unchanged): watch an ad → start with 1 random skill at 1 stack. Flea market adds the ability to *choose which* skill by spending currency.
 
-### 4.2 Flea market inventory
+### 4.2 Flea market inventory (Phase 8 decisions locked 2026-05-25)
 
-**Skills (25 — 20 base + 5 Phase 5.5 clones, more clones in future batches):** every skill in the game is purchasable for one run. Selecting one applies 1 stack of that skill when the run starts.
+**Skills (15 of 25 available per day):**
+- 15 of the 25-skill pool are available each day, rotating daily.
+- Layout: 5 rows × 3 columns grid.
+- Daily inventory seeded by device-local date (YYYY-MM-DD). Pure deterministic function — same 15 skills for all players on the same calendar day. Computed live on flea market open to handle midnight rollover during play.
+- Selecting a skill applies 1 stack of that skill when the next run starts.
 
-**Weapons (7 total):** every weapon is purchasable. Buying adds the weapon to the player's run alongside the starter Pistol (does NOT replace Pistol). Aligns with Phase 7's weapon-inventory design.
-
-**Pricing intent (placeholder, re-tune Phase 9/10):**
+**Pricing intent (placeholder, re-tune Phase 10 balance pass):**
 
 - Cheapest skills: $100-150 (reachable in ~1 run of free play)
 - Average skills: $300-500 (a few runs of grinding)
 - Premium skills: $700-1000 (multi-run grind)
-- Weapons: $2000-5000 (significant investment, or quest-grind accelerated for paid players)
 
-The intent is that free players can buy something every few runs, paid players (via quests) can buy more frequently.
+The intent is that free players can buy something every few runs; paid players accumulate at 5× rate via the daily login bonus.
 
 ### 4.3 Flea market UI
 
-- Reuses existing skill card art and weapon HUD icons — no new visual work needed
-- Scrollable grid/list of all available items with currency price and BUY button
-- Label is "Flea Market" instead of the level-up "Upgrade" framing
-- Selected item is held as `pendingStarterItem` on persistent state, cleared when run begins
-- Free players can browse and buy without paywall
+- Reuses existing skill card art — no new visual work needed
+- 5×3 grid of available skills for the day, each card showing skill name, icon, currency price, and BUY button
+- Selected skill held as `pendingStarterSkill` on persistent state, cleared when run begins
+- All players access without paywall
 
-### 4.4 Edge case: buying a duplicate
+### 4.4 Edge case: duplicate skill
 
-Phase 7's weapon inventory design specifies: if a player EQUIPs a weapon they already have, the game switches active to it but doesn't add a duplicate. **Same logic applies to flea market weapon purchases.** Buying SMG when already owning SMG simply doesn't add a duplicate (and ideally should warn or refund — implementation detail for Phase 10).
+If a player buys a skill that later appears in a level-up draw, it can stack normally (stacking is the existing skill mechanic). No special handling needed — the starter skill is simply 1 stack applied at run start, same as all other skill applications.
 
 ---
 
@@ -202,7 +203,7 @@ All players receive a flea-market currency stipend on first login each calendar 
 | Pre-run buff ad (random skill) | ✓ | ✓ |
 | Flea market (currency-based) | ✓ | ✓ |
 | In-run currency drops | ✓ | ✓ |
-| Daily login bonus | $50/day (placeholder) | $300/day (placeholder) |
+| Daily login bonus | $1,000/day | $5,000/day |
 | Removes ads | No | No (revive/buff ads stay) |
 
 **Free players are not locked out of the meta-game.** They earn slower, that's all.
@@ -243,26 +244,23 @@ Additional 5-10 clones can be added in any later batch. Same one-line-edit workf
 
 Honest rough estimate. Phase 5+ context (longer runs, more enemy types) changes specifics but the shape holds:
 
-**Phase 9 — Monetization foundation**
+**Phase 8 — Flea market + daily login bonus**
 
-- IAP SDK integration (paywall check)
-- Rewarded ad SDK integration (replaces revive-ad and pre-run-buff-ad stubs)
+- Flea market UI screen (5×3 grid, 15-of-25 daily rotation, device-local date seed)
+- Pre-run starter skill state on persistent player data
+- Daily login bonus logic: check `last_claim_date` on app launch, grant $1,000 (free) or $5,000 (paid) if a new calendar day, update `last_claim_date`
+- Paywall gate on login bonus amount (free: $1,000/day; paid: $5,000/day)
+- IAP stub: Operator License stubbed as hardcoded toggle for Phase 8 testing
+- Balance pass: tune currency drop rate, login bonus amounts, and item prices against actual Phase 7+ gameplay data
+
+**Phase 9 — Monetization foundation + ship prep**
+
+- Real IAP integration (Apple/Google sandbox + receipt validation). Replaces Phase 8 stub.
+- AdMob rewarded ad SDK integration (replaces revive-ad and pre-run-buff-ad stubs)
 - License verification and entitlement caching
-- Initial persistence layer
-- `flea_currency: number` field on persistent player data
-- `last_claim_date: string` field on persistent player data (ISO date string, device-local)
+- `last_claim_date: string` field on persistent player data (ISO date string, device-local) — added alongside Phase 8 daily bonus logic
 
-**Phase 10 — Flea market + daily login bonus**
-
-- Persistent flea_currency state (wired to in-run money pickups)
-- Currency drop logic (route money pickup collection to flea_currency increment)
-- Flea market UI screen
-- Pre-run starter skill/weapon state on persistent player data
-- Daily login bonus logic: check `last_claim_date` on app launch, grant $50 (free) or $300 (paid) if a new calendar day, update `last_claim_date`
-- Paywall gate on login bonus amount (free: $50/day; paid: $300/day)
-- Balance pass: tune currency drop rate, login bonus amounts, and item prices against actual Phase 5+ gameplay data
-
-**Estimated build size:** Phase 9 is largely unchanged from original. Phase 10 is roughly 30% of the original quest-heavy scope — no quest definitions file, no quest tracking counters in the engine, no per-quest UI screens. The daily login bonus replaces the entire quest system with a single timestamp check on app launch.
+**Estimated build size:** Phase 9 (monetization + ship prep) is largely unchanged from original scope. Phase 8 (flea market + daily bonus) is roughly 30% of the original quest-heavy scope — no quest definitions file, no quest tracking counters in the engine, no per-quest UI screens. The daily login bonus replaces the entire quest system with a single timestamp check on app launch.
 
 ---
 
@@ -275,6 +273,12 @@ Honest rough estimate. Phase 5+ context (longer runs, more enemy types) changes 
 5. **Server-time vs device-time for daily login check.** Default to device-local time (same exploit-tolerance accepted for the original quest rotation). Server-time validation can be added post-launch if abuse becomes a real problem — single function change.
 6. **What happens to flea-market starter items if player dies before run starts.** (Edge case: does the purchased item consume? Refund? Persist to next run?) Implementation decision for Phase 10.
 7. **Free player retention strategy.** If free players churn at "I can't afford things," reconsider whether the daily login bonus needs to be higher or currency drop rates more generous.
+
+---
+
+## 10. Future framing: subscription layer (v1.x, not v1)
+
+**Tier 1 Operator Status** — conceptual monthly subscription that activates premium status on top of the permanent Operator License. License is permanent (one-time purchase, keeps daily $5K bonus forever). Active Operator Status is recurring (monthly, activates an additional tier of benefit TBD). Not in Phase 8 or Phase 9 scope. Preserving framing for post-launch planning.
 
 ---
 

@@ -175,19 +175,35 @@ Design intent captured from strategy chat. Final decisions deferred to Phase 7 k
 ---
 *✅ Phase 7 COMPLETE — closed 2026-05-25. All UI rebuild items shipped. Persistence layer (money-only) shipped. Balance tuned (commit b9cc3b2). Phase 7 investigations resolved. Minimap and PostHog analytics deferred to Phase 9. Known-safe HEAD at close: b9cc3b2.*
 
-## Phase 8 — Folded into Phase 9
+## Phase 8 — Gameplay Mechanics: Flea Market + Audio
 
-Phase 8 originally scoped helicopter ambient flyby (now shipped in Phase 5) plus late-discovery polish items. Buffer space — fold into Phase 9 unless playtesting surfaces work that doesn't fit elsewhere.
+Two remaining gameplay mechanics before production work begins in Phase 9.
 
-## Phase 9 — Audio, Ship Prep, Monetization
+### Flea market (scope locked 2026-05-25)
+- Skills only — no weapons, cosmetics, or consumables in v1. Defer to post-launch content updates.
+- Price-gated only. No Operator License content gating.
+- 15 of 25 skills available per day, daily rotation.
+- Layout: 5 rows × 3 columns grid.
+- Purchased skills apply to NEXT RAID ONLY. Not permanent meta-progression.
+- Daily inventory seed: device-local date (YYYY-MM-DD). Pure deterministic function. Same skills for all players on the same date.
+- Live recompute on flea market open to handle midnight rollover during play.
 
-Final phase before launch. All audio integration here.
+### Daily bonus + time handling (scope locked 2026-05-25)
+- Device-local date, not UTC, not server time.
+- No anti-cheese mechanics — accept that some players will time-cheese.
+- Shared helper: getTodayKey() returns "YYYY-MM-DD". Consumed by both flea market and daily bonus.
+- Daily bonus claim: auto-claim on main menu mount with brief notification ("+$1,000 daily bonus claimed").
+- Values per Phase 7 closure: $1K free / $5K Operator License.
 
-### Audio
-- **Music integration.** Mo has sourced royalty-free metal/aggressive instrumental tracks. Wire 4 tracks into menu and gameplay.
-- **SFX sourcing.** Find coherent ~25 SFX set (weapon fire, hits, level-up, death, UI clicks, ambient). Aesthetic decision: 8-bit vs realistic — Mo deferred until visual polish in place.
-- **SFX integration.** Wire playback to existing gameplay events.
-- **Volume controls + mute.**
+### IAP stub for Phase 8 testing
+- Operator License unlock is stubbed (hardcoded toggle).
+- Real IAP integration moved to Phase 9.
+
+### Audio (no decisions locked — brainstorm needed)
+- SFX coverage, music layers, sourcing strategy (royalty-free vs. commissioned vs. AI), implementation library (expo-av is in stack).
+- Brainstorm at Phase 8 mid-point after flea market ships.
+
+## Phase 9 — Ship Prep, Monetization, Engine Cleanup
 
 ### Engine cleanup
 - **UI-thread worklet GC allocation churn.** 36k-60k objects/sec → 2-4ms GC pauses. Engine-wide mutable-state refactor. SKIP if targeted object pooling in Phase 5.5 already resolved stuttering.
@@ -197,30 +213,25 @@ Final phase before launch. All audio integration here.
 - **Late-game asset-dense stutter — investigate during code review.** Sporadic stutter observed in late-game (~5 min) in asset-dense map areas (Phase 7 playtest). Suspect ranking from Phase 7 CC analysis: (1) 100ms setInterval fanout × enemy slot occupancy — highest plausibility, first diagnostic is `performance.now()` bracket on setInterval body; (2) Sniper ramp sustaining `SNIPER_MAX_ACTIVE = 5` late-game; (3) Static prop collision density × enemy count; (4) Reanimated UI-thread GC churn; (5) Pickup slot saturation. Start with suspect 1 — low effort, high signal.
 - **Camera tracking smoothness — investigate during code review.** Late Phase 7 observation: fast left-right movement reveals black edges at viewport boundaries, suggesting the camera lags behind player position. Investigate whether camera lerp parameters need tuning or whether the map render area needs an extended buffer beyond the current viewport extents.
 
-### Monetization (per strategy-monetization-v1.md)
-- **IAP SDK integration** (react-native-iap).
-- **Rewarded ad SDK** (AdMob).
+### Monetization
+- **Real IAP integration** (Apple/Google sandbox + receipt validation). Operator License unlock — real store product replacing Phase 8 stub.
+- **AdMob integration.** Rewarded ad SDK. Wire revive ad and pre-run buff ad touchpoints.
 - **Entitlement caching.**
-- **flea_currency + last_claim_date persistent data.**
-- **Daily login bonus value tuning** (note from 2026-05-22 brainstorm). Strategy doc rough-tuned 2026-05-25: $1,000/day free, $5,000/day paid (5× multiplier). Based on Phase 7 earn-rate data (~$215/min post-tune). Final tuning against flea market item pricing in Phase 10 — bonus amounts and item prices must be calibrated together.
 
 ### Ship prep
 - **AdMob account.** $0, ready before Phase 9 work.
 - **Apple Developer account.** $99/yr, before Phase 9 ship prep.
 - **Google Play account.** $25 one-time, before Phase 9 ship prep.
 - **EAS Build setup.** Production build pipeline.
+- **App icon + splash screen.** Final icon asset (1024×1024, transparent background) and Expo splash config update. Blocked on game name/studio name decisions (see v3 doc parking lot).
+- **Store assets.** Screenshots, description copy, metadata for both stores.
 - **TestFlight submission (iOS).**
 - **Play Store submission (Android).**
+- **Reanimated polyfill upstream GitHub issue.** Stale-timestamp behavior in worklets RAF polyfill (root cause of Phase 7 speed-up bug, commit 016b1ad). Low priority — file post-launch or during Phase 9 if time allows. Not a blocker.
 
-## Phase 10 — Flea Market + Daily Login Bonus
+## Phase 10 — Post-Launch Balance Pass
 
-Per strategy-monetization-v1.md.
-- Currency drop logic
-- Flea market UI
-- Login bonus logic (free $1,000/day, paid $5,000/day — rough-tuned; final balance pass in Phase 10)
-- Paywall gate
-- Balance pass
-- **Flea market free-paid split: skills universal, weapons Upgrade-gated** (note from 2026-05-22 brainstorm). Locked direction (not yet documented in strategy doc): skills purchasable by all players, weapon purchases require Upgrade entitlement. Rationale: skill picks drive build variety (core gameplay differentiator, free players need full access); weapon picks affect starter loadout (strategic convenience, fits paid perk). Implementation: flea market UI shows two sections, weapon section locked overlay for non-Upgrade players, entitlement check on purchase attempt. Strategy doc Section 4 currently describes weapons + skills both purchasable without gating — needs update during Phase 9/10 planning.
+Balance pass once live player data exists: flea market item pricing, daily login bonus amounts, currency drop rate. Final tuning of the values rough-set in Phase 7 and Phase 8 against actual player earn rates and purchase behavior.
 
 ## Doc Hygiene
 
