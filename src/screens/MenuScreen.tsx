@@ -1,5 +1,5 @@
-import React from 'react';
-import { View, Text, Image, Pressable, StyleSheet } from 'react-native';
+import React, { useEffect, useRef } from 'react';
+import { Animated, View, Text, Image, Pressable, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { palette, PIXEL_FONT_FAMILY } from '../data/theme';
 
@@ -7,10 +7,25 @@ type Props = {
   onDeploy: () => void;
   onFleaMarket: () => void;
   money: number;
+  bonusMessage: string | null;
+  onBonusDismissed: () => void;
 };
 
-export default function MenuScreen({ onDeploy, onFleaMarket, money }: Props) {
+export default function MenuScreen({ onDeploy, onFleaMarket, money, bonusMessage, onBonusDismissed }: Props) {
   const insets = useSafeAreaInsets();
+  const toastOpacity = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (!bonusMessage) return;
+    toastOpacity.setValue(0);
+    const anim = Animated.sequence([
+      Animated.timing(toastOpacity, { toValue: 1, duration: 200, useNativeDriver: true }),
+      Animated.delay(2000),
+      Animated.timing(toastOpacity, { toValue: 0, duration: 300, useNativeDriver: true }),
+    ]);
+    anim.start(() => onBonusDismissed());
+    return () => anim.stop();
+  }, [bonusMessage, onBonusDismissed]);
 
   return (
     <View style={styles.root}>
@@ -19,6 +34,13 @@ export default function MenuScreen({ onDeploy, onFleaMarket, money }: Props) {
         style={styles.bgImage}
         resizeMode="cover"
       />
+
+      {bonusMessage ? (
+        <Animated.View style={[styles.toast, { top: insets.top, opacity: toastOpacity }]}>
+          <Text style={styles.toastText}>{bonusMessage}</Text>
+        </Animated.View>
+      ) : null}
+
       <View
         style={[
           styles.content,
@@ -142,5 +164,21 @@ const styles = StyleSheet.create({
     fontSize: 24,
     color: palette.accentGold,
     letterSpacing: 1,
+  },
+  toast: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    paddingVertical: 10,
+    alignItems: 'center',
+    backgroundColor: 'rgba(10, 13, 8, 0.90)',
+    borderBottomWidth: 1,
+    borderBottomColor: palette.accentGold,
+  },
+  toastText: {
+    fontFamily: PIXEL_FONT_FAMILY,
+    fontSize: 20,
+    color: palette.accentGold,
+    letterSpacing: 2,
   },
 });

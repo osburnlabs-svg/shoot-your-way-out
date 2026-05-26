@@ -15,7 +15,17 @@ import LoadingScreen from './screens/LoadingScreen';
 import GameScreen from './screens/GameScreen';
 import FleaMarketScreen from './screens/FleaMarketScreen';
 import { persistence } from './lib/persistence';
+import { getTodayKey } from './lib/fleaMarket';
 import type { SkillId } from './data/skills';
+
+// [P8-DIAG] Debugger-console testing helpers — strip after Phase 8 verification (grep: P8-DIAG)
+// In Metro Hermes debugger console:
+//   global.__p8DiagResetBonus()           — clears lastClaimDate so next menu mount re-fires the bonus
+//   global.__p8DiagSetOperator(true/false) — toggles Operator License ($5K vs $1K daily bonus)
+if (__DEV__) {
+  (global as any).__p8DiagResetBonus = () => persistence.clearLastClaimDate();
+  (global as any).__p8DiagSetOperator = (v: boolean) => persistence.setOperatorLicensed(v);
+}
 
 // Screen state machine — Phase 8 routing.
 // Boot → MenuScreen → LoadingScreen (countdown) → GameScreen.
@@ -29,10 +39,41 @@ export default function App() {
   const [screen, setScreen] = useState<Screen>('menu');
   const [persistedMoney, setPersistedMoney] = useState(0);
   const [starterSkills, setStarterSkills] = useState<SkillId[]>([]);
+  const [bonusMessage, setBonusMessage] = useState<string | null>(null);
 
   useEffect(() => {
     persistence.getMoney().then(setPersistedMoney);
   }, []);
+
+  // Daily bonus auto-claim: fires on every menu mount, silently exits if already claimed today.
+  useEffect(() => {
+    if (screen !== 'menu') {
+      setBonusMessage(null);
+      return;
+    }
+    let active = true;
+    (async () => {
+      const today = getTodayKey();
+      const lastClaim = await persistence.getLastClaimDate();
+      if (!active || lastClaim === today) return;
+
+      const isOperator = await persistence.isOperatorLicensed();
+      const amount = isOperator ? 5_000 : 1_000;
+      const label = isOperator ? '+$5,000 OPERATOR BONUS' : '+$1,000 DAILY BONUS';
+
+      await persistence.addMoney(amount);
+      await persistence.setLastClaimDate(today);
+
+      if (!active) return;
+      const total = await persistence.getMoney();
+      if (!active) return;
+      setPersistedMoney(total);
+      setBonusMessage(label);
+    })();
+    return () => { active = false; };
+  }, [screen]);
+
+  const handleBonusDismissed = useCallback(() => setBonusMessage(null), []);
 
   const handleOpenFleaMarket = useCallback(() => {
     setScreen('flea_market');
@@ -76,7 +117,15 @@ export default function App() {
     <SafeAreaProvider>
       <GestureHandlerRootView style={{ flex: 1 }}>
         <StatusBar style="light" />
-        {screen === 'menu' && <MenuScreen onDeploy={handleDeploy} onFleaMarket={handleOpenFleaMarket} money={persistedMoney} />}
+        {screen === 'menu' && (
+          <MenuScreen
+            onDeploy={handleDeploy}
+            onFleaMarket={handleOpenFleaMarket}
+            money={persistedMoney}
+            bonusMessage={bonusMessage}
+            onBonusDismissed={handleBonusDismissed}
+          />
+        )}
         {screen === 'loading' && <LoadingScreen onComplete={() => setScreen('game')} />}
         {screen === 'game' && <GameScreen onReturnToMenu={handleReturnToMenu} starterSkills={starterSkills} />}
         {screen === 'flea_market' && <FleaMarketScreen onBack={handleReturnFromFleaMarket} />}
