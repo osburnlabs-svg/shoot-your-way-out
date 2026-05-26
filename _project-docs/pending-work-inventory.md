@@ -179,7 +179,7 @@ Design intent captured from strategy chat. Final decisions deferred to Phase 7 k
 
 Two remaining gameplay mechanics before production work begins in Phase 9.
 
-### Flea market (scope locked 2026-05-25)
+### Flea market (scope locked 2026-05-25; pricing locked 2026-05-26)
 - Skills only — no weapons, cosmetics, or consumables in v1. Defer to post-launch content updates.
 - Price-gated only. No Operator License content gating.
 - 15 of 25 skills available per day, daily rotation.
@@ -187,6 +187,16 @@ Two remaining gameplay mechanics before production work begins in Phase 9.
 - Purchased skills apply to NEXT RAID ONLY. Not permanent meta-progression.
 - Daily inventory seed: device-local date (YYYY-MM-DD). Pure deterministic function. Same skills for all players on the same date.
 - Live recompute on flea market open to handle midnight rollover during play.
+- **Per-skill pricing (locked 2026-05-26):**
+
+  | Tier | Price | Skills |
+  |---|---|---|
+  | Premium | $5,000 | Plate Carrier, Heavy Plate, Helmet, Backpack, Field Medic Kit, Frag Grenade, Hollow Points |
+  | Standard | $3,000 | Armor-Piercing Rounds, Holographic, Ceramic Insert, MRE, Energy Bar, Tactical Boots, Painkillers, Smoke Grenade, Molotov |
+  | Cheap | $2,000 | Red Dot, ACOG, Suppressor, FMJ Ammo, Subsonic Rounds, Tracer Rounds, Knee Pads, Stims, Comms Headset |
+
+- **Per-raid purchase gate:** 1 purchase per raid. `pendingPurchasedSkill: skillId | null` on persistent player data. Non-null → all BUY buttons disabled, purchased card shows "PURCHASED" overlay. Survives app sessions; consumed and cleared on Deploy.
+- **Max 2 starter skills per raid:** 1 from ad (random) + 1 from flea market (chosen). On Deploy: apply both pending slots if non-null, clear both, raid starts.
 
 ### Daily bonus + time handling (scope locked 2026-05-25)
 - Device-local date, not UTC, not server time.
@@ -198,6 +208,19 @@ Two remaining gameplay mechanics before production work begins in Phase 9.
 ### IAP stub for Phase 8 testing
 - Operator License unlock is stubbed (hardcoded toggle).
 - Real IAP integration moved to Phase 9.
+
+### Pre-run ad (stubbed for Phase 8)
+- WATCH AD button lives inside the flea market screen, sibling to the purchased skill slot.
+- Phase 8 stub behavior: tap immediately grants a random skill from the 25-skill pool (no actual ad video).
+- Per-raid gate: `pendingAdSkill: skillId | null` on persistent player data. Non-null → button disabled, label reads "AD WATCHED." Survives app sessions; consumed and cleared on Deploy.
+- No app-imposed daily ad cap for v1 — only the per-raid gate. Real AdMob integration and daily-limit research is Phase 9.
+- If ad-granted skill matches purchased skill, they stack normally (existing skill stacking mechanic, no special handling).
+
+### State model — persistent player data fields (Phase 8)
+- `money: number` — already shipped Phase 7 (key `syo_flea_currency`)
+- `pendingPurchasedSkill: skillId | null` — new Phase 8; flea market purchase slot
+- `pendingAdSkill: skillId | null` — new Phase 8; pre-run ad slot
+- `lastClaimDate: 'YYYY-MM-DD' | null` — new Phase 8; daily bonus claim tracking
 
 ### Audio (no decisions locked — brainstorm needed)
 - SFX coverage, music layers, sourcing strategy (royalty-free vs. commissioned vs. AI), implementation library (expo-av is in stack).
@@ -217,6 +240,7 @@ Two remaining gameplay mechanics before production work begins in Phase 9.
 - **Real IAP integration** (Apple/Google sandbox + receipt validation). Operator License unlock — real store product replacing Phase 8 stub.
 - **AdMob integration.** Rewarded ad SDK. Wire revive ad and pre-run buff ad touchpoints.
 - **Entitlement caching.**
+- **Ad network daily-limit and no-fill UX research.** Verify whether any app-imposed cap is needed; design the no-fill button state for when the ad network returns no fill. Phase 9 research item, not a blocker.
 
 ### Ship prep
 - **AdMob account.** $0, ready before Phase 9 work.
@@ -245,8 +269,8 @@ Items needed to keep project docs accurate and trustworthy. Not gameplay work; n
 
 - **Persistence between runs.** ✅ Decided and implemented in Phase 7 — money-only (flea market currency). No high scores, no kill counts, no meta-progression. See persistence layer entry in Phase 7 section.
 - **Audio aesthetic.** 8-bit chiptune vs realistic SFX. Decide before Phase 9.
-- **Specific monetization values.** IAP price ($4.99 vs $9.99), in-run currency drop rate, flea market item prices, daily login bonus amounts, server-time vs device-time, etc. Per strategy doc Section 9. Decide during Phase 9 planning.
-- **What happens to flea-market starter items if player dies before run starts.** Per strategy doc Section 9.
+- **Specific monetization values (partial).** Two items remain open: IAP price ($4.99 vs $9.99, decide closer to launch) and in-run currency drop rate ($1/Scav placeholder, re-tune Phase 10). Flea market pricing, daily login amounts, and server-time choice are all locked.
+- **What happens to flea-market starter items if player dies before run starts.** ✅ Resolved 2026-05-26 — consumed on Deploy, no refund. See §4.5 in strategy-monetization-v1.md.
 - **Free player retention strategy.** Per strategy doc Section 9.
 
 ## Parked / Deferred (Not Active Work)

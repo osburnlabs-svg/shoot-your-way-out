@@ -134,24 +134,35 @@ Separate pre-run ad path (unchanged): watch an ad → start with 1 random skill 
 - Daily inventory seeded by device-local date (YYYY-MM-DD). Pure deterministic function — same 15 skills for all players on the same calendar day. Computed live on flea market open to handle midnight rollover during play.
 - Selecting a skill applies 1 stack of that skill when the next run starts.
 
-**Pricing intent (placeholder, re-tune Phase 10 balance pass):**
+**Per-skill pricing (locked 2026-05-26, re-tune Phase 10 against live player data):**
 
-- Cheapest skills: $100-150 (reachable in ~1 run of free play)
-- Average skills: $300-500 (a few runs of grinding)
-- Premium skills: $700-1000 (multi-run grind)
+| Tier | Price | Skills |
+|---|---|---|
+| Premium | $5,000 | Plate Carrier, Heavy Plate, Helmet, Backpack, Field Medic Kit, Frag Grenade, Hollow Points |
+| Standard | $3,000 | Armor-Piercing Rounds, Holographic, Ceramic Insert, MRE, Energy Bar, Tactical Boots, Painkillers, Smoke Grenade, Molotov |
+| Cheap | $2,000 | Red Dot, ACOG, Suppressor, FMJ Ammo, Subsonic Rounds, Tracer Rounds, Knee Pads, Stims, Comms Headset |
 
-The intent is that free players can buy something every few runs; paid players accumulate at 5× rate via the daily login bonus.
+Distribution: 7 premium / 9 standard / 9 cheap = 25 total. Prices tuned 2026-05-26 against Phase 7 earn-rate data; remain subject to Phase 10 re-tuning against live player data.
 
 ### 4.3 Flea market UI
 
 - Reuses existing skill card art — no new visual work needed
 - 5×3 grid of available skills for the day, each card showing skill name, icon, currency price, and BUY button
-- Selected skill held as `pendingStarterSkill` on persistent state, cleared when run begins
+- **Per-raid purchase gate:** Limited to 1 flea market purchase per raid. Purchase state held as `pendingPurchasedSkill: skillId | null` on persistent player data. When non-null, all BUY buttons are disabled and the purchased card shows a "PURCHASED" overlay. Slot survives app sessions (AsyncStorage, same pattern as money). Consumed and cleared on Deploy when the raid starts.
+- **WATCH AD button:** Lives inside the flea market screen alongside the purchased skill slot. Tapping grants a random skill from the 25-skill pool immediately (Phase 8: stubbed — no actual ad video; real AdMob integration is Phase 9). Per-raid gate via `pendingAdSkill: skillId | null`. When non-null, button is disabled and label reads "AD WATCHED." Same persistence behavior as `pendingPurchasedSkill` — survives app sessions, consumed on Deploy.
+- **Max 2 starter skills per raid:** 1 from ad (random) + 1 from flea market (chosen). On Deploy: apply both pending slots if non-null, clear both, raid starts.
 - All players access without paywall
 
 ### 4.4 Edge case: duplicate skill
 
-If a player buys a skill that later appears in a level-up draw, it can stack normally (stacking is the existing skill mechanic). No special handling needed — the starter skill is simply 1 stack applied at run start, same as all other skill applications.
+If a player buys a skill that later appears in a level-up draw, it can stack normally (stacking is the existing skill mechanic). No special handling needed — the starter skill is simply 1 stack applied at run start, same as all other skill applications. The same rule applies when the ad-granted skill matches the flea market purchase: they stack normally.
+
+### 4.5 Persistence and consumption rules
+
+- **No refunds.** Money spent on a purchase stays spent, even if the player never deploys.
+- **No re-rolls.** Once `pendingAdSkill` is set, the player cannot re-watch to get a different random skill while holding a pending ad skill.
+- **Consumed on Deploy.** Both `pendingPurchasedSkill` and `pendingAdSkill` are applied and cleared when the player taps Deploy. If a slot is null, it is silently skipped.
+- Matches the existing anti-cheese philosophy (device-local date, accept the cheese) — no server enforcement, minimal edge-case complexity.
 
 ---
 
@@ -167,7 +178,7 @@ This number re-tunes during Phase 9/10 against actual Phase 5+ run length and en
 
 - Free player average run: ~50-150 in-run currency + $1,000 daily login bonus (on first run each calendar day)
 - Paid player average run: ~50-150 in-run currency + $5,000 daily login bonus (on first run each calendar day)
-- A cheap skill costs roughly 1 free daily cycle; paid players accumulate at 5× rate
+- A cheap skill costs roughly 2 free daily cycles (cheapest tier $2,000 vs $1,000/day free bonus); paid players accumulate at 5× rate
 
 ### 5.2 Daily Login Bonus
 
@@ -184,7 +195,7 @@ All players receive a flea-market currency stipend on first login each calendar 
 
 ### 5.3 Currency persistence
 
-`flea_currency: number` on persistent player data. Survives between runs, never resets. Shipped Phase 7 (commit a452ab8) — `getMoney()` and `addMoney(amount)` in `src/lib/persistence.ts`, key `syo_flea_currency`. `last_claim_date: string` stores the last day the login bonus was claimed (ISO date, device-local) — added in Phase 9 alongside IAP integration.
+`flea_currency: number` on persistent player data. Survives between runs, never resets. Shipped Phase 7 (commit a452ab8) — `getMoney()` and `addMoney(amount)` in `src/lib/persistence.ts`, key `syo_flea_currency`. `last_claim_date: string` stores the last day the login bonus was claimed (ISO date, device-local) — added in Phase 8 alongside daily bonus implementation.
 
 ### 5.4 Balance philosophy
 
@@ -251,6 +262,7 @@ Honest rough estimate. Phase 5+ context (longer runs, more enemy types) changes 
 - Daily login bonus logic: check `last_claim_date` on app launch, grant $1,000 (free) or $5,000 (paid) if a new calendar day, update `last_claim_date`
 - Paywall gate on login bonus amount (free: $1,000/day; paid: $5,000/day)
 - IAP stub: Operator License stubbed as hardcoded toggle for Phase 8 testing
+- Pre-run ad stub: WATCH AD button inside flea market screen. Phase 8: tap immediately grants a random skill from the 25-skill pool (no actual ad video). `pendingAdSkill: skillId | null` on persistent player data. Real AdMob integration is Phase 9.
 - Balance pass: tune currency drop rate, login bonus amounts, and item prices against actual Phase 7+ gameplay data
 
 **Phase 9 — Monetization foundation + ship prep**
@@ -268,11 +280,7 @@ Honest rough estimate. Phase 5+ context (longer runs, more enemy types) changes 
 
 1. **Specific IAP price.** $4.99 vs $9.99 — decide closer to launch with player data and price sensitivity research.
 2. **In-run currency drop rate.** Current $1/Scav is a placeholder. Tune against actual Phase 5+ run length and enemy density.
-3. **Item price specifics in flea market.** Placeholders throughout. Tune against actual run currency yields once Phase 5+ baselines are measurable.
-4. **Daily login bonus amounts.** Free $50/day and paid $300/day are placeholders. The paid/free ratio (6×) should feel meaningfully accelerated without trivializing progression. Tune against Phase 5+ run length data and flea market item pricing.
-5. **Server-time vs device-time for daily login check.** Default to device-local time (same exploit-tolerance accepted for the original quest rotation). Server-time validation can be added post-launch if abuse becomes a real problem — single function change.
-6. **What happens to flea-market starter items if player dies before run starts.** (Edge case: does the purchased item consume? Refund? Persist to next run?) Implementation decision for Phase 10.
-7. **Free player retention strategy.** If free players churn at "I can't afford things," reconsider whether the daily login bonus needs to be higher or currency drop rates more generous.
+3. **Free player retention strategy.** If free players churn at "I can't afford things," reconsider whether the daily login bonus needs to be higher or currency drop rates more generous.
 
 ---
 
