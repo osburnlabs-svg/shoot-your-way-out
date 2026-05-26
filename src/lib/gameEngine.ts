@@ -95,7 +95,7 @@ import {
 } from '../data/gameConstants';
 import type { CrateTier } from '../data/gameConstants';
 import type { SkillId } from '../data/skills';
-import { getEffectiveStats } from '../data/skills';
+import { getEffectiveStats, SKILLS } from '../data/skills';
 import { resolveAABB, resolveCircle } from './collision';
 import type { CollisionData } from './collision';
 import { tickEnemies } from './enemyEngine';
@@ -516,10 +516,44 @@ export type GameState = {
   frameCount: number; // total fixed-step frames processed
 };
 
-export function createInitialGameState(canvasWidth: number, canvasHeight: number, tankPlacements: TankPlacement[], solidPropExclusions: Array<{ x: number; y: number; r: number }>): GameState {
+// Note: skillStacks init only covers Phase 4a skills explicitly; Phase 4b+ skills are absent
+// but handled by the ?? 0 fallback in getEffectiveStats. Pre-existing drift; not fixed here.
+export function createInitialGameState(canvasWidth: number, canvasHeight: number, tankPlacements: TankPlacement[], solidPropExclusions: Array<{ x: number; y: number; r: number }>, starterSkills?: SkillId[]): GameState {
   'worklet';
   const emptyEnemies: Array<EnemyState | null> = [];
   for (let i = 0; i < ENEMY_SOFT_CAP; i++) { emptyEnemies.push(null); }
+
+  // Build initial skill stacks and HP, applying any starter skills.
+  const initialSkillStacks: Record<string, number> = {
+    ammo_545bt: 0,
+    ammo_subsonic: 0,
+    ammo_tracer: 0,
+    optics_red_dot: 0,
+    optics_pso_scope: 0,
+    gear_plate_carrier: 0,
+    gear_tactical_boots: 0,
+    gear_mre: 0,
+    provisions_painkillers: 0,
+    provisions_stims: 0,
+  };
+  let initialHp = PLAYER_STARTING_HP;
+  if (starterSkills && starterSkills.length > 0) {
+    for (let i = 0; i < starterSkills.length; i++) {
+      const id = starterSkills[i];
+      initialSkillStacks[id] = (initialSkillStacks[id] ?? 0) + 1;
+    }
+    const startingWeapon = WEAPON_PROFILES[STARTING_WEAPON_ID];
+    const effective = getEffectiveStats(initialSkillStacks, startingWeapon, PLAYER_STARTING_HP);
+    for (let i = 0; i < starterSkills.length; i++) {
+      const skillDef = SKILLS[starterSkills[i]];
+      if (skillDef.onSelectEffect?.healHp) {
+        initialHp = Math.min(initialHp + skillDef.onSelectEffect.healHp, effective.maxHp);
+      }
+    }
+    // Clamp to effective max — handles max-HP-reducing skills (e.g. Stims).
+    initialHp = Math.min(initialHp, effective.maxHp);
+  }
+
   return {
     player: {
       x: WORLD_WIDTH / 2,
@@ -533,25 +567,14 @@ export function createInitialGameState(canvasWidth: number, canvasHeight: number
       equippedWeaponId: STARTING_WEAPON_ID,
       equippedWeaponRarity: 'common',
       weaponCooldownMs: 0,
-      hp: PLAYER_STARTING_HP,
+      hp: initialHp,
       maxHp: PLAYER_STARTING_HP,
       score: 0,
       xp: 0,
       lastDamagedAtMs: 0,
       lastFiredAtMs: -9999,
       level: 1,
-      skillStacks: {
-        ammo_545bt: 0,
-        ammo_subsonic: 0,
-        ammo_tracer: 0,
-        optics_red_dot: 0,
-        optics_pso_scope: 0,
-        gear_plate_carrier: 0,
-        gear_tactical_boots: 0,
-        gear_mre: 0,
-        provisions_painkillers: 0,
-        provisions_stims: 0,
-      },
+      skillStacks: initialSkillStacks as Record<SkillId, number>,
       invulnerableUntilMs: 0,
       fragCooldownMs: 0,
       smokeCooldownMs: 0,
