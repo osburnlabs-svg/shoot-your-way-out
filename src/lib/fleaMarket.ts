@@ -1,6 +1,14 @@
 import { SKILL_IDS } from '../data/skills';
 import type { SkillId } from '../data/skills';
 
+// Skills excluded from the flea market and pre-run ad pool.
+// Field Medic Kit: +25 HP on-select is a no-op at raid start (player starts at full HP).
+// Skill remains in the in-run level-up pool where it functions normally.
+const FLEA_MARKET_EXCLUDED = new Set<SkillId>(['provisions_field_medic_kit']);
+
+// 24-skill pool used for daily inventory and ad random selection. Computed once at module load.
+export const FLEA_MARKET_POOL: SkillId[] = SKILL_IDS.filter(id => !FLEA_MARKET_EXCLUDED.has(id));
+
 /**
  * Returns today's date as a YYYY-MM-DD string in device-local time.
  * Used to seed the daily flea market inventory and daily login bonus checks.
@@ -45,7 +53,7 @@ export function getDailyInventory(dateKey: string): SkillId[] {
   const seed = parseInt(dateKey.replace(/-/g, ''), 10);
   const rng = mulberry32(seed);
 
-  const pool = SKILL_IDS.slice(); // shallow copy — never mutate the imported array
+  const pool = FLEA_MARKET_POOL.slice(); // shallow copy — never mutate the exported pool
   for (let i = pool.length - 1; i > 0; i--) {
     const j = Math.floor(rng() * (i + 1));
     const tmp = pool[i];

@@ -8,10 +8,10 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { SKILLS, SKILL_IDS } from '../data/skills';
+import { SKILLS } from '../data/skills';
 import type { SkillId } from '../data/skills';
 import { GuiSprites } from '../lib/sprites';
-import { getDailyInventory, getTodayKey } from '../lib/fleaMarket';
+import { getDailyInventory, getTodayKey, FLEA_MARKET_POOL } from '../lib/fleaMarket';
 import { FLEA_MARKET_PRICES } from '../data/fleaMarketPricing';
 import { persistence } from '../lib/persistence';
 import { palette, PIXEL_FONT_FAMILY } from '../data/theme';
@@ -65,7 +65,7 @@ export default function FleaMarketScreen({ onBack }: Props) {
 
   const handleWatchAd = useCallback(async () => {
     if (pendingAdSkill !== null) return;
-    const grantedId = SKILL_IDS[Math.floor(Math.random() * SKILL_IDS.length)];
+    const grantedId = FLEA_MARKET_POOL[Math.floor(Math.random() * FLEA_MARKET_POOL.length)];
     setPendingAdSkill(grantedId);
     await persistence.setPendingAdSkill(grantedId);
   }, [pendingAdSkill]);
