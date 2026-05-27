@@ -165,6 +165,7 @@ import {
   useEnemySlotFlash,
 } from '../lib/slotHooks';
 import { audioEngine } from '../lib/audioEngine';
+import { showRewardedAd } from '../lib/monetization';
 
 type Props = {
   width: number;
@@ -636,6 +637,8 @@ export default function GameCanvas({ width, height, onReturnToMenu, starterSkill
   const [displayIsDead, setDisplayIsDead] = useState(false);
   const [displayBackpackStacks, setDisplayBackpackStacks] = useState(0);
   const [displayAdRevivesUsed, setDisplayAdRevivesUsed] = useState(0);
+  // Tracks in-flight rewarded ad request for the revive button loading state.
+  const [adReviveLoading, setAdReviveLoading] = useState(false);
   const [displayEquippedWeaponId, setDisplayEquippedWeaponId] = useState('pistol');
   const [displayEquippedWeaponRarity, setDisplayEquippedWeaponRarity] = useState<CrateTier>('common');
 
@@ -1476,15 +1479,35 @@ export default function GameCanvas({ width, height, onReturnToMenu, starterSkill
     };
   }, [gameState]);
 
-  // Phase 9 TODO: replace handler body with rewarded ad flow.
-  // On ad completion: apply revive effects (hp = effective.maxHp, center respawn,
-  // invulnerableUntilMs, isDead = false) and remove the early return.
-  // For now: stub sets adRevivesUsed = 1 so button greys immediately. No revive effect.
-  const handleAdRevive = useCallback(() => {
+  const handleAdRevive = useCallback(async () => {
     const state = gameState.value;
-    if (state.adRevivesUsed >= 1) return; // defensive
-    gameState.value = { ...state, adRevivesUsed: state.adRevivesUsed + 1 };
-  }, [gameState]);
+    if (state.adRevivesUsed >= 1 || adReviveLoading) return;
+    setAdReviveLoading(true);
+    const { rewarded } = await showRewardedAd();
+    if (!rewarded) {
+      // User dismissed early or ad failed — no revive, re-enable button.
+      setAdReviveLoading(false);
+      return;
+    }
+    // Ad completed — apply revive effects. Read fresh to avoid stale closure
+    // (game is frozen during isDead, so in practice values are unchanged).
+    const fresh = gameState.value;
+    const weapon = WEAPON_PROFILES[fresh.player.equippedWeaponId];
+    const effective = getEffectiveStats(fresh.player.skillStacks, weapon, fresh.player.maxHp);
+    gameState.value = {
+      ...fresh,
+      isDead: false,
+      adRevivesUsed: fresh.adRevivesUsed + 1,
+      player: {
+        ...fresh.player,
+        hp: effective.maxHp,
+        x: fresh.canvasWidth / 2,
+        y: fresh.canvasHeight / 2,
+        invulnerableUntilMs: fresh.elapsedMs + INVULNERABLE_DURATION_MS,
+      },
+    };
+    setAdReviveLoading(false);
+  }, [gameState, adReviveLoading]);
 
   const handleRedeploy = useCallback(() => {
     // Reuses the same map data — Phase 7 will generate a fresh map per restart
@@ -2151,6 +2174,7 @@ export default function GameCanvas({ width, height, onReturnToMenu, starterSkill
           visible={displayIsDead}
           backpackStacks={displayBackpackStacks}
           adRevivesUsed={displayAdRevivesUsed}
+          adReviveLoading={adReviveLoading}
           onFreeRevive={handleFreeRevive}
           onAdRevive={handleAdRevive}
           onRedeploy={handleRedeploy}

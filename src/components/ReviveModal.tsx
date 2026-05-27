@@ -29,6 +29,8 @@ type Props = {
   backpackStacks: number;
   /** Ad revives used this run (0 = ad revive available, 1 = used). */
   adRevivesUsed: number;
+  /** True while a rewarded ad is loading/showing — disables button without dimming it. */
+  adReviveLoading: boolean;
   onFreeRevive: () => void;
   onAdRevive: () => void;
   onRedeploy: () => void;
@@ -39,6 +41,7 @@ export default function ReviveModal({
   visible,
   backpackStacks,
   adRevivesUsed,
+  adReviveLoading,
   onFreeRevive,
   onAdRevive,
   onRedeploy,
@@ -66,17 +69,17 @@ export default function ReviveModal({
           <Text style={styles.buttonText}>FREE REVIVE</Text>
         </TouchableOpacity>
 
-        {/* Phase 9 TODO: replace onPress body with rewarded ad flow.
-            On ad completion: apply revive effects (full HP, invuln, center respawn)
-            and increment adRevivesUsed. Currently stubs to adRevivesUsed = 1 on tap
-            with no revive effect, so the button greys immediately. */}
+        {/* adReviveLoading: button disabled but NOT dimmed during load (dim = permanently unavailable).
+            canAdRevive false: permanently dimmed after the one-per-run ad revive is used. */}
         <TouchableOpacity
           style={[styles.button, !canAdRevive && styles.buttonDisabled]}
           onPress={onAdRevive}
-          disabled={!canAdRevive}
+          disabled={!canAdRevive || adReviveLoading}
           activeOpacity={0.7}
         >
-          <Text style={styles.buttonText}>WATCH AD TO REVIVE</Text>
+          <Text style={styles.buttonText}>
+            {adReviveLoading ? 'LOADING...' : 'WATCH AD TO REVIVE'}
+          </Text>
         </TouchableOpacity>
 
         <TouchableOpacity
