@@ -35,7 +35,7 @@ Status legend:
 | 6 — Audio + atmospheric effects | ⚪ | | | | |
 | 7 — UI + persistence + analytics | ⚪ | | | | |
 | 8 — Helicopter boss + hazards | ⚪ | | | | |
-| 9 — Monetization + store submission | ⚪ | | | | |
+| 9 — Monetization Wiring + Ship Prep | 🟡 In Progress | 2026-05-27 | | | AdMob rewarded ads wired (Session 1) |
 
 ---
 
@@ -2224,11 +2224,36 @@ Phase 7 started. SafeAreaProvider registration shipped (commit 3c39cdf) — reso
 
 ---
 
-## Phase 9 — Monetization + store submission
+## Phase 9 — Monetization Wiring + Ship Prep
 
-**Goal:** AdMob integrated (rewarded ads + menu banner), Support the Dev IAP working, revive prompt on death, App Store and Google Play submission packages prepared.
+**Goal:** Monetization wiring (rewarded ads, Operator License IAP, upgrade modal), ship prep (icons, splash, EAS production build, store submission), and investigation (stutter, camera tracking, expo-av migration). See pending-work-inventory.md Phase 9 section for full scope.
 
-**Status:** Not started
+**Status:** 🟡 In Progress (started 2026-05-27)
+
+### Phase 9 — Session 1 (2026-05-27)
+
+**Status:** Per-phase audit + AdMob rewarded ad integration. 7 commits.
+
+**Shipped this session:**
+
+- **4fe4eec** — Phase 9 v3 pre-audit corrections (5 files: v3 context, inventory, strategy, progress-log Errata #5, FleaMarketScreen.tsx `[P8-STUB]` marker). Corrections: Loading Screen description, skill icons block, AdMob phase label, IAP row (expo-in-app-purchases → react-native-iap + SDK 54 note), flea market pool counts (25 → 24 in pool/rotation references only), audio asset counts, File Structure phase labels.
+- **6fd9e8c** — AdMob SDK init + `showRewardedAd()` in `monetization.ts`. Replaced Phase 1 stub: RNGMA test unit IDs populated, `initializeAdsSdk()` wired in App.tsx startup useEffect alongside audioEngine.init(), `showRewardedAd()` implemented as never-rejecting Promise with LOADED/EARNED_REWARD/CLOSED/ERROR event listeners + 10-second load timeout. Non-personalized ads by default (no ATT prompt, no UMP consent flow).
+- **e5deebe** — Touchpoint A: flea market WATCH AD wired to rewarded ad. `adLoading` state, loading UX ("LOADING..." label, disabled during load), `[P8-STUB]` immediate-grant replaced with real ad call.
+- **6bb8d4b** — Touchpoint B: WATCH AD TO REVIVE wired to rewarded ad. `adReviveLoading` state in GameCanvas threaded to ReviveModal as prop. On completion: full revive (hp = effective.maxHp, center respawn, invulnerableUntilMs). Loading UX: full opacity during load — dim (0.4) reserved for permanently used-up state.
+- **7774642** — Fix: Promise rejection bug. Synchronous throws from RNGMA (wrong event type) rejected the Promise, which killed both `settle()` and the timeout — button stuck forever. Fix: `settled`/`settle` declared before try-catch; all ad setup wrapped in try-catch so throws call `settle({ rewarded: false })` and surface in error log. `[RNGMA]` diagnostic logging added.
+- **c255a66** — Fix: `AdEventType.LOADED` → `RewardedAdEventType.LOADED`. RNGMA v16 throws if wrong event namespace used for rewarded-specific events. Confirmed via Metro: "use RewardedAdEventType.LOADED instead of AdEventType.LOADED." `timeoutId` also moved outside try-block so catch can clear it (eliminates dangling timer noise).
+- **3aca04b** — Cleanup: stripped `[RNGMA]` diagnostic logs. Permanent error logs retained (SDK init FAILED, ad load ERROR, ad.show() rejected, synchronous throw).
+
+**Device-verified:** Happy paths confirmed on both touchpoints. Test ads load, play, reward applies on completion — flea market grants `pendingAdSkill` (applied on next Deploy), revive restores full HP + center respawn. Per-raid gate verified (flea market ad slot locks until next raid). Per-run gate verified (WATCH AD TO REVIVE dims permanently after use). Two paths not verifiable with test ads: (1) dismiss path (A5 flea market, B4 revive) — Google test ads do not expose early dismiss (X button only appears after completion; dismiss code path deferred to real-ad exposure at ship time). (2) revive invuln window — not separately timed; re-verify at ship prep.
+
+**Ship-prep handoff (stage 6 — real-ID swap):**
+- `src/lib/monetization.ts` — `ADMOB_UNIT_IDS.rewardedAndroid` + `ADMOB_UNIT_IDS.rewardedIOS`: two lines, one file.
+- `app.json` AdMob plugin — `androidAppId` + `iosAppId`: marked `_phase9_todo`. One commit covers both locations.
+
+**Working norm reinforcement — verify external SDK API surface against the installed version before wiring.**
+CC's first-pass wiring used `AdEventType.LOADED` for the rewarded LOADED event. RNGMA v16 requires `RewardedAdEventType.LOADED` — the library threw explicitly at runtime with fix guidance in the error message. Root cause: CC's prior API knowledge predated RNGMA's event-type namespace split; the drift wasn't caught in pre-review because pre-review focused on behavior and structure, not exact constant names.
+
+Going forward: SDK integration prompts must include an explicit pre-review gate to verify constant and method names against the installed version's TypeScript types or current official docs. Do not rely on prior knowledge of the API. Applies especially to: Phase 9 stage 4 (react-native-iap — multiple platforms, multiple event types, sandbox testing); expo-av → expo-audio migration; any future third-party SDK wiring.
 
 ---
 

@@ -244,7 +244,7 @@ Design intent captured from strategy chat. Final decisions deferred to Phase 7 k
 
 ### Monetization
 - **Real IAP integration** (Apple/Google sandbox + receipt validation). Operator License unlock — real store product replacing Phase 8 stub.
-- **AdMob integration.** Rewarded ad SDK. Wire revive ad and pre-run buff ad touchpoints.
+✅ **AdMob integration.** Rewarded ad SDK. Wire revive ad and pre-run buff ad touchpoints. Shipped 2026-05-27 (6fd9e8c, e5deebe, 6bb8d4b, 7774642, c255a66, 3aca04b). Test ad unit IDs in place — swap to real IDs at ship prep (see Ship prep section below).
 - **Entitlement caching.**
 - **Ad network daily-limit and no-fill UX research.** Verify whether any app-imposed cap is needed; design the no-fill button state for when the ad network returns no fill. Phase 9 research item, not a blocker.
 - **Operator License upgrade screen (design locked 2026-05-27, implements in Phase 9 with real IAP).** Reached via UPGRADE button on main menu (currently disabled stub).
@@ -254,6 +254,7 @@ Design intent captured from strategy chat. Final decisions deferred to Phase 7 k
   - Supporting copy: "No ads, no subscriptions, no recurring charges. Your purchase supports an indie developer and keeps this game ad-free forever."
 
 ### Ship prep
+- **Real AdMob ID swap (ship prep gate — do before EAS production build).** Two locations, one commit: (1) `src/lib/monetization.ts` — `ADMOB_UNIT_IDS.rewardedAndroid` + `ADMOB_UNIT_IDS.rewardedIOS`; (2) `app.json` AdMob plugin config — `androidAppId` + `iosAppId` (marked `_phase9_todo`). Do not ship with test IDs.
 - **AdMob account.** $0, ready before Phase 9 work.
 - **Apple Developer account.** $99/yr, before Phase 9 ship prep.
 - **Google Play account.** $25 one-time, before Phase 9 ship prep.
