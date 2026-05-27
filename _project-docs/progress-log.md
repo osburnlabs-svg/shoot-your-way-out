@@ -2319,7 +2319,7 @@ Major decisions made during development that override or clarify the v3 doc.
 - **v3 says:** Install `expo-in-app-purchases` in Phase 1, configure in Phase 9 (with `react-native-iap` as a fallback if SDK 54 compat issues).
 - **Reality (confirmed during Phase 2 EAS dev build):** `expo-in-app-purchases` fails to compile against `expo-modules-core` 3.x (shipped with SDK 54). It imports `expo.modules.core.ExportedModule` and `expo.modules.core.interfaces.ExpoMethod`, both removed in the new architecture. The EAS cloud build fails at the Android compile step.
 - **Why the fallback existed in v3:** v3 anticipated this risk and named `react-native-iap` as the alternative. That alternative is now the plan.
-- **Action:** Package removed in Phase 2 hotfix via `npm uninstall expo-in-app-purchases`. The `lib/monetization.ts` interface is unchanged — Phase 9 will install `react-native-iap` and wire it through `purchaseSupport()` / `isSupportUnlocked()`. No other files reference the old package.
+- **Action:** Package removed in Phase 2 hotfix via `npm uninstall expo-in-app-purchases`. Phase 9 will install `react-native-iap`. **Phase 9 integration target:** `persistence.ts:isOperatorLicensed()` / `setOperatorLicensed()` (tagged `[P8-STUB]`, AsyncStorage-backed, introduced Phase 8) — these are what Phase 9 must replace with real IAP receipt validation. `monetization.ts:isSupportUnlocked()` is a disconnected Phase 1 stub (always returns `false`; never wired to live code) — Phase 9 should decide whether to retire that method or route through it. No other files reference the old package.
 - **Future template games (game #2+):** Do NOT install `expo-in-app-purchases`. Use `react-native-iap` from the start.
 
 ---

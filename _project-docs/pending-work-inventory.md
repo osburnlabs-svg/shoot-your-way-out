@@ -240,7 +240,7 @@ Design intent captured from strategy chat. Final decisions deferred to Phase 7 k
 - **Asset loading consolidation (texture atlases).** Replace individual useImage calls with TexturePacker atlas. Do NOT do earlier — final asset list isn't locked until end of Phase 8/9.
 - **Full codebase code review + optimization pass.** Folded from Phase 6 item 6 (scrapped session 2). Scope: entire codebase. Output format: findings-only report with disposition per finding (ship in Phase 9 / defer to v1.1 / scrap). Disposition rule for findings: ship only if risk-free + localized + (trivial-mechanical OR measurable perf win). All other findings defer or scrap. Hard constraints: no proposed changes to the 30fps cap, hybrid collision pools, or anything settled in Phase 5 stutter work.
 - **Late-game asset-dense stutter — investigate during code review.** Sporadic stutter observed in late-game (~5 min) in asset-dense map areas (Phase 7 playtest). Suspect ranking from Phase 7 CC analysis: (1) 100ms setInterval fanout × enemy slot occupancy — highest plausibility, first diagnostic is `performance.now()` bracket on setInterval body; (2) Sniper ramp sustaining `SNIPER_MAX_ACTIVE = 5` late-game; (3) Static prop collision density × enemy count; (4) Reanimated UI-thread GC churn; (5) Pickup slot saturation. Start with suspect 1 — low effort, high signal.
-- **Camera tracking smoothness — investigate during code review.** Late Phase 7 observation: fast left-right movement reveals black edges at viewport boundaries, suggesting the camera lags behind player position. Investigate whether camera lerp parameters need tuning or whether the map render area needs an extended buffer beyond the current viewport extents.
+- **Camera tracking smoothness — investigate during code review.** Late Phase 7 observation: fast left-right movement reveals black edges at viewport boundaries. Note: `cameraTransform` in `GameCanvas` is direct/zero-lag (`useDerivedValue` reads `player.x`/`player.y` every frame — no lerp exists). More likely culprit: the 100ms tile viewport culling timer drives React tile state, which lags up to 100ms behind actual player position during fast movement. Investigation should start at tile culling update cadence, not camera lerp parameters.
 
 ### Monetization
 - **Real IAP integration** (Apple/Google sandbox + receipt validation). Operator License unlock — real store product replacing Phase 8 stub.
@@ -263,7 +263,7 @@ Design intent captured from strategy chat. Final decisions deferred to Phase 7 k
 - **TestFlight submission (iOS).**
 - **Play Store submission (Android).**
 - **Reanimated polyfill upstream GitHub issue.** Stale-timestamp behavior in worklets RAF polyfill (root cause of Phase 7 speed-up bug, commit 016b1ad). Low priority — file post-launch or during Phase 9 if time allows. Not a blocker.
-- **expo-av → expo-audio migration.** expo-av is deprecated in SDK 54 (no current functional impact in SDK 53). Migrate during Phase 9 ship prep when the environment is changing anyway.
+- **expo-av → expo-audio migration.** expo-av is deprecated in SDK 54 (functional in current SDK — no breakage yet; expo-audio is the forward path). Migrate during Phase 9 ship prep when the environment is changing anyway.
 - **Custom PanResponder slider → `@react-native-community/slider`.** Settings volume sliders have minor drag-jank (touch tracking gaps). Migrate during Phase 9 APK rebuild — the native module rebuild is required for the package and happens anyway for ship prep.
 
 ## Phase 10 — Post-Launch Balance Pass

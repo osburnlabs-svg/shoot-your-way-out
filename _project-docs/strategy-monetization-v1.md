@@ -128,8 +128,8 @@ Separate pre-run ad path (unchanged): watch an ad → start with 1 random skill 
 
 ### 4.2 Flea market inventory (Phase 8 decisions locked 2026-05-25)
 
-**Skills (15 of 25 available per day):**
-- 15 of the 25-skill pool are available each day, rotating daily.
+**Skills (15 of 24 available per day):**
+- 15 of the 24-skill pool are available each day, rotating daily.
 - Layout: 5 rows × 3 columns grid.
 - Daily inventory seeded by device-local date (YYYY-MM-DD). Pure deterministic function — same 15 skills for all players on the same calendar day. Computed live on flea market open to handle midnight rollover during play.
 - Selecting a skill applies 1 stack of that skill when the next run starts.
@@ -149,7 +149,7 @@ Distribution: 7 premium / 9 standard / 9 cheap = 25 total. Prices tuned 2026-05-
 - Reuses existing skill card art — no new visual work needed
 - 5×3 grid of available skills for the day, each card showing skill name, icon, currency price, and BUY button
 - **Per-raid purchase gate:** Limited to 1 flea market purchase per raid. Purchase state held as `pendingPurchasedSkill: skillId | null` on persistent player data. When non-null, all BUY buttons are disabled and the purchased card shows a "PURCHASED" overlay. Slot survives app sessions (AsyncStorage, same pattern as money). Consumed and cleared on Deploy when the raid starts.
-- **WATCH AD button:** Lives inside the flea market screen alongside the purchased skill slot. Tapping grants a random skill from the 25-skill pool immediately (Phase 8: stubbed — no actual ad video; real AdMob integration is Phase 9). Per-raid gate via `pendingAdSkill: skillId | null`. When non-null, button is disabled and label reads "AD WATCHED." Same persistence behavior as `pendingPurchasedSkill` — survives app sessions, consumed on Deploy.
+- **WATCH AD button:** Lives inside the flea market screen alongside the purchased skill slot. Tapping grants a random skill from the 24-skill pool immediately (Phase 8: stubbed — no actual ad video; real AdMob integration is Phase 9). Note: Field Medic Kit excluded from this pool — on-select heal is a no-op at run start. Per-raid gate via `pendingAdSkill: skillId | null`. When non-null, button is disabled and label reads "AD WATCHED." Same persistence behavior as `pendingPurchasedSkill` — survives app sessions, consumed on Deploy.
 - **Max 2 starter skills per raid:** 1 from ad (random) + 1 from flea market (chosen). On Deploy: apply both pending slots if non-null, clear both, raid starts.
 - All players access without paywall
 
@@ -257,12 +257,12 @@ Honest rough estimate. Phase 5+ context (longer runs, more enemy types) changes 
 
 **Phase 8 — Flea market + daily login bonus**
 
-- Flea market UI screen (5×3 grid, 15-of-25 daily rotation, device-local date seed)
+- Flea market UI screen (5×3 grid, 15-of-24 daily rotation, device-local date seed)
 - Pre-run starter skill state on persistent player data
 - Daily login bonus logic: check `last_claim_date` on app launch, grant $1,000 (free) or $5,000 (paid) if a new calendar day, update `last_claim_date`
 - Paywall gate on login bonus amount (free: $1,000/day; paid: $5,000/day)
 - IAP stub: Operator License stubbed as hardcoded toggle for Phase 8 testing
-- Pre-run ad stub: WATCH AD button inside flea market screen. Phase 8: tap immediately grants a random skill from the 25-skill pool (no actual ad video). `pendingAdSkill: skillId | null` on persistent player data. Real AdMob integration is Phase 9.
+- Pre-run ad stub: WATCH AD button inside flea market screen. Phase 8: tap immediately grants a random skill from the 24-skill pool (no actual ad video). `pendingAdSkill: skillId | null` on persistent player data. Real AdMob integration is Phase 9.
 - Balance pass: tune currency drop rate, login bonus amounts, and item prices against actual Phase 7+ gameplay data
 
 **Phase 9 — Monetization foundation + ship prep**

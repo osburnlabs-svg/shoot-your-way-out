@@ -65,6 +65,7 @@ export default function FleaMarketScreen({ onBack }: Props) {
 
   const handleWatchAd = useCallback(async () => {
     if (pendingAdSkill !== null) return;
+    // [P8-STUB] Phase 9 replaces with rewarded ad flow (grep: P8-STUB)
     const grantedId = FLEA_MARKET_POOL[Math.floor(Math.random() * FLEA_MARKET_POOL.length)];
     setPendingAdSkill(grantedId);
     await persistence.setPendingAdSkill(grantedId);

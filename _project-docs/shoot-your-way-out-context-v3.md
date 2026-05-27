@@ -198,7 +198,7 @@ Shoot Your Way Out is **game #1 of a series of mobile games**. We are building a
 | Storage | `@react-native-async-storage/async-storage` | Standard mobile persistence |
 | Audio | `expo-av` | Music + SFX with concurrent playback, ships with Expo |
 | Ads | `react-native-google-mobile-ads` (AdMob) | Standard, supports rewarded + banner |
-| IAP | `expo-in-app-purchases` (or `react-native-iap` if SDK 54 compat issues) | TBD at Phase 9 |
+| IAP | `react-native-iap` | Phase 9 — `expo-in-app-purchases` confirmed incompatible with SDK 54 in Phase 2 hotfix |
 | Analytics | PostHog or Amplitude (free tier) | Decided at Phase 1 |
 | Routing | Plain React state (no `expo-router`) | ~5-6 screens (Main Menu, Loading, Game, Pause, Game Over, Settings stub), file-based routing is overkill |
 | Frame rate | 30fps cap via time accumulator (Phase 5.5) | SurfaceFlinger buffer stuffing at 60fps caused stutter — 30fps is the fix, not a constraint |
@@ -249,9 +249,9 @@ Native modules ship as compiled C++/Java/Kotlin paired with JS bindings. The two
 - [x] Both asset kits acquired and audited
 - [ ] Apple Developer account (needed at Phase 9, not before)
 - [ ] Google Play account (needed at Phase 9, not before)
-- [ ] AdMob account (needed at Phase 6 for monetization integration)
-- [ ] Music tracks sourced (4 tracks needed, see Audio section)
-- [ ] SFX library sourced (~25 sounds, see Audio section)
+- [ ] AdMob account (needed at Phase 9 for monetization integration)
+- [x] Music tracks sourced (5 tracks: 1 menu loop + 4 combat tracks, Pixabay — shipped Phase 8)
+- [x] SFX library sourced (6 sounds, Kronbits CC0 — shipped Phase 8)
 
 ---
 
@@ -403,15 +403,7 @@ See `src/data/skills.ts` for the canonical 25-skill pool — names, descriptions
 
 **Phase 8 starter skill injection:** `createInitialGameState` accepts an optional `starterSkills: SkillId[]` parameter. `App.tsx` reads `pendingAdSkill` and `pendingPurchasedSkill` from AsyncStorage on Deploy, passes them through `GameScreen → GameCanvas → createInitialGameState`, then clears both slots. Max 2 starter skills per run.
 
-**Skill icons:** the kit's Upgrade Preset already shows weapons + heart (HP) + armor + helmet. We extend by reusing icon archetypes:
-- Damage skills → bullet/ammo icon
-- Range skills → optic/scope icon (use one of the rifle silhouettes)
-- Defense skills → armor/helmet/heart icons
-- Throwables → grenade silhouette (we'll create from grenade launcher rocket sprite)
-- Movement → speed icon
-- Specials → unique colored badges
-
-This is acceptable for v1. Generating 20 unique pixel-art icons isn't necessary — Vampire Survivors uses very simple icons too.
+**Skill icons:** See `GuiSprites.skillIcons` in `src/lib/sprites.ts` for the canonical skill icon mapping — individual 64×64 PNGs per skill, keyed by `SkillId`. That mapping is authoritative; do not maintain an archetype list here.
 
 ### Enemies
 
@@ -569,11 +561,11 @@ Scope locked in `pending-work-inventory.md` Phase 7 section (commit 8913333, 202
 
 ## Screens & Flow
 
-App.tsx screen states (Phase 8): `'menu' | 'loading' | 'game' | 'flea_market' | 'settings'`. Pause and Game Over are overlays rendered on top of the game screen — they are NOT separate screen states in the state machine. `PauseScreen.tsx` and `GameOverScreen.tsx` exist as zombie stub files (`return null`) that are not referenced by `App.tsx`. Pre-Run Modal deferred to Phase 9 (when ad SDK is wired). All screens are custom builds using kit color palette (`#0a0d08`, `#c9a356`, `#cc3333`) and VT323 pixel font. No kit layout PNGs — kit-UI direction abandoned May 12 2026 (progress log line 53).
+App.tsx screen states (Phase 8): `'menu' | 'loading' | 'game' | 'flea_market' | 'settings'`. Pause and Game Over are overlays rendered on top of the game screen — they are NOT separate screen states in the state machine. `PauseScreen.tsx` and `GameOverScreen.tsx` exist as zombie stub files (`return null`) that are not referenced by `App.tsx`. All screens are custom builds using kit color palette (`#0a0d08`, `#c9a356`, `#cc3333`) and VT323 pixel font. No kit layout PNGs — kit-UI direction abandoned May 12 2026 (progress log line 53).
 
 **Main Menu.** Background image at `assets/ui/screens/MainMenu.png`. Persistent money display — live value from `syo_flea_currency` (AsyncStorage, wired Phase 7). Buttons in vertical stack: DEPLOY (primary, functional — triggers loading screen then game), FLEA MARKET (active `<Pressable>`, Phase 8 — navigates to `'flea_market'` screen), UPGRADE (disabled stub — wires in Phase 9 alongside real IAP), SETTINGS (active `<Pressable>`, Phase 8 — navigates to `'settings'` screen). No meta-stats panel — concept scrapped, persistent money display replaces it.
 
-**Loading Screen.** Bridges the blank-frame gap on GameCanvas mount. Background image at `assets/ui/screens/LoadingScreen.png`. Triggered after Deploy button tap on main menu (NOT on app cold start — Expo splash handles cold start, swap planned for Phase 9 ship prep). Content: game logo placeholder until Phase 9 logo art lands, "Loading..." text with cycling dots animation (`.`, `..`, `...` at ~400ms via setState), random tip text chosen on mount from a 15–20 tip array (does not rotate during a single load).
+**Loading Screen.** Bridges the blank-frame gap on GameCanvas mount. Background image at `assets/ui/screens/LoadingScreen.png`. Triggered after Deploy button tap on main menu (NOT on app cold start — Expo splash handles cold start, swap planned for Phase 9 ship prep). Content: "DEPLOYING IN" label + 3-second countdown (3 → 2 → 1 via useState). Auto-advances via onComplete when countdown completes. Logo art deferred to Phase 9 ship prep.
 
 **Game.** Existing GameCanvas. HUD shipped Phase 7 (custom build, kit palette + VT323). See HUD scope in `pending-work-inventory.md` (locked commit 8913333).
 
@@ -702,8 +694,8 @@ shoot-your-way-out/
       mapLoader.ts               — render procedurally generated map data (tiles, obstacles, structures)
       pathfinding.ts             — simple enemy AI movement
       collision.ts               — entity-vs-entity, entity-vs-obstacle
-      audioEngine.ts             — music + SFX (stubbed Phase 1, full Phase 6)
-      monetization.ts            — ads + IAP abstraction (Phase 6)
+      audioEngine.ts             — music + SFX (stubbed Phase 1, full Phase 8)
+      monetization.ts            — ads + IAP abstraction (Phase 9)
       analytics.ts               — event logging (Phase 7)
       persistence.ts             — AsyncStorage typed wrapper
     data/
@@ -769,8 +761,8 @@ shoot-your-way-out/
       bonus/
       icons/                     — app store icons
     audio/
-      music/                     — 4 tracks (TBD)
-      sfx/                       — ~25 sounds (TBD)
+      music/                     — 5 tracks (Pixabay, shipped Phase 8)
+      sfx/                       — 6 sounds (Kronbits CC0, shipped Phase 8)
       ui/                        — button clicks, transitions
     fonts/                       — pixel font for HUD and titles
 ```
@@ -1021,9 +1013,9 @@ npx expo install react-native-gesture-handler
 npx expo install expo-av
 npx expo install @react-native-async-storage/async-storage
 
-# Monetization (Phase 6 will configure, install now)
+# Monetization (Phase 9 will configure, install now)
 npx expo install react-native-google-mobile-ads
-npx expo install expo-in-app-purchases
+# NOTE: expo-in-app-purchases removed — incompatible with SDK 54 (Phase 2 hotfix). Use react-native-iap in Phase 9.
 
 # Analytics (Phase 7 will configure)
 npm install posthog-react-native
