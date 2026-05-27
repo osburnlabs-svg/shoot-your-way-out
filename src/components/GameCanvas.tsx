@@ -964,11 +964,14 @@ export default function GameCanvas({ width, height, onReturnToMenu, starterSkill
   }, [heliActive]);
 
   // ─── Audio: footsteps (350ms interval while player is moving) ─────────────
+  // Modal states are deps so the interval is cleared (via cleanup) when any
+  // modal opens, and re-established when it closes — stopAllSFX() alone only
+  // kills the currently-playing sound, not the interval that spawns the next one.
   useEffect(() => {
-    if (!spriteState.isMoving) return;
+    if (!spriteState.isMoving || displayPendingLevelUp || displayIsDead || displayCrateReveal) return;
     const id = setInterval(() => audioEngine.playSFXJS('footstep'), 350);
     return () => clearInterval(id);
-  }, [spriteState.isMoving]);
+  }, [spriteState.isMoving, displayPendingLevelUp, displayIsDead, displayCrateReveal]);
 
   // ─── Audio: cut all SFX when modals open (action sounds bleed through) ────
   useEffect(() => {
@@ -978,6 +981,10 @@ export default function GameCanvas({ width, height, onReturnToMenu, starterSkill
   useEffect(() => {
     if (displayIsDead) audioEngine.stopAllSFX();
   }, [displayIsDead]);
+
+  useEffect(() => {
+    if (displayCrateReveal) audioEngine.stopAllSFX();
+  }, [displayCrateReveal]);
 
   // ─── Per-slot enemy transforms (UI thread, no runOnJS) ────────────────────
   // One useDerivedValue per slot. Only slots with an active enemy are rendered
