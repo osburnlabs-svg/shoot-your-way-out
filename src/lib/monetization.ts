@@ -65,6 +65,9 @@ export function showRewardedAd(): Promise<{ rewarded: boolean }> {
       resolve(result);
     }
 
+    // Declared outside try so the catch block can clear it if setup throws before load().
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
+
     try {
       const adUnitId = Platform.OS === 'ios'
         ? ADMOB_UNIT_IDS.rewardedIOS
@@ -73,13 +76,15 @@ export function showRewardedAd(): Promise<{ rewarded: boolean }> {
       const ad = RewardedAd.createForAdRequest(adUnitId);
 
       // 10-second load timeout — covers slow networks, no-fill, and silent SDK failures.
-      const timeoutId = setTimeout(() => {
+      timeoutId = setTimeout(() => {
         // [DIAG] Remove after verifying timeout path vs event-driven path in Metro.
         console.warn('[RNGMA] Ad load timed out after 10s — settling false');
         settle({ rewarded: false });
       }, 10_000);
 
-      ad.addAdEventListener(AdEventType.LOADED, () => {
+      // RewardedAd uses RewardedAdEventType.LOADED, not the generic AdEventType.LOADED.
+      // RNGMA v16 throws synchronously if the wrong namespace is used.
+      ad.addAdEventListener(RewardedAdEventType.LOADED, () => {
         // [DIAG] Remove after confirming LOADED fires correctly.
         console.log('[RNGMA] Ad LOADED — calling show()');
         clearTimeout(timeoutId);
@@ -113,10 +118,10 @@ export function showRewardedAd(): Promise<{ rewarded: boolean }> {
       ad.load();
     } catch (e) {
       // Catches synchronous throws from createForAdRequest / addAdEventListener / load().
-      // Most likely cause: SDK not initialized when load() is called.
-      // Previously this throw would reject the Promise, kill the timeout, and
-      // leave the button stuck in LOADING forever. Now it resolves false cleanly.
-      console.error('[RNGMA] showRewardedAd synchronous throw (SDK not initialized?):', e);
+      // Clear the timeout if it was set before the throw — prevents a dangling no-op
+      // settle() call 10 seconds later and the associated log noise.
+      if (timeoutId !== undefined) clearTimeout(timeoutId);
+      console.error('[RNGMA] showRewardedAd synchronous throw:', e);
       settle({ rewarded: false });
     }
   });
