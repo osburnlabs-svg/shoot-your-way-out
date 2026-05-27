@@ -2088,7 +2088,7 @@ Phase 7 started. SafeAreaProvider registration shipped (commit 3c39cdf) — reso
 
 **Goal:** Two remaining gameplay mechanics before production work begins in Phase 9: flea market (skills only, 15-of-25 daily rotation, per-skill pricing, per-raid gate, pre-run ad stub) and audio (SFX coverage, music layers, sourcing strategy — brainstorm before implementation). Daily login bonus and Operator License IAP stub also land in this phase. See pending-work-inventory.md Phase 8 section for full scope. See strategy-monetization-v1.md §4 for flea market design.
 
-**Status:** 🟡 In progress — flea market shipped, audio + daily bonus + IAP pending (started 2026-05-26)
+**Status:** ✅ Complete (2026-05-27) — flea market shipped 2026-05-26; daily bonus, IAP stub, audio, and Settings shipped 2026-05-27
 
 ### Phase 8 — Session 1 (2026-05-26)
 
@@ -2166,6 +2166,61 @@ Phase 7 started. SafeAreaProvider registration shipped (commit 3c39cdf) — reso
 **Working norms reinforced:** Sticky-header pushback held (CC's initial plan put header inside scroll view; pushback argued money and back button are highest-pressure info and must stay visible during scroll). Single-large-commit pushback held (CC's initial plan had Part 2 Commit C bundling grid render + all interactivity + all gate logic; pushback yielded C1/C2 split — static screen verifiable independently from state mutation logic). Two real bugs caught: Field Medic Kit no-op caught by design discussion, HP init bug caught by code review. Both fixed cleanly in single small commits.
 
 *Session-level note: One of the cleanest implementation sessions in project history. 9 commits across two implementation parts plus 2 follow-up bug-fix commits = 11 commits total for the flea market deliverable. Zero reverts. Zero scope expansion. Felt-good UX on first device test. Pre-review + checkpoint discipline + Part 1/Part 2 split + commit-level rollback granularity all contributed.*
+
+---
+
+### Phase 8 — Session 4 (2026-05-27)
+
+**Status:** Daily Login Bonus + Operator License Stub. 4 commits.
+
+**Shipped this session:**
+
+- **30d9333** — Persistence stub: Operator License helpers (`isOperatorLicensed`, `setOperatorLicensed` `[P8-STUB]`) + `clearLastClaimDate` diagnostic helper `[P8-DIAG]`.
+- **13f82b0** — Daily bonus auto-claim on menu mount: `useEffect` with `active`-flag cancellation; Operator License stub wired to bonus amount ($1K free / $5K operator); toast notification with `Animated` fade-in / hold / fade-out.
+- **40e9b3f** — Toast duration fix: 200ms in / 4500ms hold / 500ms out (5.2s total); text bumped to 26px. Previous 2.5s total was too short to read.
+- **b86ef84** — `[P8-DIAG]` cleanup: `clearLastClaimDate` and `global.__p8Diag*` helpers removed. Operator License helpers retained as `[P8-STUB]` (Phase 9 replaces with real IAP receipt check).
+
+**Device-verified:** $1K cold-start daily bonus path, toast at 5.2s duration, once-per-day gate, persistence across restart. Operator $5K path unverified (one-branch code, no practical path to exercise it at Phase 8; acceptable risk).
+
+**Notes:**
+
+- UPGRADE button on main menu intentionally left as disabled stub — wires alongside real IAP in Phase 9.
+- Hermes debugger helpers (`global.__p8DiagResetBonus`, `global.__p8DiagSetOperator`) failed with "Property 'global' doesn't exist" in Metro Hermes console. Daily bonus verified via natural cold-start flow instead.
+
+**Working norm reinforcement:** Cleanup commit `b86ef84` landed without a verification gate between `40e9b3f` (toast fix) and the cleanup — this is the primary issue: CC self-approved the removal of diagnostic helpers before Mo re-verified the toast change, bypassing the gate. Separately and independently, the Hermes debugger helper failure made programmatic re-triggering impossible regardless of whether the helpers still existed. Either gap alone would have blocked verification; both combined made it impossible. Pre-review checkpoint discipline applies between every commit in a multi-commit sequence, not just the initial implementation approval. Cleanup and removal commits wait for Mo's explicit go-ahead after verification of the working state.
+
+---
+
+### Phase 8 — Session 5 (2026-05-27)
+
+**Status:** Audio System + Settings Panel. 7 commits.
+
+**Shipped this session:**
+
+- **832240b** — Audio engine: complete expo-av implementation. Menu loop (looping), combat track rotation (4 tracks, last-played exclusion), fire-and-forget SFX (self-unloads on finish). `playSFX` carries `'worklet'` directive via `runOnJS` bridge; `playSFXJS` for JS-thread callers. App.tsx: `audioEngine.init()` on mount with persisted volumes; `audioReady` state flag gates music routing until `init()` resolves so persisted volume is applied before first track starts.
+- **e8fa684** — SFX wiring: `combatEngine.ts` (shoot / shoot_flamethrower / explosion per weapon type; rocket fires silently on launch, explosion on detonation); `throwableEngine.ts` (explosion at frag and molotov landing; smoke silent per locked spec); `GameCanvas.tsx` (footstep 350ms interval on `spriteState.isMoving`; `heli_ambient` single-shot on flyover start).
+- **64390d6** — Settings screen: custom PanResponder slider (no native dependency, no APK rebuild), music + SFX volume sliders, Pixabay/Kronbits credits section. SETTINGS button promoted from disabled stub to active `<Pressable>`. Settings routing wired in App.tsx (`'settings'` screen state).
+- **10b1bc4** — Credits attribution filled: MUSIC — Pixabay (Emmraan, OpenMindAudio, Tunetank, Alex_Kizenkov, AlexGrohl); SOUND EFFECTS — Kronbits CC0 (kronbits.itch.io/freesfx).
+- **3430fdc** — Volume persistence bug fix: `playMusic()` was racing ahead of `init()` on mount — `createAsync` received the default `_musicVol = 0.7` before `persistence.getSettings()` resolved. Fix: `audioReady` flag gates music routing until `init()` promise resolves.
+- **e5a62b7** — SFX stop on modal open: `_activeSFX: Set<Audio.Sound>` registry in audioEngine; `stopAllSFX()` kills all in-flight sounds. `useEffect` triggers on `displayPendingLevelUp` (LevelUpModal) and `displayIsDead` (ReviveModal).
+- **cefd002** — SFX stop extended: footstep interval clears on modal open (modal states added to footstep `useEffect` deps + guard — `stopAllSFX()` alone cut the in-flight sound but the interval kept spawning new ones at 350ms); `displayCrateReveal` (CrateRevealModal) added as third modal trigger.
+
+**Device-verified:** Full audio across menu/raid/modal transitions. Music continues through all three modals; SFX cuts cleanly on level-up, death, and crate reveal. Volume persistence works on startup. Settings sliders apply in real time. Credits render correctly. SFX-stop audit (read-only, no commit) confirmed no dead code: interval-clear and stopAllSFX address distinct moments (future spawns vs. currently-playing sound) and are both needed.
+
+**Assets:** 5 music tracks (Pixabay, MP3) + 6 SFX (Kronbits CC0, MP3 converted from WAV via cloudconvert). All in `assets/audio/music/` and `assets/audio/sfx/`.
+
+**Settings panel pulled from Phase 9 into Phase 8** — resolution to the open question from commit 26e2bae (audio without volume control on day one is bad UX; two options were on the table; Settings pulled in).
+
+**Notes:**
+
+- expo-av deprecation warning (SDK 54 targets expo-audio as replacement; no functional impact in current SDK). Deferred to Phase 9 ship prep.
+- Custom PanResponder slider has minor drag-jank (touch tracking gaps). Deferred to Phase 9 — migrate to `@react-native-community/slider` during APK rebuild for ship prep.
+- SFX-stop cleanup audit (read-only, no commit): 3 cosmetic findings deferred — stale `stopAllSFX` comment, three separate `useEffect` blocks vs. one combined, implicit effect ordering. Deferred per lean-toward-easiest principle.
+
+**Working norm reinforcements:**
+
+- *"Don't stack fixes" refinement.* Incomplete verification of a fix is the same problem as a broken fix. When extending or cleaning up, the starting point must be a confirmed-working state, not a believed-working state. The second commit's relationship to the original problem is ambiguous either way. Either fully verify before extending, or revert and reland clean.
+- *Default-in for cross-cutting fixes on a class.* When applying a behavior to a class of items (modals that pause gameplay), apply universally by default. CrateRevealModal was wrongly excluded from initial SFX-stop scope on an aesthetic distinction ("moment of focus, not a pause") that didn't survive device use. Structural identity — gameplay freezes, modal appears, player has a decision — is the right inclusion criterion.
 
 ---
 

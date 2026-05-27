@@ -177,7 +177,7 @@ Design intent captured from strategy chat. Final decisions deferred to Phase 7 k
 
 ## Phase 8 — Gameplay Mechanics: Flea Market + Audio
 
-Two remaining gameplay mechanics before production work begins in Phase 9.
+✅ **Phase 8 fully complete (2026-05-27).** Flea market shipped 2026-05-26; daily bonus, IAP stub, audio, and Settings shipped 2026-05-27.
 
 ### Flea market (scope locked 2026-05-25; pricing locked 2026-05-26)
 ✅ **Shipped 2026-05-26** across 11 commits (f0983ea, 993b3f6, 5954440, dee9b13, 0cf7a64, 60cfaf4, f02c6e4, a4f5321, 8c81c05, 35bd7b4, 08a3a7b). 5×3 grid with 15-of-25 daily rotation seeded by device-local date; per-skill pricing ($5K/$3K/$2K tiers); per-raid purchase gate via `pendingPurchasedSkill` slot; WATCH AD stub with per-raid gate via `pendingAdSkill` slot; max 2 starter skills per raid (1 ad + 1 purchase) consumed on Deploy; Field Medic Kit excluded from starter pool (no-op at full HP); HP initialization bug fixed for passive maxHpAdd starters.
@@ -200,6 +200,7 @@ Two remaining gameplay mechanics before production work begins in Phase 9.
 - **Max 2 starter skills per raid:** 1 from ad (random) + 1 from flea market (chosen). On Deploy: apply both pending slots if non-null, clear both, raid starts.
 
 ### Daily bonus + time handling (scope locked 2026-05-25)
+✅ **Shipped 2026-05-27** (commits 30d9333, 13f82b0, 40e9b3f, b86ef84). Auto-claim on menu mount with toast; $1K free / $5K Operator License; once-per-day gate via `lastClaimDate`; Operator License hardcoded as `[P8-STUB]` toggle, Phase 9 replaces with real IAP.
 - Device-local date, not UTC, not server time.
 - No anti-cheese mechanics — accept that some players will time-cheese.
 - Shared helper: getTodayKey() returns "YYYY-MM-DD". Consumed by both flea market and daily bonus.
@@ -207,10 +208,12 @@ Two remaining gameplay mechanics before production work begins in Phase 9.
 - Values per Phase 7 closure: $1K free / $5K Operator License.
 
 ### IAP stub for Phase 8 testing
+✅ **Shipped 2026-05-27** (see daily bonus commits). AsyncStorage boolean `syo_operator_licensed`, tagged `[P8-STUB]`.
 - Operator License unlock is stubbed (hardcoded toggle).
 - Real IAP integration moved to Phase 9.
 
 ### Pre-run ad (stubbed for Phase 8)
+✅ **Shipped 2026-05-26** (included in flea market commits). WATCH AD grants random skill from 24-skill pool immediately; per-raid gate via `pendingAdSkill`.
 - WATCH AD button lives inside the flea market screen, sibling to the purchased skill slot.
 - Phase 8 stub behavior: tap immediately grants a random skill from the 24-skill pool (Field Medic Kit excluded — no-op at full HP; no actual ad video).
 - Per-raid gate: `pendingAdSkill: skillId | null` on persistent player data. Non-null → button disabled, label reads "AD WATCHED." Survives app sessions; consumed and cleared on Deploy.
@@ -218,16 +221,18 @@ Two remaining gameplay mechanics before production work begins in Phase 9.
 - If ad-granted skill matches purchased skill, they stack normally (existing skill stacking mechanic, no special handling).
 
 ### State model — persistent player data fields (Phase 8)
+✅ **All fields shipped** (across Phase 8 commits).
 - `money: number` — already shipped Phase 7 (key `syo_flea_currency`)
 - `pendingPurchasedSkill: skillId | null` — new Phase 8; flea market purchase slot
 - `pendingAdSkill: skillId | null` — new Phase 8; pre-run ad slot
 - `lastClaimDate: 'YYYY-MM-DD' | null` — new Phase 8; daily bonus claim tracking
 
-### Audio (no decisions locked — brainstorm needed)
-- SFX coverage, music layers, sourcing strategy (royalty-free vs. commissioned vs. AI), implementation library (expo-av is in stack).
-- Brainstorm at Phase 8 mid-point after flea market ships.
+### Audio (shipped Phase 8 Session 5)
+✅ **Shipped 2026-05-27** (commits 832240b, e8fa684, 64390d6, 10b1bc4, 3430fdc, e5a62b7, cefd002). expo-av, iOS silent switch override, 1 menu loop + 4 combat track rotation (Pixabay), 6 SFX categories (Kronbits CC0), Settings volume sliders persisted. See Audio System section in v3 doc for full details.
 
 ## Phase 9 — Ship Prep, Monetization, Engine Cleanup
+
+**Phase 9 scope direction (locked 2026-05-27): hookup + investigate, not refactor + optimize.** The game is functionally complete after Phase 8. Phase 9 is: monetization wiring (real IAP, real AdMob, upgrade modal), ship prep (icons, splash, store assets, EAS production build, TestFlight/Play Store submission), and investigative work (late-game stutter diagnosis, camera tracking diagnosis, expo-av migration). Investigation results drive disposition — refactor work only lands if investigation surfaces a clear player-felt problem AND the fix is low-risk and localized. Speculative refactoring for code-health reasons is out of scope. Per the "lean toward easiest implementation" working norm.
 
 ### Engine cleanup
 - **UI-thread worklet GC allocation churn.** 36k-60k objects/sec → 2-4ms GC pauses. Engine-wide mutable-state refactor. SKIP if targeted object pooling in Phase 5.5 already resolved stuttering.
@@ -242,6 +247,11 @@ Two remaining gameplay mechanics before production work begins in Phase 9.
 - **AdMob integration.** Rewarded ad SDK. Wire revive ad and pre-run buff ad touchpoints.
 - **Entitlement caching.**
 - **Ad network daily-limit and no-fill UX research.** Verify whether any app-imposed cap is needed; design the no-fill button state for when the ad network returns no fill. Phase 9 research item, not a blocker.
+- **Operator License upgrade screen (design locked 2026-05-27, implements in Phase 9 with real IAP).** Reached via UPGRADE button on main menu (currently disabled stub).
+  - Headline: BECOME AN OPERATOR
+  - Subhead: One-time purchase (price TBD, $4.99 illustrative — see open question in strategy doc §9)
+  - Visual: side-by-side bonus comparison (Free $1,000/day vs. Operator $5,000/day)
+  - Supporting copy: "No ads, no subscriptions, no recurring charges. Your purchase supports an indie developer and keeps this game ad-free forever."
 
 ### Ship prep
 - **AdMob account.** $0, ready before Phase 9 work.
@@ -253,6 +263,8 @@ Two remaining gameplay mechanics before production work begins in Phase 9.
 - **TestFlight submission (iOS).**
 - **Play Store submission (Android).**
 - **Reanimated polyfill upstream GitHub issue.** Stale-timestamp behavior in worklets RAF polyfill (root cause of Phase 7 speed-up bug, commit 016b1ad). Low priority — file post-launch or during Phase 9 if time allows. Not a blocker.
+- **expo-av → expo-audio migration.** expo-av is deprecated in SDK 54 (no current functional impact in SDK 53). Migrate during Phase 9 ship prep when the environment is changing anyway.
+- **Custom PanResponder slider → `@react-native-community/slider`.** Settings volume sliders have minor drag-jank (touch tracking gaps). Migrate during Phase 9 APK rebuild — the native module rebuild is required for the package and happens anyway for ship prep.
 
 ## Phase 10 — Post-Launch Balance Pass
 

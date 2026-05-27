@@ -21,6 +21,14 @@ This project is built by a non-technical solo developer working with Claude as t
 
 **Verification is on-device, by hand.** No automated tests. Mo runs each group's code on a physical device and reports back. This means each group must be independently verifiable — clean state, single visible change, no stacked speculative fixes.
 
+**Verification precedes cleanup.** In multi-commit sequences with verification gates, cleanup and removal commits wait for Mo to verify the working state. A cleanup commit that removes diagnostic helpers before Mo re-verifies is a self-approval — it bypasses the gate. This applies even when the cleanup feels obviously safe: the scaffolding exists precisely so the working state can be confirmed; removing it before confirmation defeats its purpose.
+
+*What this protects.* Scaffolding that enables verification of a working state must outlive that verification, not precede it.
+
+**"Don't stack fixes" refinement.** Incomplete verification of a fix is the same problem as a broken fix. When extending or cleaning up after a fix, the starting point must be a confirmed-working state, not a believed-working state. If the fix hasn't been fully verified, the second commit's relationship to the problem is ambiguous — it may be extending a correct fix or masking an incomplete one. Either fully verify before extending, or revert and reland clean.
+
+*What this protects.* A two-commit fix where only the combined result was verified can't be cleanly rolled back. Rollback granularity depends on each commit being independently verified.
+
 **Sessions can overflow phase boundaries.** The original plan was "one CC session per phase." Reality is closer to "one CC session per group, with overflow allowed when bugs emerge that cross framework boundaries." Mo runs one chat session per phase as the strategic context anchor; CC sessions are spawned as needed for execution. The discipline that matters is "one verifiable change per commit" and "diagnose before fixing," not session count.
 
 **Communication style:** Mo prefers honest tradeoffs over confident recommendations. If two approaches are reasonable, say so. If you're uncertain, say so. Don't bury caveats. Don't paper over disagreements with the docs — the doc has known errata and Mo will catch drift faster than you will.
@@ -81,11 +89,19 @@ Each doc update is its own focused commit, separate from code commits. Same sing
 
 **When stages overlap.** Sometimes stage 1 and stage 2 collapse together — a tiny fix where the decision is obvious and the prompt is two lines. That's fine. The discipline isn't about adding ceremony to small tasks; it's about not skipping the checkpoint on tasks that actually need it. When in doubt, do all three stages. The cost of an unnecessary confirmation step is 30 seconds; the cost of a missed one can be hours.
 
+**Pre-review checkpoint applies to every approval step in a multi-commit sequence.** A single go-ahead at the start of a multi-commit group does not cover subsequent commits. When commits in a sequence have verification gates between them — working-state commit, then cleanup commit — each gate requires an explicit go-ahead from Mo before proceeding. This includes commits that appear to be pure cleanup or removal: if the cleanup removes something Mo needed to re-verify the working state, it is not pure cleanup.
+
+*What this protects.* Each verification gate exists because the state change it guards is meaningful. Skipping a gate when CC judges the next step safe teaches the wrong pattern — gates are not optional when the cost of bypassing them is low.
+
 **Lean toward easiest implementation where possible.** When evaluating any decision — design, scope, or implementation — "easiest" is a primary axis, not a tiebreaker. If a more polished option costs meaningful complexity vs. a good-enough option, default to good-enough. Time-to-ship is a real cost; "we could do better" is not always worth paying for. Mo is willing to make exceptions on features if the more difficult path is genuinely warranted.
 
 *Exception: when "easier now" creates rework later, the "easier" frame is false — it's relocating work and adding revert risk in between. Name the relocation cost when proposing easy paths; Mo decides whether to override.*
 
 *What this protects.* Complexity creep. The gap between "works" and "elegant" is expensive and often invisible in a playtest. Default to shipping the thing that works.
+
+**Default-in for cross-cutting fixes on a class.** When applying a fix or behavior to a class of items (e.g., modals that pause gameplay, call sites that cross a thread boundary), apply to all members of the class by default. Exclude explicitly only when there is a documented functional reason — not an aesthetic distinction. Exclusions made before device use are often wrong; structural identity (gameplay freezes, modal appears, player decides) is the right inclusion criterion.
+
+*What this protects.* Follow-up commits that re-apply what was initially excluded without justification. Including by default and excluding with explicit reasoning keeps the class complete on the first pass.
 
 **Kit-first principle (in-world assets only).** The asset kits (`tds-modern-hero-weapons-and-props`, `tds-modern-tilesets-environment`, and the civilian cars pack) are the canonical source for in-world visual content — sprites for weapons, enemies, throwables, props, vehicles, environment, particle effects. Before building any custom in-world sprite or visual effect, check the kit first. If the kit ships an asset that fits the need, use the kit asset. Custom in-world art is only justified when no kit asset is appropriate AND the alternative is blocking progress. When a custom in-world asset is used as a temporary stub, call it out in the progress log so it doesn't get forgotten.
 
@@ -553,9 +569,9 @@ Scope locked in `pending-work-inventory.md` Phase 7 section (commit 8913333, 202
 
 ## Screens & Flow
 
-Actual App.tsx screen states (Phase 7): `'menu' | 'loading' | 'game'`. Pause and Game Over are overlays rendered on top of the game screen — they are NOT separate screen states in the state machine. `PauseScreen.tsx` and `GameOverScreen.tsx` exist as zombie stub files (`return null`) that are not referenced by `App.tsx`. Phase 8 extends the type to add `'flea_market'`. Pre-Run Modal deferred to Phase 9 (when ad SDK is wired). All Phase 7 screens are custom builds using kit color palette (`#0a0d08`, `#c9a356`, `#cc3333`) and VT323 pixel font. No kit layout PNGs — kit-UI direction abandoned May 12 2026 (progress log line 53).
+App.tsx screen states (Phase 8): `'menu' | 'loading' | 'game' | 'flea_market' | 'settings'`. Pause and Game Over are overlays rendered on top of the game screen — they are NOT separate screen states in the state machine. `PauseScreen.tsx` and `GameOverScreen.tsx` exist as zombie stub files (`return null`) that are not referenced by `App.tsx`. Pre-Run Modal deferred to Phase 9 (when ad SDK is wired). All screens are custom builds using kit color palette (`#0a0d08`, `#c9a356`, `#cc3333`) and VT323 pixel font. No kit layout PNGs — kit-UI direction abandoned May 12 2026 (progress log line 53).
 
-**Main Menu.** Background image at `assets/ui/screens/MainMenu.png`. Persistent money display — live value from `syo_flea_currency` (AsyncStorage, wired Phase 7). Buttons in vertical stack: DEPLOY (primary, functional — triggers loading screen then game), FLEA MARKET (disabled stub, Phase 8 — will become `<Pressable>` setting screen to `'flea_market'`), UPGRADE (disabled stub, Phase 8), SETTINGS (disabled stub, Phase 9). No meta-stats panel — concept scrapped, persistent money display replaces it.
+**Main Menu.** Background image at `assets/ui/screens/MainMenu.png`. Persistent money display — live value from `syo_flea_currency` (AsyncStorage, wired Phase 7). Buttons in vertical stack: DEPLOY (primary, functional — triggers loading screen then game), FLEA MARKET (active `<Pressable>`, Phase 8 — navigates to `'flea_market'` screen), UPGRADE (disabled stub — wires in Phase 9 alongside real IAP), SETTINGS (active `<Pressable>`, Phase 8 — navigates to `'settings'` screen). No meta-stats panel — concept scrapped, persistent money display replaces it.
 
 **Loading Screen.** Bridges the blank-frame gap on GameCanvas mount. Background image at `assets/ui/screens/LoadingScreen.png`. Triggered after Deploy button tap on main menu (NOT on app cold start — Expo splash handles cold start, swap planned for Phase 9 ship prep). Content: game logo placeholder until Phase 9 logo art lands, "Loading..." text with cycling dots animation (`.`, `..`, `...` at ~400ms via setState), random tip text chosen on mount from a 15–20 tip array (does not rotate during a single load).
 
@@ -565,7 +581,7 @@ Actual App.tsx screen states (Phase 7): `'menu' | 'loading' | 'game'`. Pause and
 
 **Game Over.** Existing ReviveModal (`src/components/ReviveModal.tsx`) — already built, kit palette + VT323, watch-ad revive prompt and existing Redeploy button. Phase 7 work: add "Return to Main Menu" button alongside existing Redeploy. Run stats display is existing modal content. No custom rebuild — additive change only.
 
-**Settings.** Deferred entirely to Phase 9. Phase 7 main menu Settings button is a disabled stub. When it ships: custom vertical list with kit palette + VT323, music and SFX volume sliders, plus credits and privacy policy link. No kit layout PNGs.
+**Settings.** Shipped Phase 8. Music volume slider, SFX volume slider, Pixabay/Kronbits credits section, back button. Volume changes apply immediately (live audioEngine update) and persist to AsyncStorage. SETTINGS button on main menu is an active Pressable. No kit layout PNGs — custom build using kit palette + VT323.
 
 ---
 
@@ -577,57 +593,59 @@ Design superseded by `strategy-monetization-v1.md` — that doc is the authorita
 
 ## Audio System
 
+Shipped Phase 8. Two channels via expo-av with separate volume controls persisted to AsyncStorage. Volumes applied on app startup before first music track starts.
+
 ### Library: `expo-av`
 
-Two independent channels with separate volume controls:
-- **Music channel** — one track at a time, looping, fades on screen change, volume slider 0-100 (default 70)
-- **SFX channel** — many concurrent sounds, no looping, volume slider 0-100 (default 100)
+expo-av ships with Expo; no native module rebuild needed. Note: expo-av is deprecated in SDK 54 in favor of expo-audio — migration deferred to Phase 9 ship prep (no current functional impact).
 
 ### iOS Silent Switch Override
-Game audio plays even when phone is on silent (standard for games). One-line config:
+
 ```typescript
 Audio.setAudioModeAsync({ playsInSilentModeIOS: true });
 ```
 
-### Music — 6 tracks needed (sourcing TBD, royalty-free metal/aggressive instrumental)
-1. **Menu loop** — moodier, slower, "before deployment" vibe
-2–6. **Combat pool (5 tracks)** — driving, aggressive; one track picked at random on raid start, plays through to end. No transitions on game state changes.
+Called once on app mount via `audioEngine.init()`.
 
-**No game-over sting. No boss loop (boss cut from v1). Music volume controlled by user via Settings.**
+### Music — shipped
 
-**Sourcing approach:** look at Free Music Archive (CC-BY metal), OpenGameArt.org (CC0/CC-BY game music), Kenney audio packs (CC0). Verify license per track before use. Avoid Ollie Beanz — his license excludes video games.
+- **Menu loop** (`menu_loop.mp3`) — plays looping on menu and flea market screens. Fades out on loading screen (300ms linear, 10 steps).
+- **Combat pool** (`combat_1.mp3`–`combat_4.mp3`) — 4 tracks. Random rotation with last-played index exclusion. Auto-advances when each track finishes.
+- Source: Pixabay (Emmraan, OpenMindAudio, Tunetank, Alex_Kizenkov, AlexGrohl). Full attribution in Settings credits screen.
+- Music continues through all gameplay modals (LevelUpModal, ReviveModal, CrateRevealModal) — atmosphere preserved.
 
-### SFX — 5–6 sounds needed (lean categories)
+### SFX — shipped (6 categories)
 
-- **Explosions** — one shared sound for frag grenade, Molotov, rocket launcher
-- **Footsteps** — subtle, paced to walk cycle
-- **Player hit** — grunt on taking damage
-- **Gunshots** — one shared gunshot sound; flamethrower as a separate looping variant
-- **Helicopter ambient** — looping low-pass ambient pass during gameplay
+| ID | Trigger |
+|---|---|
+| `shoot` | Standard weapons (pistol, SMG, AR, sniper, shotgun) |
+| `shoot_flamethrower` | RPO flamethrower only |
+| `explosion` | Frag grenade landing, molotov landing, rocket detonation (rocket fires silently — explosion only on impact) |
+| `footstep` | 350ms interval while player is moving; pauses while any modal is open |
+| `hit_grunt` | Player takes contact damage |
+| `heli_ambient` | Single-shot on helicopter flyover start |
 
-*SFX volume controlled by user via Settings.*
+Source: Kronbits CC0 (kronbits.itch.io/freesfx).
 
-**Sourcing approach:**
-- **Sonniss GameAudioGDC bundles** — annual free release, explicit royalty-free commercial license, weapon sounds and explosions
-- **Freesound.org** — filter strictly to CC0
-- **Kenney audio packs** — UI sounds in CC0
+SFX stops on LevelUpModal, ReviveModal, and CrateRevealModal open (`stopAllSFX()` — cuts in-flight sounds via `_activeSFX` registry; footstep interval also clears via `useEffect` dep guard).
 
-**Open question for Phase 8 audio brainstorm:** Settings panel is currently Phase 9-deferred. Audio without volume control on day one is bad UX. Two options: (a) audio ships without user volume control — Settings panel adds sliders in Phase 9; (b) Settings panel pulled into Phase 8 alongside audio so volume control ships with sounds. Decide before implementation.
+### Volume control
+
+Music and SFX sliders (0–100 integers) in Settings screen, persisted to AsyncStorage. `audioEngine.init(musicVol, sfxVol)` called on mount; `audioReady` flag gates music routing until init resolves so persisted volume is applied before first track starts.
 
 ### Architecture: `lib/audioEngine.ts`
 
 ```typescript
-audioEngine.preloadSFX(): Promise<void>     // call during loading screen
-audioEngine.playSFX(id: string, options?: { volume?, pitch? }): void
-audioEngine.playMusic(id: string, fadeMs?: number): Promise<void>
-audioEngine.duckMusic(toVolume: number): void   // for boss spawn
-audioEngine.unduckMusic(): void
+audioEngine.init(musicVol, sfxVol): Promise<void>  // call on mount with persisted volumes (0–100)
+audioEngine.playSFX(id: string): void              // 'worklet' directive — bridges to JS thread via runOnJS
+audioEngine.playSFXJS(id: string): void            // JS-thread callers (GameCanvas footsteps, helicopter)
+audioEngine.playMusic('menu' | 'combat'): Promise<void>
+audioEngine.stopMusic(): void                      // 300ms fade then unload
 audioEngine.setMusicVolume(0-100): void
 audioEngine.setSFXVolume(0-100): void
-audioEngine.stopAll(): void
+audioEngine.stopAllSFX(): void                     // cuts in-flight SFX; music unaffected
+audioEngine.stopAll(): void                        // hard stop, no fade — used on app background
 ```
-
-Stub implementation in Phase 1 (all methods are no-ops). Real implementation in Phase 8. This means Phases 2-5 can call `audioEngine.playSFX('shoot_pistol')` and have it silently do nothing — when Phase 6 wires it up, every existing call starts working.
 
 ---
 
