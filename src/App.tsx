@@ -18,6 +18,7 @@ import SettingsScreen from './screens/SettingsScreen';
 import { persistence } from './lib/persistence';
 import { getTodayKey } from './lib/fleaMarket';
 import { audioEngine } from './lib/audioEngine';
+import { initializeAdsSdk } from './lib/monetization';
 import type { SkillId } from './data/skills';
 
 // Screen state machine — Phase 8 routing.
@@ -44,6 +45,7 @@ export default function App() {
     persistence.getSettings()
       .then(s => audioEngine.init(s.music_volume, s.sfx_volume))
       .then(() => setAudioReady(true));
+    initializeAdsSdk(); // fire-and-forget — no UI gates on SDK init
   }, []);
 
   // Route music on screen transitions. flea_market shares the menu loop.

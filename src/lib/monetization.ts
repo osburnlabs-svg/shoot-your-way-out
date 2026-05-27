@@ -1,46 +1,111 @@
-// monetization.ts — Phase 1 stub. All methods are no-ops.
-// Full implementation in Phase 9 using react-native-google-mobile-ads + react-native-iap.
-// Note: expo-in-app-purchases was removed in Phase 2 hotfix — incompatible with expo-modules-core 3.x (SDK 54).
-// Phase 9 will install react-native-iap and wire it through purchaseSupport() / isSupportUnlocked().
+// monetization.ts — Phase 9: AdMob rewarded ad integration.
+// Note: expo-in-app-purchases removed in Phase 2 hotfix — incompatible with expo-modules-core 3.x (SDK 54).
+// Phase 9 stage 4 will wire react-native-iap for Operator License IAP.
 //
-// AdMob unit IDs are placeholders — replace all before Phase 9 build.
-// Search for "_phase9_todo" to find every spot that needs updating.
+// If rewarded ads crash on first load, the dev client binary may predate the RNGMA
+// native module. Fix: eas build --profile development, reinstall APK, retry.
 
-// TODO: Replace in Phase 9 — get real unit IDs from AdMob console after creating account
-const _phase9_todo = 'Replace all ca-app-pub-PLACEHOLDER values with real AdMob unit IDs';
+import { Platform } from 'react-native';
+import MobileAds, {
+  RewardedAd,
+  RewardedAdEventType,
+  AdEventType,
+} from 'react-native-google-mobile-ads';
 
+// ─── Ad unit IDs ──────────────────────────────────────────────────────────────
+// Phase 9 dev — Google's official test IDs. Always serve test ads; safe to commit.
+// Ship prep: replace rewardedAndroid + rewardedIOS with real unit IDs from
+// Mo's AdMob console. Single file, two lines; no component code to touch.
+// Banner IDs are out-of-scope for v1 (rewarded only) — leave as placeholder.
 export const ADMOB_UNIT_IDS = {
-  // TODO: Replace in Phase 9
-  rewardedAndroid: 'ca-app-pub-PLACEHOLDER/PLACEHOLDER',
-  // TODO: Replace in Phase 9
-  rewardedIOS: 'ca-app-pub-PLACEHOLDER/PLACEHOLDER',
-  // TODO: Replace in Phase 9
-  bannerAndroid: 'ca-app-pub-PLACEHOLDER/PLACEHOLDER',
-  // TODO: Replace in Phase 9
-  bannerIOS: 'ca-app-pub-PLACEHOLDER/PLACEHOLDER',
+  rewardedAndroid: 'ca-app-pub-3940256099942544/5224354917',
+  rewardedIOS:     'ca-app-pub-3940256099942544/1712485313',
+  bannerAndroid:   'ca-app-pub-PLACEHOLDER/PLACEHOLDER',
+  bannerIOS:       'ca-app-pub-PLACEHOLDER/PLACEHOLDER',
 };
 
-export const monetization = {
-  showRewardedAd: async (_callback?: () => void): Promise<{ rewarded: boolean }> => {
-    // Phase 9: show rewarded ad; resolve { rewarded: true } on completion
-    return { rewarded: false };
-  },
+// ─── SDK bootstrap ────────────────────────────────────────────────────────────
+/**
+ * Call once on app startup before any ad is loaded.
+ * Wired in App.tsx startup useEffect alongside audioEngine.init().
+ * Fire-and-forget — no UI gates on this promise.
+ */
+export function initializeAdsSdk(): Promise<void> {
+  return MobileAds().initialize().then(() => undefined);
+}
 
+// ─── Rewarded ad ──────────────────────────────────────────────────────────────
+/**
+ * Load and show a rewarded video ad. Resolves:
+ *   { rewarded: true }  — user watched to completion (EARNED_REWARD fired)
+ *   { rewarded: false } — early dismiss, load error, or 10-second timeout
+ *
+ * Never rejects. Callers check the boolean and branch accordingly.
+ *
+ * Non-personalized ads: no ATT prompt is requested (IDFA unavailable on iOS →
+ * Google defaults to non-personalized). No UMP consent flow. Phase 9 stage 2 only.
+ */
+export function showRewardedAd(): Promise<{ rewarded: boolean }> {
+  return new Promise((resolve) => {
+    const adUnitId = Platform.OS === 'ios'
+      ? ADMOB_UNIT_IDS.rewardedIOS
+      : ADMOB_UNIT_IDS.rewardedAndroid;
+
+    const ad = RewardedAd.createForAdRequest(adUnitId);
+
+    // One-shot resolver — EARNED_REWARD fires before CLOSED on a completed view,
+    // so the first settle wins; the second call is a no-op.
+    let settled = false;
+    function settle(result: { rewarded: boolean }): void {
+      if (settled) return;
+      settled = true;
+      resolve(result);
+    }
+
+    // 10-second load timeout — covers slow networks and no-fill cases.
+    const timeoutId = setTimeout(() => settle({ rewarded: false }), 10_000);
+
+    ad.addAdEventListener(AdEventType.LOADED, () => {
+      clearTimeout(timeoutId);
+      ad.show().catch(() => settle({ rewarded: false }));
+    });
+
+    ad.addAdEventListener(RewardedAdEventType.EARNED_REWARD, () => {
+      settle({ rewarded: true });
+    });
+
+    ad.addAdEventListener(AdEventType.CLOSED, () => {
+      // Normal completion: fires after EARNED_REWARD → no-op (already settled true).
+      // Early dismiss: fires alone → settles false.
+      settle({ rewarded: false });
+    });
+
+    ad.addAdEventListener(AdEventType.ERROR, () => {
+      clearTimeout(timeoutId);
+      settle({ rewarded: false });
+    });
+
+    ad.load();
+  });
+}
+
+// ─── Stubs — Phase 9 stage 4+ ─────────────────────────────────────────────────
+export const monetization = {
   showBanner: (): void => {
     // Phase 9: display AdMob banner at bottom of main menu
   },
 
   hideBanner: (): void => {
-    // Phase 9: hide banner (on screen transitions away from main menu)
+    // Phase 9: hide banner on screen transitions
   },
 
   purchaseSupport: async (): Promise<{ success: boolean }> => {
-    // Phase 9: trigger $2.99 Support the Dev IAP (product: support_dev_v1)
+    // Phase 9 stage 4: trigger Operator License IAP via react-native-iap
     return { success: false };
   },
 
   isSupportUnlocked: (): boolean => {
-    // Phase 9: returns true if support IAP purchased (reads syo_support_unlocked from AsyncStorage)
+    // Phase 9 stage 4: returns true if Operator License purchased
     return false;
   },
 };
