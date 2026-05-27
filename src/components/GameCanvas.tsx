@@ -970,6 +970,15 @@ export default function GameCanvas({ width, height, onReturnToMenu, starterSkill
     return () => clearInterval(id);
   }, [spriteState.isMoving]);
 
+  // ─── Audio: cut all SFX when modals open (action sounds bleed through) ────
+  useEffect(() => {
+    if (displayPendingLevelUp) audioEngine.stopAllSFX();
+  }, [displayPendingLevelUp]);
+
+  useEffect(() => {
+    if (displayIsDead) audioEngine.stopAllSFX();
+  }, [displayIsDead]);
+
   // ─── Per-slot enemy transforms (UI thread, no runOnJS) ────────────────────
   // One useDerivedValue per slot. Only slots with an active enemy are rendered
   // in JSX, so only those create Skia animated-prop subscriptions.

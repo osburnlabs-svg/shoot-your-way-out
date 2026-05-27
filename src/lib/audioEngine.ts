@@ -11,6 +11,8 @@ let _sfxVol = 1.0;
 let _currentMusic: Audio.Sound | null = null;
 let _currentMusicMode: 'menu' | 'combat' | null = null;
 let _lastCombatIdx = -1;
+// Tracks all in-flight SFX sounds so stopAllSFX() can cut them immediately.
+const _activeSFX = new Set<Audio.Sound>();
 
 const MUSIC = {
   menu: require('../../assets/audio/music/menu_loop.mp3') as number,
@@ -30,13 +32,16 @@ const SFX: Record<string, number> = {
 };
 
 // Fire-and-forget: new Sound per play, self-unloads on finish. Unknown IDs are silent no-ops.
+// Registers each sound in _activeSFX so stopAllSFX() can cut them mid-play.
 function _playSFXImpl(id: string): void {
   const src = SFX[id];
   if (src === undefined) return;
   Audio.Sound.createAsync(src, { volume: _sfxVol })
     .then(({ sound }) => {
+      _activeSFX.add(sound);
       sound.setOnPlaybackStatusUpdate((status) => {
         if (status.isLoaded && status.didJustFinish) {
+          _activeSFX.delete(sound);
           sound.unloadAsync().catch(() => {});
         }
       });
@@ -156,6 +161,15 @@ export const audioEngine = {
 
   setSFXVolume: (v: number): void => {
     _sfxVol = v / 100;
+  },
+
+  // Cuts all in-flight SFX immediately — called on LevelUpModal / ReviveModal open.
+  // Music is intentionally excluded (atmosphere preserved through modals).
+  stopAllSFX: (): void => {
+    _activeSFX.forEach((sound) => {
+      sound.stopAsync().then(() => sound.unloadAsync()).catch(() => {});
+    });
+    _activeSFX.clear();
   },
 
   // Hard stop with no fade — used when app goes to background.
