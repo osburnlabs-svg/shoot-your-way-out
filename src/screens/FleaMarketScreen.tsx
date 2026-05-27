@@ -14,6 +14,7 @@ import { GuiSprites } from '../lib/sprites';
 import { getDailyInventory, getTodayKey, FLEA_MARKET_POOL } from '../lib/fleaMarket';
 import { FLEA_MARKET_PRICES } from '../data/fleaMarketPricing';
 import { persistence } from '../lib/persistence';
+import { showRewardedAd } from '../lib/monetization';
 import { palette, PIXEL_FONT_FAMILY } from '../data/theme';
 
 type BuyState = 'active' | 'no_funds' | 'gated' | 'purchased';
@@ -40,6 +41,7 @@ export default function FleaMarketScreen({ onBack }: Props) {
   const [money, setMoney] = useState(0);
   const [pendingPurchasedSkill, setPendingPurchasedSkill] = useState<SkillId | null>(null);
   const [pendingAdSkill, setPendingAdSkill] = useState<SkillId | null>(null);
+  const [adLoading, setAdLoading] = useState(false);
 
   useEffect(() => {
     Promise.all([
@@ -64,12 +66,19 @@ export default function FleaMarketScreen({ onBack }: Props) {
   }, [money, pendingPurchasedSkill]);
 
   const handleWatchAd = useCallback(async () => {
-    if (pendingAdSkill !== null) return;
-    // [P8-STUB] Phase 9 replaces with rewarded ad flow (grep: P8-STUB)
+    if (pendingAdSkill !== null || adLoading) return;
+    setAdLoading(true);
+    const { rewarded } = await showRewardedAd();
+    if (!rewarded) {
+      // User dismissed early or ad failed to load — no skill granted, re-enable button.
+      setAdLoading(false);
+      return;
+    }
     const grantedId = FLEA_MARKET_POOL[Math.floor(Math.random() * FLEA_MARKET_POOL.length)];
     setPendingAdSkill(grantedId);
     await persistence.setPendingAdSkill(grantedId);
-  }, [pendingAdSkill]);
+    setAdLoading(false);
+  }, [pendingAdSkill, adLoading]);
 
   return (
     <View style={styles.root}>
@@ -172,12 +181,15 @@ export default function FleaMarketScreen({ onBack }: Props) {
               style={({ pressed }) => [
                 styles.adBtn,
                 styles.adBtnActive,
-                pressed && styles.adBtnPressed,
+                pressed && !adLoading && styles.adBtnPressed,
               ]}
               onPress={handleWatchAd}
+              disabled={adLoading}
             >
-              <Text style={[styles.adBtnText, styles.adBtnActiveText]}>WATCH AD</Text>
-              <Text style={styles.adSubtext}>Start with 1 random skill</Text>
+              <Text style={[styles.adBtnText, styles.adBtnActiveText]}>
+                {adLoading ? 'LOADING...' : 'WATCH AD'}
+              </Text>
+              {!adLoading && <Text style={styles.adSubtext}>Start with 1 random skill</Text>}
             </Pressable>
           )}
         </View>
