@@ -30,8 +30,17 @@ export const ADMOB_UNIT_IDS = {
  * Wired in App.tsx startup useEffect alongside audioEngine.init().
  * Fire-and-forget — no UI gates on this promise.
  */
-export function initializeAdsSdk(): Promise<void> {
-  return MobileAds().initialize().then(() => undefined);
+export function initializeAdsSdk(): void {
+  MobileAds()
+    .initialize()
+    .then(() => {
+      // [DIAG] Remove after Mo confirms init resolves successfully in Metro logs.
+      console.log('[RNGMA] SDK initialized successfully');
+    })
+    .catch((e: unknown) => {
+      // Permanent — init failure is worth knowing about (will cause silent ad load failures).
+      console.error('[RNGMA] SDK init FAILED:', e);
+    });
 }
 
 // ─── Rewarded ad ──────────────────────────────────────────────────────────────
@@ -40,21 +49,15 @@ export function initializeAdsSdk(): Promise<void> {
  *   { rewarded: true }  — user watched to completion (EARNED_REWARD fired)
  *   { rewarded: false } — early dismiss, load error, or 10-second timeout
  *
- * Never rejects. Callers check the boolean and branch accordingly.
+ * Never rejects. All failure paths (including synchronous throws from RNGMA)
+ * are caught and resolve false so callers can always safely await this.
  *
  * Non-personalized ads: no ATT prompt is requested (IDFA unavailable on iOS →
  * Google defaults to non-personalized). No UMP consent flow. Phase 9 stage 2 only.
  */
 export function showRewardedAd(): Promise<{ rewarded: boolean }> {
   return new Promise((resolve) => {
-    const adUnitId = Platform.OS === 'ios'
-      ? ADMOB_UNIT_IDS.rewardedIOS
-      : ADMOB_UNIT_IDS.rewardedAndroid;
-
-    const ad = RewardedAd.createForAdRequest(adUnitId);
-
-    // One-shot resolver — EARNED_REWARD fires before CLOSED on a completed view,
-    // so the first settle wins; the second call is a no-op.
+    // Declared before try-catch so settle is reachable from the catch block.
     let settled = false;
     function settle(result: { rewarded: boolean }): void {
       if (settled) return;
@@ -62,30 +65,60 @@ export function showRewardedAd(): Promise<{ rewarded: boolean }> {
       resolve(result);
     }
 
-    // 10-second load timeout — covers slow networks and no-fill cases.
-    const timeoutId = setTimeout(() => settle({ rewarded: false }), 10_000);
+    try {
+      const adUnitId = Platform.OS === 'ios'
+        ? ADMOB_UNIT_IDS.rewardedIOS
+        : ADMOB_UNIT_IDS.rewardedAndroid;
 
-    ad.addAdEventListener(AdEventType.LOADED, () => {
-      clearTimeout(timeoutId);
-      ad.show().catch(() => settle({ rewarded: false }));
-    });
+      const ad = RewardedAd.createForAdRequest(adUnitId);
 
-    ad.addAdEventListener(RewardedAdEventType.EARNED_REWARD, () => {
-      settle({ rewarded: true });
-    });
+      // 10-second load timeout — covers slow networks, no-fill, and silent SDK failures.
+      const timeoutId = setTimeout(() => {
+        // [DIAG] Remove after verifying timeout path vs event-driven path in Metro.
+        console.warn('[RNGMA] Ad load timed out after 10s — settling false');
+        settle({ rewarded: false });
+      }, 10_000);
 
-    ad.addAdEventListener(AdEventType.CLOSED, () => {
-      // Normal completion: fires after EARNED_REWARD → no-op (already settled true).
-      // Early dismiss: fires alone → settles false.
+      ad.addAdEventListener(AdEventType.LOADED, () => {
+        // [DIAG] Remove after confirming LOADED fires correctly.
+        console.log('[RNGMA] Ad LOADED — calling show()');
+        clearTimeout(timeoutId);
+        ad.show().catch((e: unknown) => {
+          console.error('[RNGMA] ad.show() rejected:', e);
+          settle({ rewarded: false });
+        });
+      });
+
+      ad.addAdEventListener(RewardedAdEventType.EARNED_REWARD, () => {
+        // [DIAG] Remove after confirming EARNED_REWARD fires on completion.
+        console.log('[RNGMA] EARNED_REWARD — settling true');
+        settle({ rewarded: true });
+      });
+
+      ad.addAdEventListener(AdEventType.CLOSED, () => {
+        // Normal completion: fires after EARNED_REWARD → no-op (already settled true).
+        // Early dismiss: fires alone → settles false.
+        settle({ rewarded: false });
+      });
+
+      ad.addAdEventListener(AdEventType.ERROR, (error: unknown) => {
+        // Permanent — ad load errors are worth logging (network, no-fill, bad unit ID, etc.).
+        console.error('[RNGMA] Ad load ERROR:', error);
+        clearTimeout(timeoutId);
+        settle({ rewarded: false });
+      });
+
+      // [DIAG] Remove after confirming load() is called without throwing.
+      console.log('[RNGMA] Calling ad.load() with unit:', adUnitId);
+      ad.load();
+    } catch (e) {
+      // Catches synchronous throws from createForAdRequest / addAdEventListener / load().
+      // Most likely cause: SDK not initialized when load() is called.
+      // Previously this throw would reject the Promise, kill the timeout, and
+      // leave the button stuck in LOADING forever. Now it resolves false cleanly.
+      console.error('[RNGMA] showRewardedAd synchronous throw (SDK not initialized?):', e);
       settle({ rewarded: false });
-    });
-
-    ad.addAdEventListener(AdEventType.ERROR, () => {
-      clearTimeout(timeoutId);
-      settle({ rewarded: false });
-    });
-
-    ad.load();
+    }
   });
 }
 
