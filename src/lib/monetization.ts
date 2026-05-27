@@ -33,12 +33,8 @@ export const ADMOB_UNIT_IDS = {
 export function initializeAdsSdk(): void {
   MobileAds()
     .initialize()
-    .then(() => {
-      // [DIAG] Remove after Mo confirms init resolves successfully in Metro logs.
-      console.log('[RNGMA] SDK initialized successfully');
-    })
     .catch((e: unknown) => {
-      // Permanent — init failure is worth knowing about (will cause silent ad load failures).
+      // Init failure means all ad loads will fail. Worth knowing in production logs.
       console.error('[RNGMA] SDK init FAILED:', e);
     });
 }
@@ -76,17 +72,11 @@ export function showRewardedAd(): Promise<{ rewarded: boolean }> {
       const ad = RewardedAd.createForAdRequest(adUnitId);
 
       // 10-second load timeout — covers slow networks, no-fill, and silent SDK failures.
-      timeoutId = setTimeout(() => {
-        // [DIAG] Remove after verifying timeout path vs event-driven path in Metro.
-        console.warn('[RNGMA] Ad load timed out after 10s — settling false');
-        settle({ rewarded: false });
-      }, 10_000);
+      timeoutId = setTimeout(() => settle({ rewarded: false }), 10_000);
 
       // RewardedAd uses RewardedAdEventType.LOADED, not the generic AdEventType.LOADED.
       // RNGMA v16 throws synchronously if the wrong namespace is used.
       ad.addAdEventListener(RewardedAdEventType.LOADED, () => {
-        // [DIAG] Remove after confirming LOADED fires correctly.
-        console.log('[RNGMA] Ad LOADED — calling show()');
         clearTimeout(timeoutId);
         ad.show().catch((e: unknown) => {
           console.error('[RNGMA] ad.show() rejected:', e);
@@ -95,8 +85,6 @@ export function showRewardedAd(): Promise<{ rewarded: boolean }> {
       });
 
       ad.addAdEventListener(RewardedAdEventType.EARNED_REWARD, () => {
-        // [DIAG] Remove after confirming EARNED_REWARD fires on completion.
-        console.log('[RNGMA] EARNED_REWARD — settling true');
         settle({ rewarded: true });
       });
 
@@ -107,19 +95,17 @@ export function showRewardedAd(): Promise<{ rewarded: boolean }> {
       });
 
       ad.addAdEventListener(AdEventType.ERROR, (error: unknown) => {
-        // Permanent — ad load errors are worth logging (network, no-fill, bad unit ID, etc.).
+        // Ad load errors: network failure, no-fill, bad unit ID, etc.
         console.error('[RNGMA] Ad load ERROR:', error);
         clearTimeout(timeoutId);
         settle({ rewarded: false });
       });
 
-      // [DIAG] Remove after confirming load() is called without throwing.
-      console.log('[RNGMA] Calling ad.load() with unit:', adUnitId);
       ad.load();
     } catch (e) {
       // Catches synchronous throws from createForAdRequest / addAdEventListener / load().
       // Clear the timeout if it was set before the throw — prevents a dangling no-op
-      // settle() call 10 seconds later and the associated log noise.
+      // settle() call 10 seconds later.
       if (timeoutId !== undefined) clearTimeout(timeoutId);
       console.error('[RNGMA] showRewardedAd synchronous throw:', e);
       settle({ rewarded: false });
