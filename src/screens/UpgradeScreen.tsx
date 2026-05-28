@@ -1,8 +1,12 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { palette, PIXEL_FONT_FAMILY } from '../data/theme';
 import { persistence } from '../lib/persistence';
+import {
+  purchaseOperatorLicense,
+  restoreOperatorLicense,
+} from '../lib/monetization';
 
 type Props = {
   onBack: () => void;
@@ -12,14 +16,57 @@ type Props = {
 export default function UpgradeScreen({ onBack, onPurchased }: Props) {
   const insets = useSafeAreaInsets();
   const [purchasing, setPurchasing] = useState(false);
+  const [restoring, setRestoring] = useState(false);
+  const [feedbackMsg, setFeedbackMsg] = useState<string | null>(null);
+  const feedbackTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (feedbackTimer.current !== null) clearTimeout(feedbackTimer.current);
+    };
+  }, []);
+
+  function showFeedback(msg: string): void {
+    if (feedbackTimer.current !== null) clearTimeout(feedbackTimer.current);
+    setFeedbackMsg(msg);
+    feedbackTimer.current = setTimeout(() => setFeedbackMsg(null), 3000);
+  }
 
   const handlePurchase = async () => {
-    if (purchasing) return;
+    if (purchasing || restoring) return;
     setPurchasing(true);
-    // [P9-STUB] Stage 4 replaces this direct toggle with real IAP receipt validation. grep: P9-STUB
-    await persistence.setOperatorLicensed(true);
-    onPurchased();
+    setFeedbackMsg(null);
+    const result = await purchaseOperatorLicense();
+    setPurchasing(false);
+    if (result === 'success') {
+      await persistence.setOperatorLicensed(true);
+      onPurchased();
+    } else if (result === 'cancelled') {
+      // User dismissed store dialog — silent, no feedback needed.
+    } else if (result === 'not_available') {
+      showFeedback('Not available yet');
+    } else {
+      showFeedback('Purchase failed — try again');
+    }
   };
+
+  const handleRestore = async () => {
+    if (purchasing || restoring) return;
+    setRestoring(true);
+    setFeedbackMsg(null);
+    const result = await restoreOperatorLicense();
+    setRestoring(false);
+    if (result === 'restored') {
+      await persistence.setOperatorLicensed(true);
+      onPurchased();
+    } else if (result === 'none') {
+      showFeedback('No purchases to restore');
+    } else {
+      showFeedback('Restore failed — try again');
+    }
+  };
+
+  const busy = purchasing || restoring;
 
   return (
     <View style={styles.root}>
@@ -29,7 +76,7 @@ export default function UpgradeScreen({ onBack, onPurchased }: Props) {
           { paddingTop: insets.top + 16, paddingBottom: insets.bottom + 32 },
         ]}
       >
-        <Pressable style={styles.backBtn} onPress={onBack}>
+        <Pressable style={styles.backBtn} onPress={onBack} disabled={busy}>
           <Text style={styles.backText}>← BACK</Text>
         </Pressable>
 
@@ -61,11 +108,31 @@ export default function UpgradeScreen({ onBack, onPurchased }: Props) {
         <View style={styles.spacer} />
 
         <Pressable
-          style={({ pressed }) => [styles.purchaseBtn, pressed && styles.purchaseBtnPressed]}
+          style={({ pressed }) => [
+            styles.purchaseBtn,
+            pressed && !busy && styles.purchaseBtnPressed,
+            busy && styles.purchaseBtnDisabled,
+          ]}
           onPress={handlePurchase}
-          disabled={purchasing}
+          disabled={busy}
         >
-          <Text style={styles.purchaseBtnText}>PURCHASE $4.99</Text>
+          <Text style={styles.purchaseBtnText}>
+            {purchasing ? 'PURCHASING...' : 'PURCHASE $4.99'}
+          </Text>
+        </Pressable>
+
+        {feedbackMsg !== null ? (
+          <Text style={styles.feedbackText}>{feedbackMsg}</Text>
+        ) : null}
+
+        <Pressable
+          style={styles.restoreBtn}
+          onPress={handleRestore}
+          disabled={busy}
+        >
+          <Text style={[styles.restoreBtnText, busy && styles.restoreBtnTextDim]}>
+            {restoring ? 'RESTORING...' : 'RESTORE PURCHASES'}
+          </Text>
         </Pressable>
       </View>
     </View>
@@ -181,10 +248,35 @@ const styles = StyleSheet.create({
   purchaseBtnPressed: {
     opacity: 0.85,
   },
+  purchaseBtnDisabled: {
+    opacity: 0.5,
+  },
   purchaseBtnText: {
     fontFamily: PIXEL_FONT_FAMILY,
     fontSize: 32,
     color: palette.backgroundDark,
     letterSpacing: 2,
+  },
+  feedbackText: {
+    fontFamily: PIXEL_FONT_FAMILY,
+    fontSize: 16,
+    color: '#aaaaaa',
+    textAlign: 'center',
+    marginTop: 10,
+  },
+  restoreBtn: {
+    alignSelf: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    marginTop: 8,
+  },
+  restoreBtnText: {
+    fontFamily: PIXEL_FONT_FAMILY,
+    fontSize: 16,
+    color: '#666666',
+    letterSpacing: 1,
+  },
+  restoreBtnTextDim: {
+    color: '#444444',
   },
 });
