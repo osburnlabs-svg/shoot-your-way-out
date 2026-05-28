@@ -35,7 +35,7 @@ Status legend:
 | 6 — Audio + atmospheric effects | ⚪ | | | | |
 | 7 — UI + persistence + analytics | ⚪ | | | | |
 | 8 — Helicopter boss + hazards | ⚪ | | | | |
-| 9 — Monetization Wiring + Ship Prep | 🟡 In Progress | 2026-05-27 | | | AdMob rewarded ads wired (Session 1) |
+| 9 — Monetization Wiring + Ship Prep | 🟡 In Progress | 2026-05-27 | | | AdMob rewarded ads wired (Session 1). Upgrade modal shipped (Session 2). IAP skeleton (expo-iap 4.3.1) wired — Stage 4 complete (Session 3). |
 
 ---
 
@@ -2288,6 +2288,47 @@ This reinforces the existing "don't stack fixes on a broken fix" norm from Phase
 
 **Open items carried into Phase 9 Session 3 (Stage 4 — IAP skeleton):**
 - `[P9-DIAG]` RESET OPERATOR LICENSE button in SettingsScreen.tsx persists through Stage 4 for IAP sandbox retesting. Removal is an explicit Stage 4 closeout item (grep: P9-DIAG).
+
+---
+
+### Phase 9 — Session 3 (2026-05-28)
+
+**Status:** IAP skeleton — expo-iap 4.3.1 wired (Stage 4 complete). 3 code commits + 1 doc commit.
+
+**Shipped this session:**
+
+- **6b0019d** — Install expo-iap 4.3.1 (exact-pinned; native dep hygiene) + expo-build-properties ~1.0.10 + iOS deploymentTarget 15.0 in app.json. expo-iap config plugin handles: Android BILLING permission, openiap-google dependency injection, CocoaPods CDN source. expo-build-properties required separately because expo-iap's config plugin does not set Kotlin version; Kotlin 2.x is required by Google Play Billing via the openiap-google dependency. iOS deploymentTarget 15.0 must be explicit in app.json even though the expo-iap podspec stays at 13.4 (known Expo prebuild compatibility workaround documented in expo-iap CLAUDE.md).
+- **45aab66** — `purchaseOperatorLicense()` and `restoreOperatorLicense()` in `monetization.ts`. Both are never-rejecting Promises. Purchase flow: `initConnection` → `fetchProducts` (type: `'in-app'`) → register `purchaseUpdatedListener` + `purchaseErrorListener` + 60-second timeout → `finishTransaction({ isConsumable: false })` on success → settle. Restore flow: `initConnection` → `restorePurchases()` → `getAvailablePurchases()` → check for `operator_license` product ID. `endConnection` called in all paths. Dead stubs `purchaseSupport()` / `isSupportUnlocked()` removed — Phase 1 disconnected stubs that were never wired to live code.
+- **70c735c** — UpgradeScreen.tsx: `[P9-STUB]` replaced with real `handlePurchase()` calling `purchaseOperatorLicense()`. New `handleRestore()` calling `restoreOperatorLicense()` (Apple required affordance for non-consumables). Inline `feedbackMsg` state (3-second auto-clear via `feedbackTimer` ref) renders purchase/restore feedback directly on the upgrade screen — not routed through the menu toast. `busy` guard locks PURCHASE button, RESTORE PURCHASES text-link, and back button during any in-flight store operation. RESTORE PURCHASES: 44pt+ touch target, `#666666` muted grey, "RESTORING..." in-flight label.
+- **[this commit]** — Stage 4 doc closeout: progress-log Session 3 entry + inventory updates (Phase Status table, IAP integration status, stage 7 grep target cleanup).
+
+**expo-iap version story:**
+Pre-review recommended v3.4.13 based on stale alpha-status information about the v4 series. During commit 1, `npx expo install expo-iap` resolved to v4.3.1 (`latest` dist-tag on npm). Verified: `{ latest: '4.3.1', next: '4.4.0-rc.3' }` — v4.3.1 is current stable, not alpha. Stayed on v4.3.1 with approval. API re-verified against installed `node_modules/expo-iap` TypeScript types before any wiring. Two API differences caught vs. pre-review expectations: `fetchProducts` (renamed from `getProducts` in v4) and `type: 'in-app'` (not legacy `'inapp'` alias). Both would have been runtime failures in stage 7 if shipped on stale pre-review verification.
+
+**TypeScript issues resolved before commit 2:**
+- `isUserCancelledError` not exported from main `expo-iap` index (exists only in internal `utils/errorMapping`). Fix: `error.code === ErrorCode.UserCancelled` — the canonical enum pattern per expo-iap CLAUDE.md.
+- `fetchProducts` return type includes `| null` (`FetchProductsResult = ... | null`). Fix: `if (!products || products.length === 0)` guards both null and empty array.
+- `PurchaseError` dual-shape conflict: `types.PurchaseError` vs `utils/errorMapping.PurchaseError`; `purchaseErrorListener` callback uses the errorMapping shape. Fix: omit explicit type annotation on the `purchaseErrorListener` callback — let TypeScript infer from the listener's own signature.
+
+**Device-verified (can-verify at Stage 4):**
+- expo-iap native module loads clean — EAS dev client build succeeded; Kotlin 2.x config (expo-build-properties kotlinVersion 2.1.0) resolved correctly.
+- Purchase flow: "Not available yet" feedback rendered inline on upgrade screen (product not yet configured in stores — expected at Stage 4).
+- PURCHASE button: "PURCHASING..." label + opacity 0.5 during in-flight; recovers after result; not stuck.
+- RESTORE PURCHASES: present and renders "No purchases to restore" feedback when tapped.
+- Back button: correctly disabled during any in-flight store operation.
+- Navigation: back to menu works normally after any result.
+
+**Stage-7-deferred (requires developer accounts + store product config):**
+- Purchase happy path (product found, payment succeeds, `setOperatorLicensed(true)` called, `onPurchased()` fires).
+- Restore happy path (prior purchase found and `setOperatorLicensed(true)` called).
+- Store dismiss / cancel path (user closes the store dialog — should be silent, no feedback).
+- Full sandbox cycle on both iOS (TestFlight sandbox) and Android (Play Store internal testing).
+
+**Working norm reinforcement — verify SDK API surface before wiring, twice over:**
+This is the second consecutive Phase 9 session where the "verify API surface against installed version" norm prevented a runtime failure. Session 1: `AdEventType.LOADED` vs `RewardedAdEventType.LOADED` — caught at runtime with explicit fix guidance in the RNGMA error message. This session: `getProducts` → `fetchProducts` rename and `'inapp'` → `'in-app'` parameter rename — both caught at the TypeScript verification step rather than at runtime in stage 7 sandbox. Pre-review API knowledge is the least reliable input; installed types are ground truth.
+
+**`[P9-DIAG]` status at Stage 4 close:**
+`[P9-DIAG]` RESET OPERATOR LICENSE button remains in SettingsScreen.tsx — deferred to stage 7 removal. Original Stage 4 closeout checklist listed it as a Stage 4 item; after implementation the appropriate removal window is confirmed as stage 7 (the button is needed for full sandbox-cycle testing with real developer accounts). Active grep target: `grep: P9-DIAG`. `[P9-STUB]` is confirmed gone — only `[P9-DIAG]` remains.
 
 ---
 
