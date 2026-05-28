@@ -278,7 +278,7 @@ Honest rough estimate. Phase 5+ context (longer runs, more enemy types) changes 
 
 ## 9. Open questions deferred to Phase 9/10 planning
 
-1. **Specific IAP price.** $4.99 vs $9.99 — decide closer to launch with player data and price sensitivity research.
+1. ~~**Specific IAP price.**~~ **Locked at $4.99 USD (Phase 9 Session 2, 2026-05-27).** $4.99 vs $9.99 was the open question; $4.99 decided at Phase 9 Session 2 implementation. Not subject to further revision without a documented scope change.
 2. **In-run currency drop rate.** Current $1/Scav is a placeholder. Tune against actual Phase 5+ run length and enemy density.
 3. **Free player retention strategy.** If free players churn at "I can't afford things," reconsider whether the daily login bonus needs to be higher or currency drop rates more generous.
 

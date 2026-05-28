@@ -249,7 +249,7 @@ Design intent captured from strategy chat. Final decisions deferred to Phase 7 k
 - **Ad network daily-limit and no-fill UX research.** Verify whether any app-imposed cap is needed; design the no-fill button state for when the ad network returns no fill. Phase 9 research item, not a blocker.
 - **Operator License upgrade screen (design locked 2026-05-27, implements in Phase 9 with real IAP).** Reached via UPGRADE button on main menu (currently disabled stub).
   - Headline: BECOME AN OPERATOR
-  - Subhead: One-time purchase (price TBD, $4.99 illustrative — see open question in strategy doc §9)
+  - Subhead: One-time purchase — $4.99 (price locked Phase 9 Session 2; strategy doc §9 updated)
   - Visual: side-by-side bonus comparison (Free $1,000/day vs. Operator $5,000/day)
   - Supporting copy: "No ads, no subscriptions, no recurring charges. Your purchase supports an indie developer and keeps this game ad-free forever."
 
@@ -285,7 +285,7 @@ Items needed to keep project docs accurate and trustworthy. Not gameplay work; n
 
 - **Persistence between runs.** ✅ Decided and implemented in Phase 7 — money-only (flea market currency). No high scores, no kill counts, no meta-progression. See persistence layer entry in Phase 7 section.
 - **Audio aesthetic.** 8-bit chiptune vs realistic SFX. Decide before Phase 9.
-- **Specific monetization values (partial).** Two items remain open: IAP price ($4.99 vs $9.99, decide closer to launch) and in-run currency drop rate ($1/Scav placeholder, re-tune Phase 10). Flea market pricing, daily login amounts, and server-time choice are all locked.
+- **Specific monetization values (partial).** ~~IAP price ($4.99 vs $9.99)~~ — locked at $4.99 USD (Phase 9 Session 2). One item remains open: in-run currency drop rate ($1/Scav placeholder, re-tune Phase 10). Flea market pricing, daily login amounts, and server-time choice are all locked.
 - **What happens to flea-market starter items if player dies before run starts.** ✅ Resolved 2026-05-26 — consumed on Deploy, no refund. See §4.5 in strategy-monetization-v1.md.
 - **Free player retention strategy.** Per strategy doc Section 9.
 
