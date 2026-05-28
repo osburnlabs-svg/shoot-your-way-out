@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { View, Text, Pressable, StyleSheet, PanResponder } from 'react-native';
+import { View, Text, Pressable, StyleSheet } from 'react-native';
+import Slider from '@react-native-community/slider';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { palette, PIXEL_FONT_FAMILY } from '../data/theme';
 import { persistence } from '../lib/persistence';
@@ -27,9 +28,6 @@ const PIXABAY_ATTRIBUTION = [
 ].join('\n');
 
 // ─── Volume slider ─────────────────────────────────────────────────────────────
-// PanResponder-based: no native module, no APK rebuild.
-// trackWidthRef and onChangeRef break the stale-closure problem without
-// recreating the PanResponder on every render.
 
 type SliderProps = {
   label: string;
@@ -38,36 +36,20 @@ type SliderProps = {
 };
 
 function VolumeSlider({ label, value, onChange }: SliderProps) {
-  const trackWidthRef = useRef(280);
-  const onChangeRef = useRef(onChange);
-  onChangeRef.current = onChange;
-
-  const panResponder = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: () => true,
-      onPanResponderGrant: (e) => {
-        const pct = Math.max(0, Math.min(1, e.nativeEvent.locationX / trackWidthRef.current));
-        onChangeRef.current(Math.round(pct * 100));
-      },
-      onPanResponderMove: (e) => {
-        const pct = Math.max(0, Math.min(1, e.nativeEvent.locationX / trackWidthRef.current));
-        onChangeRef.current(Math.round(pct * 100));
-      },
-    }),
-  ).current;
-
   return (
     <View style={sliderStyles.row}>
       <Text style={sliderStyles.label}>{label}</Text>
-      <View
-        style={sliderStyles.track}
-        onLayout={(e) => { trackWidthRef.current = e.nativeEvent.layout.width; }}
-        {...panResponder.panHandlers}
-      >
-        <View style={[sliderStyles.fill, { width: `${value}%` }]} />
-        <View style={[sliderStyles.thumb, { left: `${value}%` }]} />
-      </View>
+      <Slider
+        style={sliderStyles.slider}
+        minimumValue={0}
+        maximumValue={100}
+        step={1}
+        value={value}
+        onValueChange={onChange}
+        minimumTrackTintColor={palette.accentGold}
+        maximumTrackTintColor="#2a2d28"
+        thumbTintColor={palette.accentGold}
+      />
       <Text style={sliderStyles.valueText}>{value}</Text>
     </View>
   );
@@ -86,28 +68,9 @@ const sliderStyles = StyleSheet.create({
     color: palette.accentGold,
     width: 72,
   },
-  track: {
+  slider: {
     flex: 1,
-    height: 6,
-    backgroundColor: '#2a2d28',
-    borderRadius: 3,
-  },
-  fill: {
-    position: 'absolute',
-    left: 0,
-    top: 0,
-    bottom: 0,
-    backgroundColor: palette.accentGold,
-    borderRadius: 3,
-  },
-  thumb: {
-    position: 'absolute',
-    top: -8,
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    backgroundColor: palette.accentGold,
-    transform: [{ translateX: -11 }],
+    height: 40,
   },
   valueText: {
     fontFamily: PIXEL_FONT_FAMILY,
