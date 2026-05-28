@@ -14,7 +14,8 @@
     },
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.osburnlabs.shootyourwayout"
+      "bundleIdentifier": "com.osburnlabs.shootyourwayout",
+      "deploymentTarget": "15.0"
     },
     "android": {
       "adaptiveIcon": {
@@ -35,6 +36,15 @@
           "_phase9_todo": "Replace androidAppId and iosAppId with real values from AdMob console before Phase 9 build",
           "androidAppId": "ca-app-pub-3940256099942544~3347511713",
           "iosAppId": "ca-app-pub-3940256099942544~1458002511"
+        }
+      ],
+      "expo-iap",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "kotlinVersion": "2.1.0"
+          }
         }
       ]
     ],
