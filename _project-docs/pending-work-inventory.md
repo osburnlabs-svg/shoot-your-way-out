@@ -243,15 +243,11 @@ Design intent captured from strategy chat. Final decisions deferred to Phase 7 k
 - **Camera tracking smoothness — investigate during code review.** Late Phase 7 observation: fast left-right movement reveals black edges at viewport boundaries. Note: `cameraTransform` in `GameCanvas` is direct/zero-lag (`useDerivedValue` reads `player.x`/`player.y` every frame — no lerp exists). More likely culprit: the 100ms tile viewport culling timer drives React tile state, which lags up to 100ms behind actual player position during fast movement. Investigation should start at tile culling update cadence, not camera lerp parameters.
 
 ### Monetization
-- **Real IAP integration** (Apple/Google sandbox + receipt validation). Operator License unlock — real store product replacing Phase 8 stub.
+- **Real IAP integration** (Apple/Google sandbox + receipt validation). Operator License unlock — real store product replacing Phase 8 stub. Stage 4 closeout checklist: (1) replace `[P9-STUB]` purchase handler in `UpgradeScreen.tsx` `handlePurchase` with real IAP call (grep: P9-STUB); (2) remove `[P9-DIAG]` RESET OPERATOR LICENSE button from `SettingsScreen.tsx` (grep: P9-DIAG).
 ✅ **AdMob integration.** Rewarded ad SDK. Wire revive ad and pre-run buff ad touchpoints. Shipped 2026-05-27 (6fd9e8c, e5deebe, 6bb8d4b, 7774642, c255a66, 3aca04b). Test ad unit IDs in place — swap to real IDs at ship prep (see Ship prep section below).
 - **Entitlement caching.**
 - **Ad network daily-limit and no-fill UX research.** Verify whether any app-imposed cap is needed; design the no-fill button state for when the ad network returns no fill. Phase 9 research item, not a blocker.
-- **Operator License upgrade screen (design locked 2026-05-27, implements in Phase 9 with real IAP).** Reached via UPGRADE button on main menu (currently disabled stub).
-  - Headline: BECOME AN OPERATOR
-  - Subhead: One-time purchase — $4.99 (price locked Phase 9 Session 2; strategy doc §9 updated)
-  - Visual: side-by-side bonus comparison (Free $1,000/day vs. Operator $5,000/day)
-  - Supporting copy: "No ads, no subscriptions, no recurring charges. Your purchase supports an indie developer and keeps this game ad-free forever."
+✅ **Operator License upgrade screen — shipped 2026-05-27** (d594b3b, 11cc170, e9b2216, 44d228d; full session history in progress-log.md Phase 9 Session 2). UPGRADE button on main menu routes to full-screen UpgradeScreen. PURCHASE button is `[P9-STUB]` — calls `setOperatorLicensed(true)` directly; Stage 4 replaces with real IAP receipt validation (grep: P9-STUB). IAP price locked at $4.99 USD. `[P9-DIAG]` RESET OPERATOR LICENSE button in SettingsScreen persists for IAP sandbox retesting — explicit Stage 4 closeout item (grep: P9-DIAG).
 
 ### Ship prep
 - **Real AdMob ID swap (ship prep gate — do before EAS production build).** Two locations, one commit: (1) `src/lib/monetization.ts` — `ADMOB_UNIT_IDS.rewardedAndroid` + `ADMOB_UNIT_IDS.rewardedIOS`; (2) `app.json` AdMob plugin config — `androidAppId` + `iosAppId` (marked `_phase9_todo`). Do not ship with test IDs.

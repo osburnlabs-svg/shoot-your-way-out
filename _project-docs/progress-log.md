@@ -2257,6 +2257,40 @@ Going forward: SDK integration prompts must include an explicit pre-review gate 
 
 ---
 
+### Phase 9 — Session 2 (2026-05-27)
+
+**Status:** Upgrade modal (BECOME AN OPERATOR) — implementation complete and verified. 5 commits.
+
+**Shipped this session:**
+
+- **d594b3b** — UpgradeScreen.tsx + App.tsx routing + MenuScreen UPGRADE wiring. New full-screen upgrade screen: BECOME AN OPERATOR headline (44pt gold VT323), asymmetric Free/$1K vs Operator/$5K day comparison cards, supporting copy, PURCHASE $4.99 button (DEPLOY button treatment). PURCHASE stub calls `setOperatorLicensed(true)` directly — Stage 4 replaces with real IAP (`[P9-STUB]`; grep: P9-STUB). App.tsx: `'upgrade'` Screen state, `isOperatorLicensed` state (read on mount), `purchaseMessage` state (separate from `bonusMessage` — avoids edge-case collision on same menu mount), full routing callbacks. MenuScreen UPGRADE stub View → conditional Pressable; hidden when licensed. Purchase confirmation toast "OPERATOR LICENSE ACTIVATED" via `purchaseMessage`.
+- **11cc170** — Toast background opaque. `rgba(10, 13, 8, 0.90)` → `palette.backgroundDark` (#0a0d08 fully opaque). Addresses money display bleed-through while toast is visible.
+- **e9b2216** — [P9-DIAG] reset helper restore. `[DIAG] RESET OPERATOR LICENSE` button at bottom of SettingsScreen (14pt, `#333` — unobtrusive on dark background). Calls `setOperatorLicensed(false)` then `onBack()`. `handleReturnFromSettings` in App.tsx re-reads `isOperatorLicensed` from persistence on every Settings return so UPGRADE button reappears without app restart. Helper was first added in erased commit c0a80b8 — this commit restores it after the hard reset (see narrative below).
+- **44d228d** — Toast render-order fix (actual bug fix). Toast `Animated.View` was rendered as a sibling *before* the content View in JSX. In RN, later siblings paint over earlier ones — the money display was compositing on top of the toast regardless of background color or width. Moving the toast to render after the content View in the tree gives correct paint order without z-index.
+- **fa02846** — IAP price lock at $4.99 (docs only). strategy-monetization-v1.md §9 item 1 closed; pending-work-inventory.md price references updated.
+
+**Erased attempts (not in current git history):**
+
+Two toast fix attempts were made and erased via `git reset --hard d594b3b` before the correct fix landed. They are not in the current git log and cannot be referenced from normal git operations. Noted here for narrative completeness only:
+- `c0a80b8` (erased) — `maxWidth: '84%'` on `toastText` directly + [P9-DIAG] helper first added. Toast fix did not work: RN `Text` nodes receive an unconstrained measurement pass when the parent uses `alignItems: 'center'`; `maxWidth` is not enforced in that context.
+- `bcfbd7d` (erased) — `maxWidth: '84%'` moved to a wrapping `View`. Also did not produce intended wrap behavior on device. Opaque background attempted next before the actual root cause was identified.
+
+Both addressed the wrong root cause. The actual issue — render order — was identified in a no-code diagnostic step (read the JSX tree, check sibling paint order) before the correct fix shipped.
+
+**Device-verified:** Upgrade screen renders correctly (BECOME AN OPERATOR headline, asymmetric comparison cards, PURCHASE $4.99 button). UPGRADE menu button hides when Operator owned; reappears after [P9-DIAG] reset (Settings → [DIAG] RESET → return to menu). Purchase toast "OPERATOR LICENSE ACTIVATED" displays cleanly with no money display bleed-through. All three toast types (daily bonus free, daily bonus operator, purchase confirmation) use consistent opaque styling and correct paint order.
+
+**Working norm reinforcement — diagnosis before retry on visual bugs.**
+Stage 3 included a four-attempt cycle on the purchase toast colliding with the money display. Three attempts (maxWidth on Text, maxWidth on View wrapper, opaque background) failed because all addressed the wrong root cause. The actual root cause was JSX render order — the money display was a later sibling of the toast, painting on top regardless of the toast's width or opacity.
+
+When a fix doesn't work, stepping back to diagnose root cause beats retrying the same class of fix with slight variations. A no-code inspection step surfaced the render-order issue and produced the correct fix in a single commit. Retrying width/wrap/opacity for a fourth attempt would have continued burning cycles without touching the actual bug.
+
+This reinforces the existing "don't stack fixes on a broken fix" norm from Phase 8. Refinement: when a fix doesn't work, diagnosis precedes retry. Mo's "let's rethink" instinct broke the loop; codifying the pattern so future-CC and future-Mo apply it earlier.
+
+**Open items carried into Phase 9 Session 3 (Stage 4 — IAP skeleton):**
+- `[P9-DIAG]` RESET OPERATOR LICENSE button in SettingsScreen.tsx persists through Stage 4 for IAP sandbox retesting. Removal is an explicit Stage 4 closeout item (grep: P9-DIAG).
+
+---
+
 ## Decisions Log
 
 Major decisions made during development that override or clarify the v3 doc.
