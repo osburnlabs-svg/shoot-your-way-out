@@ -15,17 +15,19 @@ import LoadingScreen from './screens/LoadingScreen';
 import GameScreen from './screens/GameScreen';
 import FleaMarketScreen from './screens/FleaMarketScreen';
 import SettingsScreen from './screens/SettingsScreen';
+import UpgradeScreen from './screens/UpgradeScreen';
 import { persistence } from './lib/persistence';
 import { getTodayKey } from './lib/fleaMarket';
 import { audioEngine } from './lib/audioEngine';
 import { initializeAdsSdk } from './lib/monetization';
 import type { SkillId } from './data/skills';
 
-// Screen state machine — Phase 8 routing.
+// Screen state machine — Phase 9 routing.
 // Boot → MenuScreen → LoadingScreen (countdown) → GameScreen.
 // MenuScreen → FleaMarketScreen → MenuScreen (back, money refreshed).
 // MenuScreen → SettingsScreen → MenuScreen (back).
-type Screen = 'menu' | 'loading' | 'game' | 'flea_market' | 'settings';
+// MenuScreen → UpgradeScreen → MenuScreen (back or purchase).
+type Screen = 'menu' | 'loading' | 'game' | 'flea_market' | 'settings' | 'upgrade';
 
 export default function App() {
   const [fontsLoaded, fontError] = useFonts({
@@ -33,8 +35,10 @@ export default function App() {
   });
   const [screen, setScreen] = useState<Screen>('menu');
   const [persistedMoney, setPersistedMoney] = useState(0);
+  const [isOperatorLicensed, setIsOperatorLicensed] = useState(false);
   const [starterSkills, setStarterSkills] = useState<SkillId[]>([]);
   const [bonusMessage, setBonusMessage] = useState<string | null>(null);
+  const [purchaseMessage, setPurchaseMessage] = useState<string | null>(null);
   // Gates music routing until persisted volumes are loaded into the engine.
   // Without this, playMusic fires on mount before init() resolves, so createAsync
   // receives the default _musicVol instead of the persisted value.
@@ -42,17 +46,18 @@ export default function App() {
 
   useEffect(() => {
     persistence.getMoney().then(setPersistedMoney);
+    persistence.isOperatorLicensed().then(setIsOperatorLicensed);
     persistence.getSettings()
       .then(s => audioEngine.init(s.music_volume, s.sfx_volume))
       .then(() => setAudioReady(true));
     initializeAdsSdk(); // fire-and-forget — no UI gates on SDK init
   }, []);
 
-  // Route music on screen transitions. flea_market shares the menu loop.
+  // Route music on screen transitions. flea_market, upgrade, settings all share the menu loop.
   // Depends on audioReady so the initial 'menu' routing fires after volumes are set.
   useEffect(() => {
     if (!audioReady) return;
-    if (screen === 'menu' || screen === 'flea_market') {
+    if (screen === 'menu' || screen === 'flea_market' || screen === 'upgrade') {
       audioEngine.playMusic('menu');
     } else if (screen === 'game') {
       audioEngine.playMusic('combat');
@@ -62,9 +67,11 @@ export default function App() {
   }, [screen, audioReady]);
 
   // Daily bonus auto-claim: fires on every menu mount, silently exits if already claimed today.
+  // Also clears transient toast messages when leaving the menu.
   useEffect(() => {
     if (screen !== 'menu') {
       setBonusMessage(null);
+      setPurchaseMessage(null);
       return;
     }
     let active = true;
@@ -90,6 +97,7 @@ export default function App() {
   }, [screen]);
 
   const handleBonusDismissed = useCallback(() => setBonusMessage(null), []);
+  const handlePurchaseDismissed = useCallback(() => setPurchaseMessage(null), []);
 
   const handleOpenFleaMarket = useCallback(() => {
     setScreen('flea_market');
@@ -99,6 +107,10 @@ export default function App() {
     setScreen('settings');
   }, []);
 
+  const handleOpenUpgrade = useCallback(() => {
+    setScreen('upgrade');
+  }, []);
+
   const handleReturnFromSettings = useCallback(() => {
     setScreen('menu');
   }, []);
@@ -106,6 +118,16 @@ export default function App() {
   const handleReturnFromFleaMarket = useCallback(async () => {
     const total = await persistence.getMoney();
     setPersistedMoney(total);
+    setScreen('menu');
+  }, []);
+
+  const handleReturnFromUpgrade = useCallback(() => {
+    setScreen('menu');
+  }, []);
+
+  const handlePurchasedFromUpgrade = useCallback(() => {
+    setIsOperatorLicensed(true);
+    setPurchaseMessage('OPERATOR LICENSE ACTIVATED');
     setScreen('menu');
   }, []);
 
@@ -145,16 +167,23 @@ export default function App() {
           <MenuScreen
             onDeploy={handleDeploy}
             onFleaMarket={handleOpenFleaMarket}
+            onUpgrade={handleOpenUpgrade}
             onSettings={handleOpenSettings}
             money={persistedMoney}
+            isOperatorLicensed={isOperatorLicensed}
             bonusMessage={bonusMessage}
             onBonusDismissed={handleBonusDismissed}
+            purchaseMessage={purchaseMessage}
+            onPurchaseDismissed={handlePurchaseDismissed}
           />
         )}
         {screen === 'loading' && <LoadingScreen onComplete={() => setScreen('game')} />}
         {screen === 'game' && <GameScreen onReturnToMenu={handleReturnToMenu} starterSkills={starterSkills} />}
         {screen === 'flea_market' && <FleaMarketScreen onBack={handleReturnFromFleaMarket} />}
         {screen === 'settings' && <SettingsScreen onBack={handleReturnFromSettings} />}
+        {screen === 'upgrade' && (
+          <UpgradeScreen onBack={handleReturnFromUpgrade} onPurchased={handlePurchasedFromUpgrade} />
+        )}
       </GestureHandlerRootView>
     </SafeAreaProvider>
   );

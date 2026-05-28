@@ -6,27 +6,36 @@ import { palette, PIXEL_FONT_FAMILY } from '../data/theme';
 type Props = {
   onDeploy: () => void;
   onFleaMarket: () => void;
+  onUpgrade: () => void;
   onSettings: () => void;
   money: number;
+  isOperatorLicensed: boolean;
   bonusMessage: string | null;
   onBonusDismissed: () => void;
+  purchaseMessage: string | null;
+  onPurchaseDismissed: () => void;
 };
 
-export default function MenuScreen({ onDeploy, onFleaMarket, onSettings, money, bonusMessage, onBonusDismissed }: Props) {
+export default function MenuScreen({ onDeploy, onFleaMarket, onUpgrade, onSettings, money, isOperatorLicensed, bonusMessage, onBonusDismissed, purchaseMessage, onPurchaseDismissed }: Props) {
   const insets = useSafeAreaInsets();
   const toastOpacity = useRef(new Animated.Value(0)).current;
 
+  // Purchase message takes precedence over bonus message when both are set.
+  const toastMessage = purchaseMessage ?? bonusMessage;
+  const dismissRef = useRef<() => void>(() => {});
+  dismissRef.current = purchaseMessage ? onPurchaseDismissed : onBonusDismissed;
+
   useEffect(() => {
-    if (!bonusMessage) return;
+    if (!toastMessage) return;
     toastOpacity.setValue(0);
     const anim = Animated.sequence([
       Animated.timing(toastOpacity, { toValue: 1, duration: 200, useNativeDriver: true }),
       Animated.delay(4500),
       Animated.timing(toastOpacity, { toValue: 0, duration: 500, useNativeDriver: true }),
     ]);
-    anim.start(() => onBonusDismissed());
+    anim.start(() => dismissRef.current());
     return () => anim.stop();
-  }, [bonusMessage, onBonusDismissed]);
+  }, [toastMessage]);
 
   return (
     <View style={styles.root}>
@@ -36,9 +45,9 @@ export default function MenuScreen({ onDeploy, onFleaMarket, onSettings, money, 
         resizeMode="cover"
       />
 
-      {bonusMessage ? (
+      {toastMessage ? (
         <Animated.View style={[styles.toast, { top: insets.top, opacity: toastOpacity }]}>
-          <Text style={styles.toastText}>{bonusMessage}</Text>
+          <Text style={styles.toastText}>{toastMessage}</Text>
         </Animated.View>
       ) : null}
 
@@ -71,9 +80,14 @@ export default function MenuScreen({ onDeploy, onFleaMarket, onSettings, money, 
             <Text style={styles.fleaMarketBtnText}>FLEA MARKET</Text>
           </Pressable>
 
-          <View style={[styles.stubBtn, styles.disabled]}>
-            <Text style={styles.stubText}>UPGRADE</Text>
-          </View>
+          {!isOperatorLicensed && (
+            <Pressable
+              style={({ pressed }) => [styles.fleaMarketBtn, pressed && styles.fleaMarketBtnPressed]}
+              onPress={onUpgrade}
+            >
+              <Text style={styles.fleaMarketBtnText}>UPGRADE</Text>
+            </Pressable>
+          )}
 
           <Pressable
             style={({ pressed }) => [styles.fleaMarketBtn, pressed && styles.fleaMarketBtnPressed]}
@@ -132,24 +146,6 @@ const styles = StyleSheet.create({
     fontSize: 32,
     color: palette.backgroundDark,
     letterSpacing: 2,
-  },
-  stubBtn: {
-    height: 52,
-    backgroundColor: 'rgba(10, 13, 8, 0.6)',
-    borderRadius: 4,
-    borderWidth: 1,
-    borderColor: '#3a3d38',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  disabled: {
-    opacity: 0.5,
-  },
-  stubText: {
-    fontFamily: PIXEL_FONT_FAMILY,
-    fontSize: 24,
-    color: '#888888',
-    letterSpacing: 1,
   },
   fleaMarketBtn: {
     height: 52,
