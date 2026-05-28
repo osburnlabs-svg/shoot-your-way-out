@@ -35,7 +35,7 @@ Status legend:
 | 6 — Audio + atmospheric effects | ⚪ | | | | |
 | 7 — UI + persistence + analytics | ⚪ | | | | |
 | 8 — Helicopter boss + hazards | ⚪ | | | | |
-| 9 — Monetization Wiring + Ship Prep | 🟡 In Progress | 2026-05-27 | | | AdMob rewarded ads wired (Session 1). Upgrade modal shipped (Session 2). IAP skeleton (expo-iap 4.3.1) wired — Stage 4 complete (Session 3). |
+| 9 — Monetization Wiring + Ship Prep | 🟡 In Progress | 2026-05-27 | | | AdMob rewarded ads wired (Session 1). Upgrade modal shipped (Session 2). IAP skeleton (expo-iap 4.3.1) wired — Stage 4 complete (Session 3). Sustained-movement stutter resolved — Skia 2.6.4 bump — Stage 5 complete (Session 4). |
 
 ---
 
@@ -2329,6 +2329,56 @@ This is the second consecutive Phase 9 session where the "verify API surface aga
 
 **`[P9-DIAG]` status at Stage 4 close:**
 `[P9-DIAG]` RESET OPERATOR LICENSE button remains in SettingsScreen.tsx — deferred to stage 7 removal. Original Stage 4 closeout checklist listed it as a Stage 4 item; after implementation the appropriate removal window is confirmed as stage 7 (the button is needed for full sandbox-cycle testing with real developer accounts). Active grep target: `grep: P9-DIAG`. `[P9-STUB]` is confirmed gone — only `[P9-DIAG]` remains.
+
+---
+
+### Phase 9 — Session 4 (2026-05-28)
+
+**Status:** Stage 5 complete — sustained-movement stutter resolved. Skia 2.6.4 bump confirmed as the permanent fix.
+
+**Shipped (2 permanent commits):**
+
+- **778626a** — `@shopify/react-native-skia` 2.2.12 → 2.6.4. Originally committed as `[P9-DIAG]` test; Mo confirmed on device that the stutter is fully resolved, including the helicopter flyby worst-case scenario. The `[P9-DIAG]` subject marker in 778626a is superseded by this closeout — the test became the permanent fix. No force-push needed.
+- **4443d2a** — Regenerated `package-lock.json` without `--legacy-peer-deps`. Required for EAS strict `npm ci`. Root cause: `react-native-worklets@0.8.3` declares `@react-native/metro-config: "*"` as a peer dep; npm resolves `"*"` to latest (0.85.3 at build time), pulling in 5 sibling `@react-native/0.85.3` internal packages. Prior lockfiles generated with `--legacy-peer-deps` silently suppressed this. `react-native` itself remains at 0.81.5 — the 0.85.3 packages are nested peer dep installs, isolated from the runtime. See post-launch monitoring note in pending-work-inventory.md for the latent drift risk.
+- **[this commit]** — Phase 9 Session 4 doc closeout.
+
+**Verified on device:** Sustained unidirectional movement no longer stutters. Helicopter flyby — previously the worst-case stutter scenario — also fully resolved. Mo's perceptual confirmation on device after EAS dev client build.
+
+**Diagnostic chain — 7 hypotheses systematically eliminated before the fix was found:**
+
+1. **Round 0: 100ms timer body** — `performance.now()` instrumentation showed zero >16ms ticks across 5+ min dense run. The setInterval callback itself was never the cost.
+2. **Rounds 1–2: Frame-time deltas + heli/spawn context** — `useFrameCallback` worklet instrumented with >50ms then >36ms thresholds. Two real hitches captured (~67ms) at elapsed ~89s and ~110s. Helicopter spawn correlation ruled out; audio ruled out (stutter persisted with SFX muted).
+3. **A/B Test 1: Framerate budget** — `TICK_INTERVAL_MS` 33.333 → 41.667 (24fps cap); no improvement. Budget is not the gate.
+4. **A/B Test 2: Enemy render + slot count** — `ENEMY_SOFT_CAP` 50 → 30 (40% fewer render loop iterations per frame); no improvement. Enemy draw count is not the gate.
+5. **A/B Test 3: Tile atlas rebuild** — Tile atlas streaming replaced with full-map precompute at mount (tile atlas rebuild test — reset-away diagnostic commit); no improvement. The ~4 Hz useMemo rebuild during sustained movement was ruled out.
+6. **A/B Test 4: Prop rendering** — Entire prop render block disabled (prop rendering disable test — reset-away diagnostic commit); no improvement. 25–35 `drawAtlas` calls per frame covering 150–270 world-space instances ruled out.
+7. **A/B Test 5: Prop collision + rendering** — Prop arrays emptied from `buildCollisionData` AND render block disabled (prop collision disable test — reset-away diagnostic commit). Both per-frame paths cleared simultaneously; stutter persisted. Props conclusively ruled out.
+
+**Pivot:** After 7 hypotheses failed, JS instrumentation was identified as an unreliable proxy for the felt symptom. Shifted to architecture audit + Skia changelog research.
+
+**Architecture audit:** Project confirmed on New Architecture (`newArchEnabled: true`), Skia v2 (immutable display list), Reanimated 4, Hermes — current intended production stack at RN 0.81 / Expo SDK 54. No architectural lag.
+
+**Skia changelog audit (v2.3–v2.6):** Found a cluster of concurrency/race-condition fixes matching the symptom precisely — all live in the native reconciler layer, invisible to JS instrumentation, fire during sustained scene graph updates:
+- v2.3.7 — race condition in RuntimeAwareCache + scene graph destructor
+- v2.3.11 — **severe concurrency issue in the reconciler** (#3529)
+- v2.3.13 — potential deadlock in Android main thread dispatcher (#3538)
+- v2.4.7 — race condition in the renderer (#3588)
+
+Project was on Skia 2.2.12, behind all four fixes. Bumped directly to 2.6.4 (all four + accumulated improvements through v2.5.x). No API changes required — `useImage`, `Atlas`, `Canvas`, `Image`, `Group`, `RSXform`, `sampling` props all stable across 2.3.x–2.6.x.
+
+**Build recovery:** Initial EAS build failed — `--legacy-peer-deps` lockfile suppressed the worklets wildcard peer dep resolution. Regenerated with clean `npm install`; second build succeeded.
+
+**Working norm reinforcements captured this session:**
+
+- *"The instrumentation measures what it measures, not what you feel."* Frame-time deltas, timer logs, and game-state snapshots are proxies for perceived stutter, not stutter itself. Rounds 1–2 produced hitch data that didn't cleanly correlate with Mo's felt symptom. Future investigations should explicitly validate whether the chosen instrumentation correlates with the felt symptom before chaining multiple rounds against it.
+- *"When a fix doesn't work, rethink root cause, don't retry the same fix class."* Reaffirmed from Phase 8 toast bug. Applied here: after 7 JS-side diagnostics ran out, pivoted to architecture audit rather than trying another instrumentation angle.
+- *"SDK API compatibility claims are not sufficient — verify transitive peer-dep behavior under strict `npm ci`."* Skia changelog confirmed RN ≥ 0.78 with no API changes; the actual EAS failure came from a transitive wildcard peer dep (`react-native-worklets@0.8.3` → `@react-native/metro-config: "*"`) that changelog review cannot surface. Always regenerate lockfile with clean `npm install` (not `--legacy-peer-deps`) after any `package.json` change.
+- *"Phase scope can shift mid-stage — accommodate it cleanly."* Stage 5 began under "investigate, don't refactor" locked scope. Mid-stage Mo confirmed the game is feature-complete and the investigation itself became ship-prep work. Future stages may similarly pivot; the method should allow it without friction.
+
+**Open items carried into Phase 9 Session 5 (Stage 6: ship prep):**
+
+- Remove `[P9-DIAG]` RESET OPERATOR LICENSE button from `SettingsScreen.tsx` — persists through Stage 4 for sandbox testing; remove at Stage 7 closeout (grep: `P9-DIAG`)
+- All Stage 6 ship prep items per pending-work-inventory.md
 
 ---
 
