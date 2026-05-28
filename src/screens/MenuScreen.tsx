@@ -45,12 +45,6 @@ export default function MenuScreen({ onDeploy, onFleaMarket, onUpgrade, onSettin
         resizeMode="cover"
       />
 
-      {toastMessage ? (
-        <Animated.View style={[styles.toast, { top: insets.top, opacity: toastOpacity }]}>
-          <Text style={styles.toastText}>{toastMessage}</Text>
-        </Animated.View>
-      ) : null}
-
       <View
         style={[
           styles.content,
@@ -97,6 +91,12 @@ export default function MenuScreen({ onDeploy, onFleaMarket, onUpgrade, onSettin
           </Pressable>
         </View>
       </View>
+
+      {toastMessage ? (
+        <Animated.View style={[styles.toast, { top: insets.top, opacity: toastOpacity }]}>
+          <Text style={styles.toastText}>{toastMessage}</Text>
+        </Animated.View>
+      ) : null}
     </View>
   );
 }
