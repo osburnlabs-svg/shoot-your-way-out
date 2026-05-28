@@ -111,7 +111,9 @@ export default function App() {
     setScreen('upgrade');
   }, []);
 
-  const handleReturnFromSettings = useCallback(() => {
+  const handleReturnFromSettings = useCallback(async () => {
+    const licensed = await persistence.isOperatorLicensed();
+    setIsOperatorLicensed(licensed);
     setScreen('menu');
   }, []);
 

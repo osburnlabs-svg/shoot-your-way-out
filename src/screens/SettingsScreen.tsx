@@ -179,6 +179,17 @@ export default function SettingsScreen({ onBack }: Props) {
           <Text style={styles.creditsTitle}>CREDITS</Text>
           <Text style={styles.creditsBody}>{PIXABAY_ATTRIBUTION}</Text>
         </View>
+
+        {/* [P9-DIAG] Remove at Stage 4 closeout after IAP sandbox testing is done. grep: P9-DIAG */}
+        <Pressable
+          style={styles.diagBtn}
+          onPress={async () => {
+            await persistence.setOperatorLicensed(false);
+            onBack();
+          }}
+        >
+          <Text style={styles.diagText}>[DIAG] RESET OPERATOR LICENSE</Text>
+        </Pressable>
       </View>
     </View>
   );
@@ -233,5 +244,16 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#444',
     lineHeight: 22,
+  },
+  // [P9-DIAG] Remove at Stage 4 closeout. grep: P9-DIAG
+  diagBtn: {
+    marginTop: 16,
+    paddingVertical: 8,
+    alignItems: 'center',
+  },
+  diagText: {
+    fontFamily: PIXEL_FONT_FAMILY,
+    fontSize: 14,
+    color: '#333',
   },
 });
