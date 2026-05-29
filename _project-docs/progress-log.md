@@ -35,7 +35,7 @@ Status legend:
 | 6 — Audio + atmospheric effects | ⚪ | | | | |
 | 7 — UI + persistence + analytics | ⚪ | | | | |
 | 8 — Helicopter boss + hazards | ⚪ | | | | |
-| 9 — Monetization Wiring + Ship Prep | 🟡 In Progress | 2026-05-27 | | | AdMob rewarded ads wired (Session 1). Upgrade modal shipped (Session 2). IAP skeleton (expo-iap 4.3.1) wired — Stage 4 complete (Session 3). Sustained-movement stutter resolved — Skia 2.6.4 bump — Stage 5 complete (Session 4). |
+| 9 — Monetization Wiring + Ship Prep | 🟡 In Progress | 2026-05-27 | | | AdMob rewarded ads wired (Session 1). Upgrade modal shipped (Session 2). IAP skeleton (expo-iap 4.3.1) wired — Stage 4 complete (Session 3). Sustained-movement stutter resolved — Skia 2.6.4 bump — Stage 5 complete (Session 4). Ship-prep configs, assets, slider migration, EAS production profile — Stage 6 complete (Session 5). |
 
 ---
 
@@ -2379,6 +2379,73 @@ Project was on Skia 2.2.12, behind all four fixes. Bumped directly to 2.6.4 (all
 
 - Remove `[P9-DIAG]` RESET OPERATOR LICENSE button from `SettingsScreen.tsx` — persists through Stage 4 for sandbox testing; remove at Stage 7 closeout (grep: `P9-DIAG`)
 - All Stage 6 ship prep items per pending-work-inventory.md
+
+---
+
+### Phase 9 — Session 5 (2026-05-28)
+
+**Status:** Stage 6 complete — ship-prep configs, assets, slider migration, and EAS production profile all committed. Audio migration attempted and reverted.
+
+**Shipped (7 permanent commits + this doc commit):**
+
+- **cbaecca** — `expo-splash-screen` installed, `app.json` wired with icon/splash/adaptive icon paths and `#000000` backgrounds. Required because prior `app.json` referenced `./assets/AppIcon.png` and `./assets/SplashScreen.png` but neither the package nor the images were committed. Splash screen now active on Android.
+- **a5cc80a** — `expo-av` → `expo-audio` migration. **Attempted; reverted in deea2b3.** See audio migration narrative below.
+- **b271e31** — Custom `PanResponder` volume slider replaced with `@react-native-community/slider` (native slider component). Removes ~60 lines of PanResponder gesture state machinery; native Slider handles touch tracking. `[P9-DIAG]` RESET OPERATOR LICENSE button retained — still needed for Stage 7 sandbox testing.
+- **fd49f90** — Pinned `expo-asset@12.0.13` and `expo-constants@18.0.13` explicitly in `package.json`. Fix for `NoClassDefFoundError: AnyTypeCache` crash on launch. See crash root cause narrative below.
+- **9b17958** — `assets/AppIcon.png` and `assets/SplashScreen.png` committed to git. Both were untracked despite `cbaecca` referencing them in `app.json` — the asset files never followed the wiring commit. Square `SplashScreen.png` used to fill Android 12's 288×288dp icon area cleanly.
+- **deea2b3** — Revert of a5cc80a. Conflict-resolved revert: kept `@react-native-community/slider`, `expo-asset` pin, `expo-constants` pin, and asset files; reverted only `expo-audio` entry, `expo-av` re-addition, and `app.json` `expo-audio` plugin removal. `audioEngine.ts` restored to expo-av implementation.
+- **5e1865f** — `eas.json` production profile configured for store submission: `distribution: "store"` (explicit), `android.buildType: "app-bundle"` (Google Play requires AAB for new submissions), `ios.credentialsSource: "auto"` (EAS manages Apple signing when Apple Developer account exists). `submit.production` left as `{}` — EAS submit prompts interactively for credentials not yet available.
+- **[this commit]** — Stage 6 doc closeout.
+
+---
+
+**Audio migration attempt + revert narrative**
+
+The expo-av → expo-audio migration (a5cc80a) was completed, the `NoClassDefFoundError` crash was fixed by pinning version dependencies, and an EAS dev build succeeded. However, two audio regressions were found on device:
+
+1. **SFX silent at ~20–30s into a run.** Timing correlated with the first `LevelUpModal` open — the point where `stopAllSFX()` is called. expo-audio's `AudioPlayer` is a `SharedObject<AudioEvents>` from expo-modules-core. `stopAllSFX()` calls `player.remove()` on all active players. Queued `playbackStatusUpdate` events in the JS event loop fire after remove and call `player.remove()` a second time on the already-released SharedObject. Unlike expo-av's `.catch(() => {})` chains that silently swallowed every error, expo-audio has no equivalent protection — the unhandled double-remove could corrupt native audio event dispatch on Android.
+
+2. **All audio silent after player death.** On the "return to menu" path: `stopAll()` was implemented to stop only `_currentMusic`, never touching `_activeSFX`. Players that were added to `_activeSFX` but never cleaned up (due to the broken event dispatch from regression 1) accumulated. After enough accumulation, `createAudioPlayer` for the menu music failed silently — system audio instance limit hit.
+
+**Decision: revert rather than fix-forward.** expo-av was working correctly before the migration. Both regressions are structural — fixing them requires deeper changes to cleanup lifecycle and error handling across the engine. expo-av's async `.then()/.catch()` pattern provides implicit error isolation that expo-audio's synchronous SharedObject model does not. The migration cost exceeded the benefit at this stage.
+
+The expo-av deprecation warning remains (SDK 54 targets expo-audio as the long-term replacement). This is a deferred cleanup item for a future native rebuild window, not a ship blocker.
+
+---
+
+**Splash "very small" root cause**
+
+After `cbaecca` + `9b17958` landed, the splash appeared as a small portrait image in the center of the screen rather than filling it. Root cause: expo-splash-screen v31.x uses the Android 12 SplashScreen API (`Theme.SplashScreen` + `windowSplashScreenAnimatedIcon`), which constrains the splash drawable to a 288×288dp circular icon area. The legacy `expo_splash_screen_resize_mode` string in `strings.xml` is vestigial — it is not read by `SplashScreenManager.kt` at runtime in v31. Additionally, `getAndroidSplashConfig.js` hardcodes `imageWidth: 200` in the config path used when no explicit `imageWidth` is set, producing a ~93×200dp visible portrait image within the 288dp constraint.
+
+**Fix:** Mo replaced `assets/SplashScreen.png` with a square image. A square image fills the 288dp icon area without wasted space. No code changes needed. No app.json changes needed.
+
+---
+
+**`NoClassDefFoundError: AnyTypeCache` crash root cause + fix**
+
+After a5cc80a added `expo-audio@1.1.1`, the EAS dev build crashed at launch with `NoClassDefFoundError: AnyTypeCache`. Root cause: `expo-audio@1.1.1` declares `"expo-asset": "*"` as a peer dependency. npm 7+ resolves `"*"` to the latest published version rather than the installed SDK 54-compatible version. At build time this resolved to `expo-asset@56.0.15` (SDK 56). That version in turn pulled `expo-constants@56.0.16`. Both reference `AnyTypeCache`, a class present in newer `expo-modules-core` versions but absent from SDK 54's `expo-modules-core@3.0.30`.
+
+**Fix:** Explicit version pins `"expo-asset": "12.0.13"` and `"expo-constants": "18.0.13"` added to root `package.json` `dependencies`. These are the SDK 54-canonical versions confirmed in `node_modules/expo/bundledNativeModules.json`.
+
+---
+
+**Working norm reinforcements captured this session**
+
+- *"Wildcard peer deps (`"*"`) in native packages silently pull incompatible versions under npm 7+."* This is now the second consecutive Phase 9 session where a `"*"` in peerDependencies caused a contamination chain. Session 4: `react-native-worklets@0.8.3` declared `"@react-native/metro-config": "*"`, pulling 0.85.3 internal packages into the lockfile. Session 5: `expo-audio@1.1.1` declared `"expo-asset": "*"`, pulling SDK 56 packages and causing a `NoClassDefFoundError` crash. **Working norm:** after any native package install that introduces a `"*"` peer dep, immediately audit with `npm why <package>` to trace the resolution chain and add explicit version pins in `package.json` before the first EAS build.
+
+- *"expo-audio's synchronous SharedObject model requires explicit double-remove guards that expo-av's async `.catch(() => {})` chain provided implicitly."* If the expo-audio migration is retried in a future native rebuild window, `stopAllSFX()` must guard against re-entrant removes (flag or set-clear-before-iterate pattern), and `stopAll()` must clear `_activeSFX` alongside `_currentMusic`.
+
+---
+
+**Open items carried into Phase 9 Session 6 (Stage 7: store submission prep)**
+
+Stage 7 checklist:
+
+- [ ] **Real AdMob IDs** — replace test IDs in `app.json` plugin (`androidAppId`, `iosAppId`) and unit IDs in `lib/monetization.ts`. Search targets: `_phase9_todo` in `app.json`; `// TODO: Replace in Phase 9` in `monetization.ts`.
+- [ ] **Remove `[P9-DIAG]` RESET OPERATOR LICENSE button** from `SettingsScreen.tsx` (grep: `P9-DIAG`). Retained through Stage 6 for sandbox testing; remove before production build.
+- [ ] **IAP sandbox testing** — configure product in Google Play Console (internal testing track), test full purchase and restore flows on device with a real Google test account.
+- [ ] **Closed test** — publish to Google Play internal testing track, confirm install from Play Store on device.
+- [ ] **Production submission** — `eas build --profile production --platform android` → `.aab`; upload to Google Play Console for production track review. iOS submission follows Apple Developer account + D-U-N-S enrollment (timeline TBD).
 
 ---
 
