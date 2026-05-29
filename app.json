@@ -46,8 +46,7 @@
             "kotlinVersion": "2.1.0"
           }
         }
-      ],
-      "expo-audio"
+      ]
     ],
     "extra": {
       "eas": {
