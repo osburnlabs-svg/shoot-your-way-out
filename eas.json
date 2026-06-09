@@ -21,7 +21,7 @@
         "buildType": "app-bundle"
       },
       "ios": {
-        "credentialsSource": "auto"
+        "credentialsSource": "remote"
       }
     }
   },

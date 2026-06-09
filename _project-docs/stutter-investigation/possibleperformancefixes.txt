@@ -1,0 +1,223 @@
+● I have all the data I need. Here is the ranked analysis.
+
+  ---
+  Phase 7 Late-Game Stutter Suspect Ranking
+
+  Key numbers established from code:
+  - ENEMY_SOFT_CAP = 50 (not 30 — more per-slot work than assumed)
+  - Sniper ramp: 45s → 120s, SNIPER_MAX_ACTIVE = 5
+  - EFFECT_ZONE_SLOT_COUNT = 20, PICKUP_SLOT_COUNT = 50, PROJECTILE_SLOT_COUNT = 30 — all fixed-cap sparse arrays
+  - Projectile game state array is dynamic (not sparse-null), bounded naturally by fire rate × flight time (in practice 1–8 bullets in flight at
+  once)
+
+  ---
+  1. 100ms setInterval React state fanout — entity occupancy scaling
+
+  Plausibility: High
+
+  The setInterval at GameCanvas.tsx:677 drives 20+ setState calls per tick. The core work inside scales with how many enemy slots are non-null:
+
+  - The per-slot loops reset and repopulate 50 slots for et/es/ef (type/status/frame) buffers. Each non-null slot computes getCurrentFrame(...) — a
+   time-calculation + modulo. Early game: mostly empty slots, fast. Late game: most of 50 slots occupied, nearly max work.
+  - After the loop, all 20+ setState calls trigger a React reconcile. React 18 auto-batches these into one re-render per interval, but that single
+  re-render is heavier late-game: more conditional <Group> branches in JSX evaluate to non-null (active enemies render sprite Groups, active
+  pickups render, active zones render), growing the reconcile tree.
+
+  Time-correlated: YES — spawn rate maxes around 60s, but enemy kill rate and respawn churn means more simultaneously alive enemies as combat
+  density peaks late-game.
+
+  Asset-dense areas: YES — tight geometry pins enemies near the player longer (harder to dodge), inflating occupancy. Player also can't safely loop
+   to collect pickups, filling pickup slots faster.
+
+  Evidence: GameCanvas.tsx:678–893. The for (let i = 0; i < ENEMY_SOFT_CAP; i++) at line 733 is the primary cost driver.
+
+  Diagnostic difficulty: Easy. Bracket the setInterval body with performance.now(). Log average ms at minute 1 vs. minute 5. Should show clear
+  correlation if this is the cause.
+
+  ---
+  2. Sniper ramp producing qualitatively heavier per-tick simulation cost
+
+  Plausibility: Medium-High
+
+  Snipers ramp from 0 to SNIPER_MAX_ACTIVE = 5 between 45s and 120s. By minute 5, 5 snipers are consistently active. Snipers differ from scavs and
+  raiders in two ways grounded in the code:
+
+  - They fire at the player — SNIPER_FIRE_COOLDOWN_MS, SNIPER_FIRE_RANGE_PX are imported in enemyEngine.ts, so tickEnemies handles their shot
+  logic. Their projectiles enter the shared projectile array. More snipers → more active enemy projectiles per tick → more collision checks against
+   player and walls per tick.
+  - They prefer to stay at range rather than rush, which means they spend more ticks near walls and structures → more resolveAABB + resolveCircle
+  calls per enemy per tick in asset-dense areas.
+
+  Time-correlated: YES for the ramp window (45–120s). But at minute 5 the ramp is already complete and the cap is maintained, not growing. The
+  time-correlation here is "sniper presence is sustained late-game" rather than "sniper count is still increasing."
+
+  Asset-dense areas: YES — cover-seeking AI positions snipers near walls, amplifying collision cost.
+
+  Evidence: enemyEngine.ts:72–78 (sniper ratio function), gameConstants.ts:302–308 (SNIPER ramp constants).
+
+  Diagnostic difficulty: Medium. Add a sniper count read to the 100ms interval log and correlate with stutter events. Separately log projectile
+  array length per tick.
+
+  ---
+  3. Static prop collision resolution cost — asset-density amplifier
+
+  Plausibility: Medium (amplifier, not primary)
+
+  tickEnemies calls resolveAABB + resolveCircle for every alive, moving enemy each tick. The spatial grid has 144 cells at COLLISION_GRID_CELL_SIZE
+   = 500px. In asset-dense areas (buildings cluster barrels, watchtowers, vegetation), grid cells near structures can have more props per cell →
+  more AABB tests per entity per frame.
+
+  This factor is NOT time-correlated on its own — the static map doesn't change. But multiplied by enemy count: late-game 40–50 alive enemies in an
+   asset-dense area × higher prop density per grid cell = compounding. This is why the symptom is specifically in asset-dense areas and not open
+  ground.
+
+  Evidence: gameConstants.ts:167 (cell size), gameEngine.ts:687–692 (player collision resolution pair), enemyEngine.ts (each enemy's resolution
+  call).
+
+  Diagnostic difficulty: Medium. Profile collision resolution time by area. Compare an open-ground fight vs. building cluster at the same enemy
+  count.
+
+  ---
+  4. Reanimated UI-thread GC churn — baseline amplified by active entity count
+
+  Plausibility: Medium
+
+  Phase 5 characterized 36k–60k UI-thread object allocations/sec. The 10 intermediate GameState spreads per tick are the primary source. Spreads
+  copy field references, not array contents, so per-tick cost is roughly constant.
+
+  The time-correlated angle: late-game with 40–50 live enemies, each enemy object referenced from the non-null slots stays in the heap longer
+  (alive enemies don't get nulled). The live heap grows proportionally to occupancy. GC sweep time scales with live heap size, so GC pauses may be
+  slightly longer late-game even at the same 30fps tick rate.
+
+  The effect is marginal rather than step-change, but as a second-order contributor layered on top of suspect 1, it could push borderline-OK
+  performance over the stutter threshold.
+
+  Evidence: Pattern in gameEngine.ts:732–756 (10 intermediate states) + Phase 5 GC investigation.
+
+  Diagnostic difficulty: Medium. Xcode Instruments (UI thread) or Android Studio Profiler for GC pause duration distribution at minute 1 vs. minute
+   5.
+
+  ---
+  5. Pickup slot saturation — magnet math scaling
+
+  Plausibility: Low-Medium
+
+  tickPickups iterates all 50 pickup slots each tick. For each active pickup inside magnet range, it computes Math.sqrt(dx*dx + dy*dy), compares to
+   MAGNET_RANGE_PX, and applies velocity math. Late-game: higher kill rate → faster pickup spawn → slots filling toward 50.
+
+  Time-correlated: YES if kill rate consistently exceeds collection rate. In asset-dense areas where player is held in combat, uncollected money
+  piles up.
+
+  Bounded at 50, so worst case is constant (50 sqrt calls per tick), not unbounded. But the difference between 5 active pickups (minute 1) and 45
+  active pickups (minute 5) is ~9× more magnet math per tick.
+
+  Evidence: gameConstants.ts:226 (PICKUP_SLOT_COUNT = 50), pickupEngine.ts structure.
+
+  Diagnostic difficulty: Easy. Log state.pickups.filter(Boolean).length in the 100ms interval over time.
+
+  ---
+  6. Per-tick GameState spread allocation — constant baseline
+
+  Plausibility: Low
+
+  The 10 intermediate GameState objects created per tick (stateAfterPlayer, stateAfterEnemies, etc.) produce constant allocation regardless of run
+  time. Spreads copy field references; array lengths in GameState are all fixed-cap sparse. No mechanism causes the spread cost to grow over the
+  run.
+
+  This is background GC churn (already addressed in Phase 5 by the 30fps cap) and not a time-correlated suspect. Included for completeness; rule it
+   out.
+
+  Evidence: gameEngine.ts:732–756.
+
+  Diagnostic difficulty: N/A — ruled out as time-correlated suspect.
+
+  ---
+  7. Skill stack effect cost — getEffectiveStats
+
+  Plausibility: Very Low
+
+  getEffectiveStats iterates SKILL_IDS.length (constant, ~25 entries) with simple arithmetic per skill. More stacks late-game means slightly fewer
+  if (stacks === 0) continue short-circuits — the hot path runs more field checks. Cost increase is negligible: ≤25 multiplications regardless of
+  stacks, called once per tick.
+
+  Evidence: skills.ts:444–457.
+
+  Diagnostic difficulty: N/A — too cheap to matter.
+
+  ---
+  8. Projectile and effect zone accumulation — capped, no risk
+
+  Plausibility: Very Low
+
+  - Projectiles: dynamic array, bounded by fire rate × flight time. In practice 1–8 bullets in flight. Range-expiry cleanup in combatEngine.ts:221
+  is reliable.
+  - Effect zones: EFFECT_ZONE_SLOT_COUNT = 20, fixed sparse array. Duration-expiry cleanup at throwableEngine.ts:402. Silently drops new zones if
+  all 20 slots full.
+
+  Neither can accumulate unboundedly. No time-correlated growth mechanism.
+
+  Evidence: combatEngine.ts:216–236, throwableEngine.ts:373–406, gameConstants.ts:389 (EFFECT_ZONE_SLOT_COUNT = 20).
+
+  Diagnostic difficulty: N/A — architecture already prevents accumulation.
+
+  ---
+  Summary table
+
+  Rank: 1
+  Suspect: 100ms setInterval fanout (enemy slot occupancy + React reconcile)
+  Plausibility: High
+  Time-correlated: Yes
+  Asset-dense amplified: Yes
+  Diagnostic: Easy
+  ────────────────────────────────────────
+  Rank: 2
+  Suspect: Sniper ramp → heavier enemy projectile + collision load
+  Plausibility: Med-High
+  Time-correlated: Yes (sustained cap)
+  Asset-dense amplified: Yes
+  Diagnostic: Medium
+  ────────────────────────────────────────
+  Rank: 3
+  Suspect: Static prop collision density × late-game enemy count
+  Plausibility: Medium
+  Time-correlated: Amplifier only
+  Asset-dense amplified: Yes (primary)
+  Diagnostic: Medium
+  ────────────────────────────────────────
+  Rank: 4
+  Suspect: Reanimated UI-thread GC churn — live heap grows with occupancy
+  Plausibility: Medium
+  Time-correlated: Marginal
+  Asset-dense amplified: No
+  Diagnostic: Medium
+  ────────────────────────────────────────
+  Rank: 5
+  Suspect: Pickup slot saturation — magnet math per tick
+  Plausibility: Low-Med
+  Time-correlated: Yes
+  Asset-dense amplified: Yes
+  Diagnostic: Easy
+  ────────────────────────────────────────
+  Rank: 6
+  Suspect: GameState spread allocation baseline
+  Plausibility: Low
+  Time-correlated: No
+  Asset-dense amplified: No
+  Diagnostic: N/A
+  ────────────────────────────────────────
+  Rank: 7
+  Suspect: getEffectiveStats skill cost
+  Plausibility: Very Low
+  Time-correlated: No
+  Asset-dense amplified: No
+  Diagnostic: N/A
+  ────────────────────────────────────────
+  Rank: 8
+  Suspect: Projectile / effect zone accumulation
+  Plausibility: Very Low
+  Time-correlated: No
+  Asset-dense amplified: No
+  Diagnostic: N/A
+
+  If this warrants a future investigation session, the recommended first check is suspect 1 with a performance.now() bracket around the setInterval
+   body — it's low-effort and would either confirm the dominant cause or cleanly rule it out, redirecting to suspect 2.
