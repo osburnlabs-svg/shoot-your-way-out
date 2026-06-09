@@ -34,15 +34,15 @@ import {
 const OPERATOR_LICENSE_PRODUCT_ID = 'operator_license';
 
 // ─── Ad unit IDs ──────────────────────────────────────────────────────────────
-// Phase 9 dev — Google's official test IDs. Always serve test ads; safe to commit.
-// Ship prep: replace rewardedAndroid + rewardedIOS with real unit IDs from
-// Mo's AdMob console. Single file, two lines; no component code to touch.
-// Banner IDs are out-of-scope for v1 (rewarded only) — leave as placeholder.
+// Production IDs — Android live. iOS deferred (placeholder until iOS submission).
+// Banner out-of-scope for v1 — leave as placeholder.
 export const ADMOB_UNIT_IDS = {
-  rewardedAndroid: 'ca-app-pub-3940256099942544/5224354917',
-  rewardedIOS:     'ca-app-pub-3940256099942544/1712485313',
-  bannerAndroid:   'ca-app-pub-PLACEHOLDER/PLACEHOLDER',
-  bannerIOS:       'ca-app-pub-PLACEHOLDER/PLACEHOLDER',
+  fleaMarketBuffAndroid: 'ca-app-pub-7674915821859801/5369903445',
+  fleaMarketBuffIOS:     'ca-app-pub-PLACEHOLDER/PLACEHOLDER',
+  reviveAndroid:         'ca-app-pub-7674915821859801/8350078554',
+  reviveIOS:             'ca-app-pub-PLACEHOLDER/PLACEHOLDER',
+  bannerAndroid:         'ca-app-pub-PLACEHOLDER/PLACEHOLDER',
+  bannerIOS:             'ca-app-pub-PLACEHOLDER/PLACEHOLDER',
 };
 
 // ─── SDK bootstrap ────────────────────────────────────────────────────────────
@@ -68,7 +68,7 @@ export function initializeAdsSdk(): void {
  * Never rejects. All failure paths (including synchronous throws from RNGMA)
  * are caught and resolve false so callers can always safely await this.
  */
-export function showRewardedAd(): Promise<{ rewarded: boolean }> {
+export function showRewardedAd(placement: 'fleaMarketBuff' | 'revive'): Promise<{ rewarded: boolean }> {
   return new Promise((resolve) => {
     let settled = false;
     function settle(result: { rewarded: boolean }): void {
@@ -81,8 +81,8 @@ export function showRewardedAd(): Promise<{ rewarded: boolean }> {
 
     try {
       const adUnitId = Platform.OS === 'ios'
-        ? ADMOB_UNIT_IDS.rewardedIOS
-        : ADMOB_UNIT_IDS.rewardedAndroid;
+        ? (placement === 'fleaMarketBuff' ? ADMOB_UNIT_IDS.fleaMarketBuffIOS : ADMOB_UNIT_IDS.reviveIOS)
+        : (placement === 'fleaMarketBuff' ? ADMOB_UNIT_IDS.fleaMarketBuffAndroid : ADMOB_UNIT_IDS.reviveAndroid);
 
       const ad = RewardedAd.createForAdRequest(adUnitId);
 

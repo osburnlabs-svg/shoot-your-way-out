@@ -1483,7 +1483,7 @@ export default function GameCanvas({ width, height, onReturnToMenu, starterSkill
     const state = gameState.value;
     if (state.adRevivesUsed >= 1 || adReviveLoading) return;
     setAdReviveLoading(true);
-    const { rewarded } = await showRewardedAd();
+    const { rewarded } = await showRewardedAd('revive');
     if (!rewarded) {
       // User dismissed early or ad failed — no revive, re-enable button.
       setAdReviveLoading(false);

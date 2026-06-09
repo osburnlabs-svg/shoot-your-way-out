@@ -68,7 +68,7 @@ export default function FleaMarketScreen({ onBack }: Props) {
   const handleWatchAd = useCallback(async () => {
     if (pendingAdSkill !== null || adLoading) return;
     setAdLoading(true);
-    const { rewarded } = await showRewardedAd();
+    const { rewarded } = await showRewardedAd('fleaMarketBuff');
     if (!rewarded) {
       // User dismissed early or ad failed to load — no skill granted, re-enable button.
       setAdLoading(false);
