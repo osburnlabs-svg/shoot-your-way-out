@@ -33,8 +33,7 @@
       [
         "react-native-google-mobile-ads",
         {
-          "_phase9_todo": "Replace androidAppId and iosAppId with real values from AdMob console before Phase 9 build",
-          "androidAppId": "ca-app-pub-3940256099942544~3347511713",
+          "androidAppId": "ca-app-pub-7674915821859801~3869119518",
           "iosAppId": "ca-app-pub-3940256099942544~1458002511"
         }
       ],
